@@ -1,0 +1,55 @@
+{
+  "id": "punctuation-gate",
+  "name": "The Lone Stone Story of Throne Gate",
+  "biome": "candy-land",
+  "type": "fill-in",
+  "max_attempts": 0,
+  "description": "A stone gate with inscribed sentences and empty boxes. Fill in the correct punctuation.",
+  "punctuation_marks": ["em-dash", "period", "comma", "colon", "semicolon", "ellipsis", "interrobang", "exclamation", "hyphen"],
+  "sentences": [
+    {
+      "text": "There was once an ancient city—prospering and standing.",
+      "blanks": [
+        {"position": 26, "answer": "—", "options": ["—", ",", "."]},
+        {"position": 44, "answer": ".", "options": [".", ",", ";"]}
+      ]
+    },
+    {
+      "text": "It was ruled by a goddess, lacking her supernatural abilities.",
+      "blanks": [
+        {"position": 20, "answer": ",", "options": [",", ";", ":"], "note": "after 'goddess'"}
+      ]
+    },
+    {
+      "text": "The goddess reigns over the city with three key values: integrity, order, and consistency.",
+      "blanks": [
+        {"position": 44, "answer": ":", "options": [":", ";", ","]},
+        {"position": 55, "answer": ",", "options": [",", ";", "—"]},
+        {"position": 61, "answer": ",", "options": [",", "—", ":"], "note": "after 'order'"}
+      ]
+    },
+    {
+      "text": "One day, artisans of the city created something extraordinary: a portal they had made….",
+      "blanks": [
+        {"position": 8, "answer": ",", "options": [",", ";", "—"]},
+        {"position": 47, "answer": ":", "options": [":", ",", ";"]},
+        {"position": 70, "answer": "…", "options": ["…", ".", ","]}
+      ]
+    },
+    {
+      "text": "\"What is this sorcery that defies my order…? Have it abolished—now!\"",
+      "blanks": [
+        {"position": 35, "answer": "…?", "options": ["…?", "?!", ".?"]},
+        {"position": 56, "answer": "—", "options": ["—", ",", ";"]},
+        {"position": 61, "answer": "!", "options": ["!", ".", "?"]}
+      ]
+    },
+    {
+      "text": "This sparked a 200-year-long war that resulted in the portal evolving into something greater; it was now able to teleport to different dimensions.",
+      "blanks": [
+        {"position": 22, "answer": "-", "options": ["-", "—", " "], "note": "hyphen in compound '200-year-long'"},
+        {"position": 80, "answer": ";", "options": [";", ",", ":"], "note": "after 'greater'"}
+      ]
+    }
+  ]
+}

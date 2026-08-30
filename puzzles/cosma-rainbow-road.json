@@ -1,0 +1,49 @@
+{
+  "id": "rainbow-road",
+  "name": "The Rainbow Road",
+  "biome": "cosma",
+  "type": "catching-minigame",
+  "max_attempts": 0,
+  "description": "Catch falling stars to fill a meter. Form a poem on stone slabs. Light 3 torches. Summon the Fire Genie. Answer its question.",
+  "lives": 3,
+  "stages": [
+    {
+      "stage": 1,
+      "name": "star-catching",
+      "description": "Catch falling good stars to fill the meter. Avoid dying stars (lose meter + 1 life).",
+      "good_stars": {"color": "gold", "meter_fill": 10},
+      "bad_stars": {"color": "red", "meter_drain": 20, "life_cost": 1}
+    },
+    {
+      "stage": 2,
+      "name": "poem-formation",
+      "description": "Full meter fuses stars into a poem fragment carved on a stone slab.",
+      "slabs_needed": 3
+    },
+    {
+      "stage": 3,
+      "name": "torch-lighting",
+      "description": "Place 3 stone slabs on podiums to light 3 torches.",
+      "torches_needed": 3
+    },
+    {
+      "stage": 4,
+      "name": "genie-question",
+      "description": "Magic Fire Genie appears and asks the meaning of the whole poem.",
+      "wrong_answer_effect": "restart_entire_puzzle_new_poem"
+    }
+  ],
+  "poems": [
+    {
+      "id": "poem-1",
+      "fragments": [
+        "Stars that burn too bright",
+        "Fade before the dawn",
+        "Yet their light remains",
+        "In the hearts they've drawn"
+      ],
+      "meaning": "Impact outlasts presence. People shape us even after they're gone."
+    }
+  ],
+  "note": "Different poem on each retry. More poems to be added."
+}

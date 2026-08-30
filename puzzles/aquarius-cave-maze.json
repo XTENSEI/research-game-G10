@@ -1,0 +1,41 @@
+{
+  "id": "cave-maze",
+  "name": "The Grave Cave Maze of Craze",
+  "biome": "aquarius",
+  "type": "navigation",
+  "max_attempts": 0,
+  "description": "Navigate a cave network by answering directional questions. Randomized question-to-direction mapping.",
+  "randomize": true,
+  "wrong_answer_effect": "silently_sent_back_to_previous_question",
+  "directions": {
+    "south": {
+      "questions": [
+        "Things go wrong, Things go…",
+        "I sound like 'down', but I'm technically not down"
+      ]
+    },
+    "north": {
+      "questions": [
+        "I am a red needle for the path you take",
+        "Where the fresh sea berries grow"
+      ],
+      "npc_clue": "Market Lady says real sea berries grow from the North"
+    },
+    "east": {
+      "questions": [
+        "It wouldn't be an occident to orient yourself to me",
+        "Direction where the city hall faces"
+      ],
+      "npc_clue": "City Hall faces to the east"
+    },
+    "west": {
+      "questions": [
+        "Where the locals claim the sea berries grow",
+        "I am the nest for where it rests; it is the light that leaves at night"
+      ],
+      "npc_clue": "Scalleon says wild sea berries grow in the west"
+    }
+  },
+  "correct_path": ["north", "east", "south", "west"],
+  "note": "Path may be randomized per playthrough"
+}
