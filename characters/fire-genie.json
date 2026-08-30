@@ -1,0 +1,17 @@
+{
+  "id": "fire-genie",
+  "name": "Magic Fire Genie",
+  "role": "npc",
+  "biome": "cosma",
+  "description": "Summoned by lighting 3 torches on the Rainbow Road. Asks the final question about the poem's meaning.",
+  "sprites": {
+    "summoned": "assets/sprites/fire-genie-summoned.png",
+    "idle": "assets/sprites/fire-genie-idle.png"
+  },
+  "summon_condition": "3_torches_lit",
+  "final_question": {
+    "type": "figurative_language",
+    "description": "Asks what the poem means as a whole",
+    "wrong_answer_effect": "restart_entire_puzzle_new_poem"
+  }
+}

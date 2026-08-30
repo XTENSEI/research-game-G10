@@ -1,0 +1,16 @@
+{
+  "id": "river",
+  "name": "River",
+  "role": "protagonist",
+  "pronouns": "they/them",
+  "description": "Bold and strong. They've gone through many hardships in life, balancing work and school.",
+  "sprites": {
+    "idle": "assets/sprites/river-idle.png",
+    "walk": "assets/sprites/river-walk.png",
+    "talk": "assets/sprites/river-talk.png"
+  },
+  "stats": {
+    "health": 100,
+    "lives": 3
+  }
+}

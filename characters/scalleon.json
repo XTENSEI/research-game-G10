@@ -1,0 +1,10 @@
+{
+  "id": "scalleon",
+  "name": "Scalleon",
+  "role": "npc",
+  "biome": "aquarius",
+  "description": "Citizen of Aquarius. Companion of Gillbert.",
+  "sprites": {
+    "idle": "assets/sprites/scalleon-idle.png"
+  }
+}

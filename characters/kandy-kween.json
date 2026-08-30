@@ -1,0 +1,27 @@
+{
+  "id": "kandy-kween",
+  "name": "Kandy Kween",
+  "role": "boss",
+  "biome": "candy-land",
+  "description": "Rules the Candy Land castle. Has a necklace containing an essential elixir ingredient.",
+  "sprites": {
+    "idle": "assets/sprites/kandy-kween-idle.png",
+    "fuming": "assets/sprites/kandy-kween-fuming.png"
+  },
+  "attendant": "matt",
+  "dialogue_options": [
+    {
+      "text": "I thought they were great",
+      "kandy_kween_reaction": "thanks"
+    },
+    {
+      "text": "They were really easy",
+      "kandy_kween_reaction": "fuming"
+    },
+    {
+      "text": "Those puzzles sucked",
+      "kandy_kween_reaction": "very_angry"
+    }
+  ],
+  "outcome": "trap_door_regardless"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "gillbert",
+  "name": "Gillbert",
+  "role": "npc",
+  "biome": "aquarius",
+  "description": "Citizen of Aquarius. Provides directional clues for the cave maze.",
+  "sprites": {
+    "idle": "assets/sprites/gillbert-idle.png"
+  },
+  "clue": {
+    "context": "Asks about wild sea berries",
+    "answer_from_scareleon": "west",
+    "dialogue": "Gill: hey, do you know where wild sea berries grow?\nScal: hmm, I believe it's in the west, I think?"
+  }
+}

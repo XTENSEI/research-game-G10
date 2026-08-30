@@ -1,0 +1,11 @@
+{
+  "id": "nadia",
+  "name": "Nadia",
+  "role": "sibling",
+  "pronouns": "she/her",
+  "description": "The MC's younger sibling. Timid but hopeful. Sick with 'illiteracy'.",
+  "sprites": {
+    "sick": "assets/sprites/nadia-sick.png",
+    "hopeful": "assets/sprites/nadia-hopeful.png"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "jin",
+  "name": "Jin",
+  "role": "npc",
+  "biome": "candy-land",
+  "description": "Gingerbread Man. Lives alone in the red licorice forest. First encounter in Candy Land.",
+  "sprites": {
+    "idle": "assets/sprites/jin-idle.png",
+    "talk": "assets/sprites/jin-talk.png",
+    "battle": "assets/sprites/jin-battle.png"
+  },
+  "tutorial_battle": {
+    "description": "Jin asks comprehension questions about the conversation just had, plus basic English.",
+    "on_win": {
+      "perfect_clear": {
+        "description": "No losses. Jin gives River his horse.",
+        "reward": "horse",
+        "dialogue": "jin-dialogues/perfect-clear.json"
+      },
+      "with_losses": {
+        "description": "At least one loss. Travel on foot.",
+        "reward": "none",
+        "dialogue": "jin-dialogues/with-losses.json"
+      }
+    },
+    "on_lose": {
+      "options": [
+        {
+          "label": "Challenge him again",
+          "effect": "restart_battle_fewer_questions"
+        },
+        {
+          "label": "Give up",
+          "effect": "restart_interaction"
+        }
+      ]
+    }
+  }
+}
