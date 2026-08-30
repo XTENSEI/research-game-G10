@@ -1,0 +1,17 @@
+{
+  "id": "house",
+  "name": "House",
+  "focus": [],
+  "aesthetic": {
+    "setting": "normal home interior",
+    "mood": "warm but worried"
+  },
+  "order": 0,
+  "scenes": ["intro", "ending"],
+  "parallax_layers": [
+    {"name": "wall", "speed": 0.3},
+    {"name": "furniture", "speed": 0.7},
+    {"name": "foreground", "speed": 1.0}
+  ],
+  "particles": ["dust-mote"]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "candy-land",
+  "name": "Candy Land",
+  "focus": ["punctuation", "spelling", "grammar"],
+  "aesthetic": {
+    "sky": "pinkish",
+    "clouds": "cotton candy",
+    "ground": "yellow lemon land",
+    "vegetation": "lollipop bushes, pink candy greenery"
+  },
+  "order": 1,
+  "puzzle": "punctuation-gate",
+  "riddles": ["obfuscate-vocab", "accommodate-spelling"],
+  "boss": "kandy-kween",
+  "transition_next": "aquarius",
+  "parallax_layers": [
+    {"name": "sky", "speed": 0.1},
+    {"name": "clouds", "speed": 0.3},
+    {"name": "midground", "speed": 0.6},
+    {"name": "foreground", "speed": 1.0}
+  ],
+  "particles": ["cotton-candy-float", "sparkle"]
+}

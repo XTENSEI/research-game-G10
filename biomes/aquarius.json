@@ -1,0 +1,26 @@
+{
+  "id": "aquarius",
+  "name": "Aquarius",
+  "focus": ["context", "dialogue-meaning", "italics"],
+  "aesthetic": {
+    "sky": "underwater blue",
+    "ground": "sandy with rich corals",
+    "decorations": "shipwreck scraps, bubbles, fish",
+    "deity": "Neptune"
+  },
+  "order": 2,
+  "puzzle": "cave-maze",
+  "riddles": ["italics-interpretation", "lore-comprehension"],
+  "clues": {
+    "npcs": ["gillbert", "scalleon", "market-lady"],
+    "environment": "City Hall faces east"
+  },
+  "transition_next": "cosma",
+  "parallax_layers": [
+    {"name": "deep-water", "speed": 0.05},
+    {"name": "coral-back", "speed": 0.2},
+    {"name": "fish-layer", "speed": 0.4},
+    {"name": "foreground", "speed": 1.0}
+  ],
+  "particles": ["bubble-rise", "light-ray", "fish-swim"]
+}

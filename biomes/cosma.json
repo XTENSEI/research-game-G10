@@ -1,0 +1,22 @@
+{
+  "id": "cosma",
+  "name": "Cosma",
+  "focus": ["figurative-language", "story-comprehension"],
+  "aesthetic": {
+    "sky": "black space",
+    "stars": "colorful neon (yellow, blue, red, white)",
+    "ground": "narrow stone castle walkways",
+    "decorations": "floating stones, pebbles, tiny stars"
+  },
+  "order": 3,
+  "puzzle": "rainbow-road",
+  "riddles": ["figurative-meaning", "deeper-interpretation"],
+  "transition_next": "ending",
+  "parallax_layers": [
+    {"name": "deep-space", "speed": 0.02},
+    {"name": "neon-stars-back", "speed": 0.15},
+    {"name": "floating-rocks", "speed": 0.5},
+    {"name": "foreground", "speed": 1.0}
+  ],
+  "particles": ["neon-glow", "star-fall", "dying-star"]
+}
