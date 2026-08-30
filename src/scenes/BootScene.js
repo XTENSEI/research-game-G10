@@ -33,11 +33,10 @@ export class BootScene extends Phaser.Scene {
       loadingText.destroy();
     });
 
-    // Load placeholder assets (will be replaced with real art)
-    this.load.image('placeholder-player', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+    // No external assets needed - all procedural
   }
 
   create() {
-    this.scene.start('PreloaderScene');
+    this.scene.start('PreloaderScene', { nextScene: 'IntroScene' });
   }
 }

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene.js';
 import { PreloaderScene } from './scenes/PreloaderScene.js';
+import { IntroScene } from './scenes/IntroScene.js';
 import { HouseScene } from './scenes/HouseScene.js';
 import { CandyLandScene } from './scenes/CandyLandScene.js';
 import { AquariusScene } from './scenes/AquariusScene.js';
@@ -24,6 +25,7 @@ const config = {
   scene: [
     BootScene,
     PreloaderScene,
+    IntroScene,
     HouseScene,
     CandyLandScene,
     AquariusScene,

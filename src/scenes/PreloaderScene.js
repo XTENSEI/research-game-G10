@@ -5,11 +5,11 @@ export class PreloaderScene extends Phaser.Scene {
     super({ key: 'PreloaderScene' });
   }
 
-  create() {
+  create(data) {
     this.generateCharacterPortraits();
     this.generateUI();
     this.generateEnvironment();
-    this.scene.start('HouseScene');
+    this.scene.start(data.nextScene || 'IntroScene');
   }
 
   // ─── Character Portraits (procedural, stylized) ──────────
