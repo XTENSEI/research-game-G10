@@ -1,0 +1,31 @@
+{
+  "biome": "aquarius",
+  "riddles": [
+    {
+      "id": "italics-interpretation",
+      "type": "italics",
+      "question": "Which italicization correctly specifies that Gillbert specifically does not particularly believe in Neptune?",
+      "options": [
+        "Scalleon said that Gillbert *doesn't* believe in Neptune",
+        "Scalleon said that *Gillbert* doesn't believe in Neptune",
+        "Scalleon *said* that Gillbert doesn't believe in Neptune",
+        "Scalleon said that Gillbert doesn't believe in *Neptune*"
+      ],
+      "correct": 3,
+      "explanation": "Italicizing Neptune emphasizes that it's Neptune specifically (their god) that Gillbert doesn't believe in."
+    },
+    {
+      "id": "lore-comprehension",
+      "type": "lore",
+      "question": "Based on this dimension, what is Neptune?",
+      "options": [
+        "Their god",
+        "Their supreme leader",
+        "A book",
+        "A region they live in"
+      ],
+      "correct": 0,
+      "explanation": "Neptune is the god of Aquarius, referenced throughout the biome's lore."
+    }
+  ]
+}

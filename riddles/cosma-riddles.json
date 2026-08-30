@@ -1,0 +1,26 @@
+{
+  "biome": "cosma",
+  "riddles": [
+    {
+      "id": "figurative-meaning",
+      "type": "figurative-language",
+      "question": "The more of me you discover, the less you actually know. I outweigh everything you can see, yet you cannot see me at all. What am I?",
+      "options": [
+        "Darkness",
+        "Ignorance",
+        "The unknown",
+        "Space"
+      ],
+      "correct": 2,
+      "explanation": "The unknown. The more you learn, the more you realize how much you don't know (Socratic paradox)."
+    },
+    {
+      "id": "deeper-interpretation",
+      "type": "short-story",
+      "question": "[Placeholder. Will contain a 5+ sentence short story with a figurative meaning question]",
+      "options": ["TBD"],
+      "correct": 0,
+      "explanation": "TBD. Short story comprehension question pending."
+    }
+  ]
+}

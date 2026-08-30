@@ -1,0 +1,31 @@
+{
+  "biome": "candy-land",
+  "riddles": [
+    {
+      "id": "obfuscate-vocab",
+      "type": "vocabulary",
+      "question": "He always obfuscates his instructions for the candy housing projects because it's obvious that he wants us to fail and be humiliated. / I can't even understand your plan, it's like you're obfuscating it. / Based on the statements above, what does OBFUSCATE mean?",
+      "options": [
+        "Harshness in tone or behavior due to personal reasons",
+        "Faking or fabricating of evidence",
+        "Making something vague and unintelligible",
+        "A confused mixture"
+      ],
+      "correct": 2,
+      "explanation": "Obfuscate means to make something vague, unclear, or unintelligible."
+    },
+    {
+      "id": "accommodate-spelling",
+      "type": "spelling",
+      "question": "What word was correctly spelled?",
+      "options": [
+        "Acommodate",
+        "Acomodate",
+        "Accomodate",
+        "Accommodate"
+      ],
+      "correct": 3,
+      "explanation": "Accommodate. Double c AND double m."
+    }
+  ]
+}
