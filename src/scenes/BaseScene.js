@@ -9,9 +9,9 @@ import Phaser from 'phaser';
  * - Tween animations
  */
 export class BaseScene extends Phaser.Scene {
-  constructor(key, biomeId) {
-    super({ key });
-    this.biomeId = biomeId;
+  constructor(opts) {
+    super(opts.key);
+    this.biomeId = opts.biomeId || opts.key;
     this.player = null;
     this.cursors = null;
     this.wasd = null;
@@ -107,7 +107,7 @@ export class BaseScene extends Phaser.Scene {
       ease: 'Sine.easeInOut'
     });
 
-    this.physics.add.collider(this.player, this.platforms);
+    if (this.platforms) this.physics.add.collider(this.player, this.platforms);
     this.physics.add.overlap(this.player, this.npcGroup, this.onPlayerNearNPC, null, this);
 
     return this.player;
