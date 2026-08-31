@@ -1,5 +1,11 @@
 import { BaseScene } from './BaseScene.js';
 import { audioManager } from '../audio/AudioManager.js';
+import { RiddleBox } from '../ui/RiddleBox.js';
+import { PunctuationGate } from '../ui/PunctuationGate.js';
+import candyRiddleData from '../../riddles/candy-land-riddles.json';
+import gateData from '../../puzzles/candy-land-punctuation-gate.json';
+
+const CANDY_RIDDLES = candyRiddleData.riddles;
 
 const JIN_QUESTIONS = [
   { q: 'Where did Jin say he was earlier?', opts: ['In the candy castle', 'In the red licorice forest', 'At the market', 'By the river'], correct: 1 },
@@ -27,6 +33,10 @@ export class CandyLandScene extends BaseScene {
 
     this.cameras.main.fadeIn(2000);
     this.cameras.main.setBackgroundColor('#2a0a1a');
+
+    this.riddleBox = new RiddleBox(this);
+    this.gate = new PunctuationGate(this);
+    this.riddleQueue = [];
 
     this.setupParallax([
       { key: 'particle', speed: 0.02, y: 0, depth: -5, tint: 0xffb6c1, alpha: 0.3 },
@@ -380,8 +390,81 @@ export class CandyLandScene extends BaseScene {
   guardsFight() {
     // Script: The guards fight, letting River pass through quietly
     this.showDialogue('Narrator', 'The guards start arguing and eventually start fighting each other. River quietly slips past them into the castle.', [
-      { text: 'Enter the castle', callback: () => this.kandyKween() }
+      { text: 'Enter the castle', callback: () => this.castleGate() }
     ]);
+  }
+
+  // ─── CANDY RIDDLES + PUNCTUATION GATE ────────────────────
+  // Script: "River goes through a multitude of puzzles and riddles, finds one of
+  // the things needed for the literacy elixir and reaches the candy boss."
+
+  castleGate() {
+    this.showDialogue('Narrator',
+      'Past the brawling guards, a lone stone gate bars the way to the throne. A candy scribe with ink-stained fingers gestures from beside it: prove your words are strong, and the gate will yield.',
+      [{ text: 'Face the scribe', callback: () => this.candyRiddles() }]
+    );
+  }
+
+  candyRiddles() {
+    const done = this.gameState.completedRiddles || [];
+    this.riddleQueue = CANDY_RIDDLES.filter(r => !done.includes(r.id));
+    this.askNextRiddle();
+  }
+
+  askNextRiddle() {
+    if (this.riddleQueue.length === 0) { this.punctuationGate(); return; }
+    const r = this.riddleQueue.shift();
+    this.riddleBox.show({
+      title: 'Candy Riddle',
+      question: r.question,
+      options: r.options,
+      correct: r.correct,
+      explanation: r.explanation,
+      onComplete: (ok) => {
+        const done = this.gameState.completedRiddles || (this.gameState.completedRiddles = []);
+        if (!done.includes(r.id)) done.push(r.id);
+        this.time.delayedCall(300, () => {
+          if (this.riddleQueue.length > 0) {
+            this.showDialogue('Candy Scribe', 'Hmm, one more for the road? Or are you ready to face the gate?', [
+              { text: 'Answer another riddle', callback: () => this.askNextRiddle() },
+              { text: 'Face the gate', callback: () => this.punctuationGate() }
+            ]);
+          } else {
+            this.showDialogue('Candy Scribe', 'Well done. The gate recognizes a sharp mind. Step forward.', [
+              { text: 'Approach the gate', callback: () => this.punctuationGate() }
+            ]);
+          }
+        });
+      }
+    });
+  }
+
+  punctuationGate() {
+    this.showDialogue('Narrator',
+      'The Lone Stone Story of Throne Gate looms before River. Sentences are inscribed in the stone with punctuation missing. Fill every blank with the correct mark.',
+      [{ text: 'Read the gate', callback: () => this.startPunctuationGate() }],
+      'portrait-river'
+    );
+  }
+
+  startPunctuationGate() {
+    this.gate.show({
+      title: gateData.name,
+      sentences: gateData.sentences,
+      onComplete: () => {
+        const puzzles = this.gameState.completedPuzzles || (this.gameState.completedPuzzles = []);
+        if (!puzzles.includes('punctuation-gate')) puzzles.push('punctuation-gate');
+        const inv = this.gameState.inventory || (this.gameState.inventory = []);
+        if (!inv.includes('candy-ingredient')) inv.push('candy-ingredient');
+        audioManager.playScreenFlash();
+        this.cameras.main.flash(600, 255, 220, 100);
+        this.showDialogue('Narrator',
+          'The gate rumbles open! Within its hollow, River finds the first ingredient of the Gift of Education: a Candy Shard, crystallized from the city\'s ancient words.',
+          [{ text: 'Claim the shard', callback: () => this.kandyKween() }],
+          'portrait-river'
+        );
+      }
+    });
   }
 
   kandyKween() {
@@ -501,11 +584,20 @@ export class CandyLandScene extends BaseScene {
     this.cameras.main.setBackgroundColor('#000000');
     this.cameras.main.fadeOut(1000);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.cameras.main.fadeIn(2000);
-      this.cameras.main.setBackgroundColor('#050a1a');
-      this.showDialogue('Narrator', "Pitch black. Then... eyelids open. Blurry lights. A shot of River's eye. River finds themselves in an underwater world.", [
-        { text: 'Continue', callback: () => this.transitionTo('AquariusScene', 1500, 0x050a1a) }
-      ]);
+    this.cameras.main.fadeIn(2000);
+    this.cameras.main.setBackgroundColor('#2a0a1a');
+
+    this.setupGround(0x8a7a2a, 460);
+
+    this.setupParallax([
+      { key: 'particle', speed: 0.02, y: 0, depth: -5, tint: 0xffb6c1, alpha: 0.3 },
+      { key: 'particle', speed: 0.08, y: 80, depth: -4, tint: 0xffc0cb, alpha: 0.25 },
+      { key: 'particle', speed: 0.15, y: 180, depth: -3, tint: 0xff69b4, alpha: 0.2 },
+      { key: 'sparkle-pink', speed: 0.25, y: 300, depth: -2, tint: 0xffaacc, alpha: 0.4 },
+      { key: 'particle', speed: 0.5, y: 420, depth: -1, tint: 0xff88aa, alpha: 0.3 }
+    ]);
+
+    this.setupVignette(0.5, 89);
     });
   }
 
