@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene.js';
 import { PreloaderScene } from './scenes/PreloaderScene.js';
 import { IntroScene } from './scenes/IntroScene.js';
-import { HouseScene } from './scenes/HouseScene.js';
 import { CandyLandScene } from './scenes/CandyLandScene.js';
 import { AquariusScene } from './scenes/AquariusScene.js';
 import { CosmaScene } from './scenes/CosmaScene.js';
@@ -17,16 +16,12 @@ const config = {
   roundPixels: true,
   physics: {
     default: 'arcade',
-    arcade: {
-      gravity: { y: 0 },
-      debug: false
-    }
+    arcade: { gravity: { y: 0 }, debug: false }
   },
   scene: [
     BootScene,
     PreloaderScene,
     IntroScene,
-    HouseScene,
     CandyLandScene,
     AquariusScene,
     CosmaScene,
@@ -35,5 +30,12 @@ const config = {
 };
 
 const game = new Phaser.Game(config);
+
+// Auto-focus canvas for keyboard input
+game.canvas.setAttribute('tabindex', '0');
+game.canvas.focus();
+
+// Expose for testing
+globalThis.__game = game;
 
 export default game;
