@@ -12,11 +12,15 @@ export class EndingScene extends BaseScene {
     this.cameras.main.fadeIn(1000);
     this.cameras.main.setBackgroundColor('#1a0505');
 
+    this.setupGround(0x2a0a0a, 460);
+
     this.setupParallax([
       { key: 'particle', speed: 0.02, y: 0, depth: -3, tint: 0x3a0a0a, alpha: 0.5 },
       { key: 'particle', speed: 0.1, y: 200, depth: -2, tint: 0x5a1a1a, alpha: 0.3 },
       { key: 'particle', speed: 0.3, y: 400, depth: -1, tint: 0x8a2a2a, alpha: 0.2 }
     ]);
+
+    this.setupVignette(0.55, 89);
 
     const player = this.createPlayer(512, 300);
 
@@ -95,8 +99,10 @@ export class EndingScene extends BaseScene {
   }
 
   finale() {
+    const inv = this.gameState.inventory || [];
+    const pieces = inv.length > 0 ? inv.length : 3;
     this.showDialogue('Narrator',
-      'Nadia is cured. The family is whole again. River smiles, knowing the journey was worth every step.',
+      `Nadia is cured. The family is whole again. River smiles, knowing the journey across ${pieces} worlds was worth every step.`,
       [{ text: 'The End', callback: () => this.credits() }],
       'portrait-river'
     );
@@ -105,7 +111,7 @@ export class EndingScene extends BaseScene {
   credits() {
     this.cameras.main.fadeOut(3000, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.start('HouseScene', { gameState: this.gameState });
+      this.scene.start('IntroScene', { gameState: this.gameState });
     });
   }
 
