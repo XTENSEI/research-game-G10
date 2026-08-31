@@ -6,13 +6,14 @@
   "max_attempts": 0,
   "description": "Catch falling stars to fill a meter. Form a poem on stone slabs. Light 3 torches. Summon the Fire Genie. Answer its question.",
   "lives": 3,
+  "stars_needed": 15,
   "stages": [
     {
       "stage": 1,
       "name": "star-catching",
       "description": "Catch falling good stars to fill the meter. Avoid dying stars (lose meter + 1 life).",
-      "good_stars": {"color": "gold", "meter_fill": 10},
-      "bad_stars": {"color": "red", "meter_drain": 20, "life_cost": 1}
+      "good_stars": { "color": "gold", "meter_fill": 10 },
+      "bad_stars": { "color": "red", "meter_drain": 20, "life_cost": 1 }
     },
     {
       "stage": 2,
@@ -36,14 +37,52 @@
   "poems": [
     {
       "id": "poem-1",
+      "title": "The Unforgotten Flame",
       "fragments": [
         "Stars that burn too bright",
         "Fade before the dawn",
-        "Yet their light remains",
-        "In the hearts they've drawn"
+        "Yet their light remains"
       ],
-      "meaning": "Impact outlasts presence. People shape us even after they're gone."
+      "meaning": "Impact outlasts presence. Even after they are gone, people shape us.",
+      "options": [
+        "Impact outlasts presence. Even after people are gone, they shape us.",
+        "The brightest stars live the shortest lives and are soon forgotten.",
+        "Stars are only beautiful when they burn forever.",
+        "The dawn always ends the night, no matter what."
+      ]
+    },
+    {
+      "id": "poem-2",
+      "title": "The Road of Steps",
+      "fragments": [
+        "The road is not of stone",
+        "But of the steps you take alone",
+        "Every mile a lesson earned"
+      ],
+      "meaning": "The journey itself teaches you. Growth comes from walking the road, not from the destination.",
+      "options": [
+        "The journey itself teaches you. Growth comes from walking the road.",
+        "A road built of stone is stronger than any path of memories.",
+        "Traveling alone means no one can ever help you.",
+        "Miles are only worth counting when you arrive early."
+      ]
+    },
+    {
+      "id": "poem-3",
+      "title": "The Light You Carry",
+      "fragments": [
+        "When the last light dims to gray",
+        "Remember how you found the way",
+        "Hope is what you carry home"
+      ],
+      "meaning": "Hope persists through darkness. What you have learned lights your way home.",
+      "options": [
+        "Hope persists through darkness. What you have learned lights your way home.",
+        "When the light fades, it never returns, so be afraid.",
+        "Only gray days are worth remembering.",
+        "Home is the place where all hope must be left behind."
+      ]
     }
   ],
-  "note": "Different poem on each retry. More poems to be added."
+  "note": "A random poem is chosen on each attempt, so retries give a different poem."
 }

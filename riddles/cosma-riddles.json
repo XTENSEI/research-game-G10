@@ -15,12 +15,17 @@
       "explanation": "The unknown. The more you learn, the more you realize how much you don't know (Socratic paradox)."
     },
     {
-      "id": "deeper-interpretation",
+      "id": "story-comprehension",
       "type": "short-story",
-      "question": "[Placeholder. Will contain a 5+ sentence short story with a figurative meaning question]",
-      "options": ["TBD"],
+      "question": "Mara swept the corridor of the great lighthouse every evening. She was never allowed to light the lamp - that was the Keeper's sacred duty. But on the night the Keeper fell ill, the ships below began to cry out in the storm. Mara climbed the winding stairs with a torch in trembling hands. The light she kindled that night guided a hundred sailors home. They called her a hero, but Mara only smiled: the lamp had always been ready; it simply needed someone brave enough to light it. / What does this story suggest about courage?",
+      "options": [
+        "Courage is acting when it is needed most",
+        "Courage is a gift passed down by the Keeper",
+        "Only trained Keepers are ever truly brave",
+        "The lamp granted Mara magical powers"
+      ],
       "correct": 0,
-      "explanation": "TBD. Short story comprehension question pending."
+      "explanation": "Mara's heroism came from stepping up when the moment demanded it - courage is showing up when it counts."
     }
   ]
 }
