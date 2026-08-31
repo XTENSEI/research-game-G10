@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>research-game-G10</title>
+  <title>Gift of Education — A Literacy Adventure</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -15,12 +15,35 @@
       overflow: hidden;
     }
     #game-container {
-      image-rendering: pixelated;
+      cursor: pointer;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #game-container canvas {
+      outline: none;
+      max-width: 100vw;
+      max-height: 100vh;
     }
   </style>
 </head>
 <body>
   <div id="game-container"></div>
   <script type="module" src="/src/main.js"></script>
+  <script>
+    // Auto-focus the Phaser canvas so keyboard input works immediately
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        const canvas = document.querySelector('#game-container canvas');
+        if (canvas) {
+          canvas.setAttribute('tabindex', '0');
+          canvas.focus();
+          canvas.click();
+        }
+      }, 500);
+    });
+  </script>
 </body>
 </html>

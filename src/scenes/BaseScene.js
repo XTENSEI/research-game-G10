@@ -3,12 +3,7 @@ import { DialogueBox } from '../ui/DialogueBox.js';
 import { audioManager } from '../audio/AudioManager.js';
 
 /**
- * Base scene with:
- * - WASD + arrow movement with squash/stretch
- * - Parallax scrolling backgrounds (layered, colored)
- * - Particle effects per biome
- * - Undertale-style dialogue with portraits
- * - Camera juice (shake, flash, fade)
+ * Base scene with WASD/arrows, parallax, particles, Undertale-style dialogue.
  */
 export class BaseScene extends Phaser.Scene {
   constructor(opts) {
@@ -26,14 +21,8 @@ export class BaseScene extends Phaser.Scene {
 
   init(data) {
     this.gameState = data.gameState || {
-      hasHorse: false,
-      completedRiddles: [],
-      completedPuzzles: [],
-      inventory: [],
-      health: 100,
-      lives: 3,
-      battleCorrect: 0,
-      battleWrong: 0
+      hasHorse: false, completedRiddles: [], completedPuzzles: [],
+      inventory: [], health: 100, lives: 3, battleCorrect: 0, battleWrong: 0
     };
   }
 
@@ -53,7 +42,7 @@ export class BaseScene extends Phaser.Scene {
     this.dialogueBox = new DialogueBox(this);
   }
 
-  // ─── Parallax ──────────────────────────────────────────
+  // ─── Parallax ──
 
   setupParallax(layers) {
     this.parallaxLayers = [];
@@ -62,9 +51,7 @@ export class BaseScene extends Phaser.Scene {
 
     layers.forEach((layer) => {
       const bg = this.add.tileSprite(0, layer.y ?? h / 2, w * 2, h, layer.key)
-        .setOrigin(0.5)
-        .setScrollFactor(0)
-        .setDepth(layer.depth ?? 0);
+        .setOrigin(0.5).setScrollFactor(0).setDepth(layer.depth ?? 0);
       if (layer.tint) bg.setTint(layer.tint);
       if (layer.alpha) bg.setAlpha(layer.alpha);
       this.parallaxLayers.push({ sprite: bg, speed: layer.speed });
@@ -79,7 +66,25 @@ export class BaseScene extends Phaser.Scene {
     });
   }
 
-  // ─── Particles ─────────────────────────────────────────
+  // ─── Atmosphere helpers ──
+
+  setupGround(color, top = 470) {
+    const w = this.cameras.main.width;
+    const h = this.cameras.main.height;
+    this.ground = this.add.rectangle(w / 2, top + (h - top) / 2, w, h - top, color, 1).setDepth(6);
+    return this.ground;
+  }
+
+  setupVignette(alpha = 0.55, depth = 89) {
+    if (!this.textures.exists('vignette')) return null;
+    const w = this.cameras.main.width;
+    const h = this.cameras.main.height;
+    this.vignette = this.add.image(w / 2, h / 2, 'vignette')
+      .setDisplaySize(w, h).setScrollFactor(0).setDepth(depth).setAlpha(alpha);
+    return this.vignette;
+  }
+
+  // ─── Particles ──
 
   setupEmitter(texture, config) {
     const emitter = this.add.particles(0, 0, texture, {
@@ -97,7 +102,7 @@ export class BaseScene extends Phaser.Scene {
     return emitter;
   }
 
-  // ─── Player ────────────────────────────────────────────
+  // ─── Player ──
 
   createPlayer(x, y) {
     this.player = this.physics.add.sprite(x, y, 'player');
@@ -107,24 +112,18 @@ export class BaseScene extends Phaser.Scene {
 
     // Idle breathing
     this.tweens.add({
-      targets: this.player,
-      scaleY: 2.55,
-      duration: 1200,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
+      targets: this.player, scaleY: 2.55,
+      duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
     });
 
     // Shadow
-    this.player.shadow = this.add.ellipse(x, y + 24, 40, 10, 0x000000, 0.3)
-      .setDepth(9);
+    this.player.shadow = this.add.ellipse(x, y + 24, 40, 10, 0x000000, 0.3).setDepth(9);
 
     if (this.platforms) this.physics.add.collider(this.player, this.platforms);
-
     return this.player;
   }
 
-  // ─── Movement ──────────────────────────────────────────
+  // ─── Movement ──
 
   handleMovement(speed = 200) {
     if (this.dialogueActive || !this.player) {
@@ -146,20 +145,14 @@ export class BaseScene extends Phaser.Scene {
     else if (down) this.player.setVelocityY(speed);
     else this.player.setVelocityY(0);
 
-    // Squash-stretch while walking
     if (moving) {
       if (!this._walkTween || !this._walkTween.isPlaying()) {
         this._walkTween = this.tweens.add({
           targets: this.player,
-          scaleX: { from: 2.4, to: 2.6 },
-          scaleY: { from: 2.6, to: 2.4 },
-          duration: 120,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
+          scaleX: { from: 2.4, to: 2.6 }, scaleY: { from: 2.6, to: 2.4 },
+          duration: 120, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
         });
       }
-      // Footstep SFX (throttled)
       const now = this.time.now;
       if (now - this._lastFootstep > 250) {
         audioManager.playFootstep();
@@ -171,16 +164,15 @@ export class BaseScene extends Phaser.Scene {
       this.player.setScale(2.5);
     }
 
-    // Update shadow
     if (this.player.shadow) {
       this.player.shadow.x = this.player.x;
       this.player.shadow.y = this.player.y + 24;
     }
   }
 
-  // ─── NPC ───────────────────────────────────────────────
+  // ─── NPC ──
 
-  createNPC(x, y, npcKey, name, portraitKey) {
+  createNPC(x, y, npcKey, name, portraitKey, tint) {
     const npc = this.npcGroup.create(x, y, 'npc');
     npc.setScale(2.5);
     npc.setImmovable(true);
@@ -188,52 +180,35 @@ export class BaseScene extends Phaser.Scene {
     npc.npcName = name;
     npc.portraitKey = portraitKey || `portrait-${npcKey}`;
     npc.setDepth(10);
+    if (tint) npc.setTint(tint);
 
-    // Idle bob
     this.tweens.add({
-      targets: npc,
-      y: npc.y - 5,
-      duration: 1400,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
+      targets: npc, y: npc.y - 5,
+      duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
       delay: Math.random() * 600
     });
 
-    // Shadow
     npc.shadow = this.add.ellipse(x, y + 24, 40, 10, 0x000000, 0.3).setDepth(9);
 
-    // Name tag (styled)
     const nameTag = this.add.text(x, y - 60, name, {
-      fontFamily: '"Courier New", monospace',
-      fontSize: '13px',
-      color: '#ff69b4',
-      stroke: '#000000',
-      strokeThickness: 3,
-      backgroundColor: '#00000066',
-      padding: { x: 8, y: 3 }
+      fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px',
+      color: '#ff69b4', stroke: '#000000', strokeThickness: 3,
+      backgroundColor: '#00000066', padding: { x: 8, y: 3 }
     }).setOrigin(0.5).setDepth(11);
-
     npc.nameTag = nameTag;
+
     return npc;
   }
 
-  // ─── Dialogue wrapper ──────────────────────────────────
+  // ─── Dialogue wrapper ──
+  // showDialogue clears dialogueActive synchronously via onDestroy callback.
+  // The next dialogue call in the callback chain will work immediately.
 
   showDialogue(speaker, text, options = null, portraitKey = null, expression = null) {
     if (this.dialogueActive) return;
     this.dialogueActive = true;
-    this.dialogueBox.show(speaker, text, portraitKey, expression, options);
-    // Reset dialogueActive when box is destroyed
-    const check = this.time.addEvent({
-      delay: 50,
-      callback: () => {
-        if (!this.dialogueBox.active) {
-          this.dialogueActive = false;
-          check.remove();
-        }
-      },
-      repeat: -1
+    this.dialogueBox.show(speaker, text, portraitKey, expression, options, () => {
+      this.dialogueActive = false;
     });
   }
 

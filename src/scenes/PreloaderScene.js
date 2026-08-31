@@ -164,6 +164,66 @@ export class PreloaderScene extends Phaser.Scene {
       g.arc(w / 2, h * 0.52, 10, 0.2, Math.PI - 0.2, false);
       g.strokePath();
     });
+
+    // Gillbert - wise old fish, sandy brown
+    this._drawPortrait('portrait-gillbert', (g, w, h) => {
+      g.fillStyle(0x8b5a2b, 1);
+      g.fillEllipse(w / 2, h * 0.42, w * 0.5, h * 0.42);
+      g.fillTriangle(w * 0.9, h * 0.42, w * 0.78, h * 0.34, w * 0.78, h * 0.5);
+      // Eye
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(w * 0.38, h * 0.38, 8);
+      g.fillStyle(0x1a0a00, 1);
+      g.fillCircle(w * 0.38, h * 0.38, 4);
+      // Whiskers/beard
+      g.lineStyle(2, 0x5a3a1a, 1);
+      g.lineBetween(w * 0.44, h * 0.5, w * 0.4, h * 0.62);
+      g.lineBetween(w * 0.5, h * 0.52, w * 0.52, h * 0.64);
+    });
+
+    // Scalleon - sprightly scaled fish, teal
+    this._drawPortrait('portrait-scalleon', (g, w, h) => {
+      g.fillStyle(0x2e8b8b, 1);
+      g.fillEllipse(w / 2, h * 0.45, w * 0.42, h * 0.38);
+      g.fillTriangle(w * 0.84, h * 0.45, w * 0.72, h * 0.38, w * 0.72, h * 0.52);
+      // Scales
+      g.fillStyle(0x3a9b9b, 0.6);
+      g.fillCircle(w * 0.5, h * 0.5, 5);
+      g.fillCircle(w * 0.58, h * 0.42, 4);
+      g.fillCircle(w * 0.56, h * 0.56, 4);
+      // Eye
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(w * 0.4, h * 0.4, 9);
+      g.fillStyle(0x1a0a00, 1);
+      g.fillCircle(w * 0.4, h * 0.4, 4.5);
+      // Cheeky grin
+      g.lineStyle(2, 0x1a6b6b, 1);
+      g.beginPath();
+      g.arc(w * 0.44, h * 0.5, 6, 0.2, Math.PI - 0.6, false);
+      g.strokePath();
+    });
+
+    // Market Lady - friendly coral fish merchant
+    this._drawPortrait('portrait-market-lady', (g, w, h) => {
+      g.fillStyle(0xff7f50, 1);
+      g.fillEllipse(w / 2, h * 0.45, w * 0.45, h * 0.4);
+      g.fillTriangle(w * 0.85, h * 0.45, w * 0.73, h * 0.38, w * 0.73, h * 0.52);
+      // Flower on head
+      g.fillStyle(0xffdd00, 1);
+      g.fillCircle(w * 0.55, h * 0.22, 6);
+      g.fillStyle(0xff69b4, 1);
+      g.fillCircle(w * 0.5, h * 0.2, 4);
+      // Eye
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(w * 0.4, h * 0.4, 8);
+      g.fillStyle(0x1a0a00, 1);
+      g.fillCircle(w * 0.4, h * 0.4, 4);
+      // Warm smile
+      g.lineStyle(2, 0x9a3a1a, 1);
+      g.beginPath();
+      g.arc(w * 0.42, h * 0.5, 7, 0.2, Math.PI - 0.4, false);
+      g.strokePath();
+    });
   }
 
   // ─── UI Assets ───────────────────────────────────────────
@@ -213,6 +273,17 @@ export class PreloaderScene extends Phaser.Scene {
 
   generateEnvironment() {
     const g = this.make.graphics({ x: 0, y: 0, add: false });
+
+    // Vignette (soft dark edges) via canvas radial gradient
+    const cv = document.createElement('canvas');
+    cv.width = 512; cv.height = 288;
+    const vctx = cv.getContext('2d');
+    const grad = vctx.createRadialGradient(256, 144, 130, 256, 144, 300);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.6)');
+    vctx.fillStyle = grad;
+    vctx.fillRect(0, 0, 512, 288);
+    this.textures.addCanvas('vignette', cv);
 
     // Particles
     g.fillStyle(0xffffff, 1);
