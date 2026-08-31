@@ -3,7 +3,7 @@ import { audioManager } from '../audio/AudioManager.js';
 import { DialogueBox } from '../ui/DialogueBox.js';
 
 /**
- * IntroScene - Undertale-style: pictures and text, not playable.
+ * IntroScene - Undertale-style cutscene: pictures and text, not playable.
  * Nadia gets sick, Grandparent gives the book, River reads it, transported.
  */
 export class IntroScene extends Phaser.Scene {
@@ -17,64 +17,98 @@ export class IntroScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0a0a0a');
     this.cameras.main.fadeIn(1000);
     this.dialogue = new DialogueBox(this);
-    this.step = 0;
-    this.advanced = false;
+    this._busy = false;
 
-    this.input.keyboard.on('keydown-SPACE', () => { this.advanced = true; });
-    this.input.keyboard.on('keydown-ENTER', () => { this.advanced = true; });
-
-    this.showPanel([
-      { text: 'River and Nadia grew up in a small house with their older sibling Mark and their Grandparent.', delay: 500 },
-      { text: 'Life was hard. Mark worked various jobs, never finished school. River balanced work and school.', delay: 3000 },
-      { text: 'Then one day, Nadia fell sick.', delay: 5500 },
-      { text: 'The doctors called it "illiteracy" - a disease that made words blur and meaning slip away.', delay: 7500 },
-      { text: 'River was desperate.', delay: 10000 }
+    this.showIntroPanels([
+      'River and Nadia grew up in a small house with their older sibling Mark and their Grandparent.',
+      'Life was hard. Mark worked various jobs, never finished school. River balanced work and school.',
+      'Then one day, Nadia fell sick.',
+      'The doctors called it "illiteracy" - a disease that made words blur and meaning slip away.',
+      'River was desperate.'
     ], () => this.showGrandparent());
   }
 
-  showPanel(lines, onComplete) {
+  showIntroPanels(lines, onComplete) {
     this.children.removeAll();
     this.cameras.main.setBackgroundColor('#0a0a0a');
-
-    // Cinematic letterbox bars
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
-    this.add.rectangle(w / 2, 0, w, 60, 0x000000).setOrigin(0.5, 0);
-    this.add.rectangle(w / 2, h, w, 60, 0x000000).setOrigin(0.5, 1);
+
+    // Letterbox bars
+    this.add.rectangle(w / 2, 0, w, 50, 0x000000).setOrigin(0.5, 0).setDepth(5);
+    this.add.rectangle(w / 2, h, w, 50, 0x000000).setOrigin(0.5, 1).setDepth(5);
 
     let currentLine = 0;
 
     const showLine = () => {
       if (currentLine >= lines.length) { onComplete(); return; }
-      const line = lines[currentLine];
-      this.advanced = false;
+      if (this._busy) return;
+      this._busy = true;
+
+      const text = lines[currentLine];
 
       const txt = this.add.text(w / 2, h / 2, '', {
-        fontFamily: '"Courier New", monospace',
-        fontSize: '18px',
-        color: '#cccccc',
-        wordWrap: { width: w - 200 },
+        fontFamily: 'Georgia, "Times New Roman", serif',
+        fontSize: '20px',
+        color: '#c8c0b0',
+        wordWrap: { width: w - 180 },
         align: 'center',
         lineSpacing: 8
-      }).setOrigin(0.5).setAlpha(0);
+      }).setOrigin(0.5).setAlpha(0).setDepth(10);
 
-      this.tweens.add({ targets: txt, alpha: 1, duration: 500 });
+      this.tweens.add({ targets: txt, alpha: 1, duration: 400 });
 
-      // Typewriter
       let ci = 0;
+      let typewriterDone = false;
+      let advanced = false;
+
+      const advance = () => {
+        if (this._advanceTimer) { this._advanceTimer.remove(); this._advanceTimer = null; }
+        this._busy = false;
+        txt.destroy();
+        currentLine++;
+        showLine();
+      };
+
+      const skipToFull = () => {
+        if (!typewriterDone) {
+          txt.text = text;
+          typewriterDone = true;
+          this._advanceTimer = this.time.delayedCall(700, advance);
+        }
+      };
+
+      // Single click handler - use once to avoid stacking
+      const clickHandler = () => {
+        if (this._busy) {
+          if (!typewriterDone) skipToFull();
+          else advance();
+        }
+      };
+      this.input.once('pointerdown', clickHandler);
+
+      // Also Space/Enter
+      const spaceHandler = () => {
+        if (this._busy) {
+          if (!typewriterDone) skipToFull();
+          else advance();
+        }
+      };
+      this.input.keyboard.once('keydown-SPACE', spaceHandler);
+      this.input.keyboard.once('keydown-ENTER', spaceHandler);
+
       const timer = this.time.addEvent({
         delay: 30,
         callback: () => {
-          if (this.advanced) {
-            txt.text = line.text;
+          if (!this._busy || typewriterDone) { timer.remove(); return; }
+          if (ci < text.length) { txt.text += text[ci]; ci++; }
+          else {
+            typewriterDone = true;
             timer.remove();
-            this.time.delayedCall(800, () => { currentLine++; showLine(); });
-            return;
+            this._advanceTimer = this.time.delayedCall(600, advance);
           }
-          if (ci < line.text.length) { txt.text += line.text[ci]; ci++; }
-          else { timer.remove(); this.time.delayedCall(600, () => { currentLine++; showLine(); }); }
         },
-        repeat: line.text.length - 1
+        repeat: text.length - 1
       });
     };
 
@@ -82,42 +116,46 @@ export class IntroScene extends Phaser.Scene {
   }
 
   showGrandparent() {
-    // Portrait area
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
     this.children.removeAll();
+    this._busy = false;
+
     this.cameras.main.setBackgroundColor('#1a1208');
+    this.add.rectangle(w / 2, h / 2, w, h, 0x2a1a0a, 1).setDepth(0);
 
-    // Warm background
-    this.add.rectangle(w / 2, h / 2, w, h, 0x2a1a0a, 1);
-
-    // Grandparent portrait (simple, warm)
-    const g = this.add.graphics();
+    // Grandparent portrait
+    const g = this.add.graphics().setDepth(1);
     g.fillStyle(0xd2b48c, 1);
-    g.fillEllipse(w / 2, h * 0.35, 120, 120);
+    g.fillEllipse(w / 2, h * 0.32, 130, 130);
+    // Hair
     g.fillStyle(0x888888, 1);
-    g.fillEllipse(w / 2, h * 0.22, 130, 60); // hair
+    g.fillEllipse(w / 2, h * 0.20, 140, 60);
+    // Eyes
     g.fillStyle(0xffffff, 1);
-    g.fillCircle(w * 0.45, h * 0.33, 6);
-    g.fillCircle(w * 0.55, h * 0.33, 6);
+    g.fillCircle(w * 0.45, h * 0.30, 7);
+    g.fillCircle(w * 0.55, h * 0.30, 7);
     g.fillStyle(0x333333, 1);
-    g.fillCircle(w * 0.45, h * 0.33, 3);
-    g.fillCircle(w * 0.55, h * 0.33, 3);
+    g.fillCircle(w * 0.45, h * 0.30, 3.5);
+    g.fillCircle(w * 0.55, h * 0.30, 3.5);
+    // Smile
     g.lineStyle(2, 0x8a6a4a, 1);
     g.beginPath();
-    g.arc(w / 2, h * 0.40, 12, 0.2, Math.PI - 0.2, false);
+    g.arc(w / 2, h * 0.37, 14, 0.2, Math.PI - 0.2, false);
     g.strokePath();
 
     // Book glow
-    const book = this.add.rectangle(w / 2, h * 0.6, 60, 45, 0x8B4513, 1);
+    const book = this.add.rectangle(w / 2, h * 0.58, 60, 45, 0x8B4513, 1).setDepth(2);
     this.tweens.add({ targets: book, alpha: { from: 0.7, to: 1 }, duration: 1000, yoyo: true, repeat: -1 });
-    const glow = this.add.circle(w / 2, h * 0.6, 40, 0xffd700, 0.15);
-    this.tweens.add({ targets: glow, scaleX: 1.3, scaleY: 1.3, alpha: { from: 0.1, to: 0.2 }, duration: 1500, yoyo: true, repeat: -1 });
+    const glow = this.add.circle(w / 2, h * 0.58, 45, 0xffd700, 0.12).setDepth(1);
+    this.tweens.add({ targets: glow, scaleX: 1.3, scaleY: 1.3, alpha: { from: 0.08, to: 0.18 }, duration: 1500, yoyo: true, repeat: -1 });
 
     this.time.delayedCall(500, () => {
-      this.dialogue.show('Grandparent', 'River, come here. I have something for you. This is our Family Heirloom. A book that might be the key to curing Nadia.', [
-        { text: 'Open the book', callback: () => this.readBook() }
-      ]);
+      this.dialogue.show('Grandparent',
+        'River, come here. I have something for you. This is our Family Heirloom. A book that might be the key to curing Nadia.',
+        null, null,
+        [{ text: 'Open the book', callback: () => this.readBook() }]
+      );
     });
   }
 
@@ -127,10 +165,14 @@ export class IntroScene extends Phaser.Scene {
     this.cameras.main.shake(600, 0.02);
 
     this.time.delayedCall(2000, () => {
-      // Fade to white, then to Candy Land
       this.cameras.main.fadeOut(1000, 255, 255, 255);
       this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.start('CandyLandScene', { gameState: { hasHorse: false, completedRiddles: [], completedPuzzles: [], inventory: [], health: 100, lives: 3 } });
+        this.scene.start('CandyLandScene', {
+          gameState: {
+            hasHorse: false, completedRiddles: [], completedPuzzles: [],
+            inventory: [], health: 100, lives: 3
+          }
+        });
       });
     });
   }
