@@ -1,4 +1,4 @@
-import { BaseScene } from './BaseScene.js';
+import { BaseScene, GROUND_Y } from './BaseScene.js';
 import { audioManager } from '../audio/AudioManager.js';
 import { RiddleBox } from '../ui/RiddleBox.js';
 import aquariusRiddleData from '../../riddles/aquarius-riddles.json';
@@ -7,6 +7,7 @@ import mazeData from '../../puzzles/aquarius-cave-maze.json';
 const AQUARIUS_RIDDLES = aquariusRiddleData.riddles;
 const DIRECTIONS = ['north', 'east', 'south', 'west'];
 const DIR_LABELS = { north: 'North', east: 'East', south: 'South', west: 'West' };
+const AQUA_Y = GROUND_Y - 56;
 
 export class AquariusScene extends BaseScene {
   constructor() {
@@ -17,48 +18,76 @@ export class AquariusScene extends BaseScene {
     super.create(data);
 
     this.cameras.main.fadeIn(1500);
-    this.cameras.main.setBackgroundColor('#050a1a');
+    this.cameras.main.setBackgroundColor('#052030');
+    this.setTheme('#6ad4ff', '#17577a');
 
-    this.setupGround(0x062a3a, 460);
+    this.setupSky('sky-aqua');
+    this.setupGround('tile-aqua', GROUND_Y, 0x0a2436);
 
-    // Deep ocean parallax
-    this.setupParallax([
-      { key: 'particle', speed: 0.01, y: 0, depth: -5, tint: 0x0a1a3a, alpha: 0.6 },
-      { key: 'particle', speed: 0.05, y: 80, depth: -4, tint: 0x1a3a5a, alpha: 0.4 },
-      { key: 'particle', speed: 0.1, y: 200, depth: -3, tint: 0x228B22, alpha: 0.3 },
-      { key: 'particle', speed: 0.2, y: 320, depth: -2, tint: 0x4682B4, alpha: 0.35 },
-      { key: 'particle', speed: 0.4, y: 420, depth: -1, tint: 0xf4a460, alpha: 0.25 }
-    ]);
+    // Distant seabed ridge + kelp silhouettes
+    this.addBand('ridge-aqua', 470, 200, -5, 0.95, 0.05);
+    this.add.image(180, 330, 'kelp').setScrollFactor(0).setDepth(-4).setAlpha(0.8).setScale(0.9);
+    this.add.image(760, 300, 'kelp').setScrollFactor(0).setDepth(-4).setAlpha(0.7);
 
-    const player = this.createPlayer(100, 380);
+    // Shipwreck on the far left, half-buried
+    const wreck = this.add.image(120, GROUND_Y, 'shipwreck').setScrollFactor(0).setDepth(5).setScale(0.85);
+    this.add.image(120, GROUND_Y - 14, 'rock').setScrollFactor(0).setDepth(6).setAlpha(0.9);
+
+    // Corals + seaweed lining the sea floor
+    this.placeProp('coral', 330, 1.0, 7);
+    this.placeProp('seaweed', 720, 1.1, 7);
+    this.placeProp('coral', 560, 0.8, 7);
+    this.placeProp('seaweed', 950, 0.85, 7);
+    this.placeProp('coral', 210, 0.9, 7);
+
+    // Light shafts from the surface
+    for (let i = 0; i < 4; i++) {
+      const ray = this.add.rectangle(120 + i * 260, 150, 50, 700, 0x9fe0ff, 0.05)
+        .setDepth(0).setScrollFactor(0).setAngle(6 + i * 4);
+      this.tweens.add({
+        targets: ray, alpha: { from: 0.03, to: 0.07 }, x: ray.x + 20,
+        duration: 4000 + i * 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+      });
+    }
+
+    const player = this.createPlayer(90, AQUA_Y);
 
     this.riddleBox = new RiddleBox(this);
     this.riddleQueue = [];
 
-    // NPCs
-    this.createNPC(330, 370, 'gillbert', 'Gillbert', 'portrait-gillbert', 0xd2a06a);
-    this.createNPC(410, 370, 'scalleon', 'Scalleon', 'portrait-scalleon', 0x44dddd);
-    this.createNPC(620, 370, 'market-lady', 'Market Lady', 'portrait-market-lady', 0xff8a5a);
+    // NPCs on the sea floor
+    this.createNPC(330, AQUA_Y, 'gillbert', 'Gillbert', 'portrait-gillbert');
+    const scalleon = this.createNPC(415, AQUA_Y, 'scalleon', 'Scalleon', 'portrait-scalleon');
+    scalleon.talkable = false;
+    this.createNPC(630, AQUA_Y, 'market-lady', 'Market Lady', 'portrait-market-lady');
 
-    // City Hall facing east (environmental clue)
-    const hall = this.add.rectangle(830, 400, 120, 160, 0x2a4a6a, 1).setDepth(6);
-    hall.setStrokeStyle(2, 0x6ab0e0, 0.6);
-    this.add.text(830, 340, 'CITY HALL', {
-      fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#6ab0e0',
-      backgroundColor: '#00000055', padding: { x: 6, y: 2 }
-    }).setOrigin(0.5).setDepth(7);
-    this.add.rectangle(850, 375, 10, 8, 0x66ccff, 0.8).setDepth(7).setStrokeStyle(1, 0x000000, 0.4);
-    this.add.rectangle(810, 375, 10, 8, 0x66ccff, 0.8).setDepth(7).setStrokeStyle(1, 0x000000, 0.4);
-
-    // Light rays
-    for (let i = 0; i < 3; i++) {
-      const ray = this.add.rectangle(200 + i * 300, 0, 40, 600, 0x88ccff, 0.04)
-        .setDepth(0).setScrollFactor(0).setAngle(10 + i * 5);
-      this.tweens.add({
-        targets: ray, x: ray.x + 30, alpha: { from: 0.03, to: 0.06 },
-        duration: 4000 + i * 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
-      });
-    }
+    // City Hall facing east (environmental clue) — stone dome building
+    const hallX = 830;
+    const hall = this.add.container(hallX, 0).setDepth(6).setScrollFactor(0);
+    const hg = this.add.graphics();
+    hg.fillStyle(0x35647a, 1);
+    hg.fillRoundedRect(-70, -190, 140, 190, 8);
+    hg.fillStyle(0x2a4f66, 1);
+    hg.fillTriangle(-70, -190, 70, -190, 0, -250); // dome
+    hg.lineStyle(2, 0x6ab0e0, 0.7);
+    hg.strokeRoundedRect(-70, -190, 140, 190, 8);
+    hall.add(hg);
+    // dome windows row + doorway facing EAST (right)
+    hall.add(this.add.rectangle(-30, -160, 22, 16, 0xaef0ff, 0.9).setStrokeStyle(1, 0x000000, 0.4));
+    hall.add(this.add.rectangle(30, -160, 22, 16, 0xaef0ff, 0.9).setStrokeStyle(1, 0x000000, 0.4));
+    hall.add(this.add.rectangle(58, -90, 16, 34, 0x1a3242, 0.9).setStrokeStyle(1, 0x6ab0e0, 0.6));
+    // pillar accents
+    hall.add(this.add.rectangle(-55, -60, 10, 60, 0x4a7a90, 1));
+    hall.add(this.add.rectangle(55, -60, 10, 60, 0x4a7a90, 1));
+    hall.add(this.add.text(0, -208, 'CITY HALL', {
+      fontFamily: '"Courier New", monospace', fontSize: '11px', color: '#9fdcff',
+      backgroundColor: '#00000066', padding: { x: 6, y: 2 }
+    }).setOrigin(0.5));
+    this.tweens.add({
+      targets: this.add.circle(hallX + 62, -30, 8, 0x66ccff, 0.25).setScrollFactor(0).setDepth(7),
+      scaleX: 1.6, scaleY: 1.6, alpha: 0, duration: 1600, repeat: -1
+    });
+    hall.setY(GROUND_Y);
 
     // Rising bubbles
     this.setupEmitter('bubble', {
@@ -67,24 +96,24 @@ export class AquariusScene extends BaseScene {
       speed: { min: 20, max: 50 },
       scale: { start: 0.2, end: 0.6 },
       alpha: { start: 0.4, end: 0.05 },
-      frequency: 120,
+      frequency: 140,
       blendMode: 'ADD',
       tint: 0x88ccff,
       depth: 12
     });
 
-    // Fish particles
+    // Slow fish silhouettes crossing
     this.setupEmitter('particle', {
-      x: { min: -50, max: -50 },
-      y: { min: 100, max: 400 },
-      lifespan: 8000,
-      speed: { min: 30, max: 60 },
-      angle: { min: 170, max: 190 },
-      scale: { start: 0.3, end: 0.15 },
-      alpha: { start: 0.5, end: 0.1 },
-      frequency: 800,
-      tint: [0xffaa44, 0x44aaff, 0xff6688],
-      depth: 4
+      x: { min: -60, max: -60 },
+      y: { min: 120, max: 380 },
+      lifespan: 9000,
+      speed: { min: 40, max: 70 },
+      angle: { min: 174, max: 186 },
+      scale: { start: 0.5, end: 0.2 },
+      alpha: { start: 0.35, end: 0.05 },
+      frequency: 900,
+      tint: [0xffaa66, 0x77ccff, 0xff88aa],
+      depth: 3
     });
 
     this.setupVignette(0.5, 89);
@@ -100,7 +129,7 @@ export class AquariusScene extends BaseScene {
     this.physics.add.overlap(player, lady, () => this.marketLadyTalk());
 
     // City hall approach = environmental clue
-    this.hallZone = this.add.zone(830, 380, 140, 60).setDepth(3);
+    this.hallZone = this.add.zone(hallX, AQUA_Y, 160, 80).setDepth(3);
     this.physics.add.existing(this.hallZone, true);
     this.physics.add.overlap(player, this.hallZone, () => {
       if (!this.hallNoted && !this.dialogueActive && !this.mazeActive) {
@@ -113,10 +142,11 @@ export class AquariusScene extends BaseScene {
     });
 
     // Cave entrance (right side) - gated by >=1 riddle
-    this.caveZone = this.add.zone(920, 380, 90, 140).setDepth(3);
+    this.caveZone = this.add.zone(950, AQUA_Y, 110, 120).setDepth(3);
     this.physics.add.existing(this.caveZone, true);
-    this.caveArrow = this.add.text(930, 320, 'CAVE \u25B8', {
-      fontFamily: 'Arial, sans-serif', fontSize: '13px', color: '#66ccff',
+    this.add.circle(940, GROUND_Y - 26, 46, 0x071018, 1).setScrollFactor(0).setDepth(6).setStrokeStyle(3, 0x1a3242, 1);
+    this.caveArrow = this.add.text(930, 260, 'CAVE \u25B8', {
+      fontFamily: '"Courier New", monospace', fontSize: '13px', color: '#9fdcff',
       backgroundColor: '#00000066', padding: { x: 8, y: 4 }
     }).setOrigin(0.5).setDepth(7);
     this.tweens.add({ targets: this.caveArrow, alpha: { from: 0.4, to: 1 }, duration: 800, yoyo: true, repeat: -1 });
@@ -362,5 +392,6 @@ export class AquariusScene extends BaseScene {
   update() {
     this.handleMovement(160);
     this.updateParallax();
+    this.updateNPCs();
   }
 }

@@ -1,4 +1,4 @@
-import { BaseScene } from './BaseScene.js';
+import { BaseScene, GROUND_Y } from './BaseScene.js';
 import { audioManager } from '../audio/AudioManager.js';
 
 export class EndingScene extends BaseScene {
@@ -9,32 +9,59 @@ export class EndingScene extends BaseScene {
   create(data) {
     super.create(data);
 
-    this.cameras.main.fadeIn(1000);
+    this.cameras.main.fadeIn(800);
     this.cameras.main.setBackgroundColor('#1a0505');
+    this.setTheme('#ff6b6b', '#8a1a1a');
 
-    this.setupGround(0x2a0a0a, 460);
+    this.setupSky('sky-crumble');
 
-    this.setupParallax([
-      { key: 'particle', speed: 0.02, y: 0, depth: -3, tint: 0x3a0a0a, alpha: 0.5 },
-      { key: 'particle', speed: 0.1, y: 200, depth: -2, tint: 0x5a1a1a, alpha: 0.3 },
-      { key: 'particle', speed: 0.3, y: 400, depth: -1, tint: 0x8a2a2a, alpha: 0.2 }
-    ]);
+    // Broken horizon rubble silhouettes
+    this.addBand('ridge-cosma', 470, 210, -4, 0.55, 0.1);
 
-    this.setupVignette(0.55, 89);
+    this.setupGround('tile-neon', GROUND_Y, 0x1a0a0a);
 
-    const player = this.createPlayer(512, 300);
+    // Glowing fractures creeping up the floor
+    const cracks = this.add.graphics().setDepth(7).setScrollFactor(0);
+    cracks.lineStyle(2, 0xff6b2a, 0.6);
+    [[200, 470], [430, 470], [700, 470], [900, 470]].forEach(([x, y], i) => {
+      cracks.lineBetween(x, y, x - 20 - i * 6, y - 30);
+      cracks.lineBetween(x, y, x + 16 + i * 4, y - 46);
+      cracks.lineBetween(x - 20 - i * 6, y - 30, x - 30, y - 12);
+    });
+    this.cracks = cracks;
 
-    // Crumbling particles (red/orange debris)
-    this.setupEmitter('particle', {
-      y: { min: 0, max: 576 },
-      lifespan: 2000,
-      speed: { min: 30, max: 80 },
-      scale: { start: 0.6, end: 0 },
-      alpha: { start: 0.8, end: 0 },
-      frequency: 80,
+    this.setupVignette(0.6, 89);
+
+    const player = this.createPlayer(512, GROUND_Y - 56);
+
+    // Crumble debris falling from the sky
+    this.debris = this.setupEmitter('particle', {
+      y: { min: -20, max: 120 },
+      x: { min: 0, max: 1024 },
+      lifespan: 2600,
+      speed: { min: 60, max: 140 },
+      angle: { min: 80, max: 100 },
+      gravityY: 220,
+      scale: { start: 0.7, end: 0 },
+      alpha: { start: 0.9, end: 0 },
+      frequency: 70,
       blendMode: 'ADD',
-      tint: [0xff3333, 0xff6600, 0xffaa00],
+      tint: [0xff4433, 0xff8822, 0xffcc44],
       depth: 15
+    });
+
+    // Red heat pulse rising from horizon
+    this.heat = this.setupEmitter('sparkle-pink', {
+      y: { min: 430, max: 470 },
+      x: { min: 0, max: 1024 },
+      lifespan: 1500,
+      speed: { min: -30, max: -10 },
+      scale: { start: 0.5, end: 0 },
+      alpha: { start: 0.5, end: 0 },
+      frequency: 120,
+      blendMode: 'ADD',
+      tint: 0xff5522,
+      depth: 2
     });
 
     this.cameras.main.shake(5000, 0.004);
@@ -47,7 +74,6 @@ export class EndingScene extends BaseScene {
       );
     });
   }
-
   runSequence() {
     this.cameras.main.shake(800, 0.02);
     this.showDialogue('Narrator',
@@ -69,8 +95,19 @@ export class EndingScene extends BaseScene {
     audioManager.stopAllAmbient();
     this.cameras.main.fadeOut(1500, 255, 255, 255);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.cameras.main.setBackgroundColor('#f5f0e0');
+      // Swap the crumbling realm for a warm, safe room
+      if (this.sky) this.sky.setTexture('sky-home');
+      if (this.ground) this.ground.setTexture('tile-house');
+      if (this.cracks) this.cracks.setVisible(false);
+      if (this.debris) this.debris.stop();
+      if (this.heat) this.heat.stop();
+      this.cameras.main.setBackgroundColor('#fbf3e1');
       this.cameras.main.fadeIn(2000);
+
+      // Place home props (centred so their bases sit on the floor)
+      this.add.image(180, GROUND_Y - 55, 'window').setScrollFactor(0).setDepth(7).setScale(0.9);
+      this.add.image(760, GROUND_Y - 45, 'bed').setScrollFactor(0).setDepth(7).setScale(1.1);
+      this.add.image(940, GROUND_Y - 60, 'shelf').setScrollFactor(0).setDepth(7).setScale(1.0);
 
       this.time.delayedCall(1500, () => {
         this.showDialogue('Narrator',

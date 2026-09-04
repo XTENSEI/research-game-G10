@@ -1,4 +1,4 @@
-import { BaseScene } from './BaseScene.js';
+import { BaseScene, GROUND_Y } from './BaseScene.js';
 import { audioManager } from '../audio/AudioManager.js';
 import { RiddleBox } from '../ui/RiddleBox.js';
 import { PunctuationGate } from '../ui/PunctuationGate.js';
@@ -32,28 +32,53 @@ export class CandyLandScene extends BaseScene {
     super.create(data);
 
     this.cameras.main.fadeIn(2000);
-    this.cameras.main.setBackgroundColor('#2a0a1a');
+    this.cameras.main.setBackgroundColor('#3a1226');
+    this.setTheme('#ff5f9e', '#7a1f4a');
 
     this.riddleBox = new RiddleBox(this);
     this.gate = new PunctuationGate(this);
     this.riddleQueue = [];
 
-    this.setupParallax([
-      { key: 'particle', speed: 0.02, y: 0, depth: -5, tint: 0xffb6c1, alpha: 0.3 },
-      { key: 'particle', speed: 0.08, y: 80, depth: -4, tint: 0xffc0cb, alpha: 0.25 },
-      { key: 'particle', speed: 0.15, y: 180, depth: -3, tint: 0xff69b4, alpha: 0.2 },
-      { key: 'sparkle-pink', speed: 0.25, y: 300, depth: -2, tint: 0xffaacc, alpha: 0.4 },
-      { key: 'particle', speed: 0.5, y: 420, depth: -1, tint: 0xff88aa, alpha: 0.3 }
-    ]);
+    this.setupSky('sky-candy');
 
-    this.createPlayer(100, 380);
+    // Sun-globe (a giant lemon drop) low in the sky
+    const sun = this.add.circle(150, 130, 64, 0xfff0b8, 0.9).setScrollFactor(0).setDepth(-11);
+    this.tweens.add({ targets: sun, alpha: { from: 0.8, to: 1 }, duration: 2200, yoyo: true, repeat: -1 });
+    this.add.circle(150, 130, 96, 0xfff0b8, 0.14).setScrollFactor(0).setDepth(-12);
 
-    // Cotton candy sparkles
+    // Cotton candy clouds (slow parallax)
+    this.addBand('cloud-cotton', 130, 150, -9, 0.85, 0.015);
+    this.addBand('cloud-cotton', 230, 170, -8, 0.4, 0.04);
+
+    // Lemon hills
+    this.addBand('ridge-candy', 470, 210, -5, 0.9, 0.1);
+
+    // Distant castle on the horizon
+    this.add.image(900, 240, 'castle-far').setScrollFactor(0).setDepth(-4).setScale(1.15);
+
+    // Candy ground + props
+    this.setupGround('tile-candy', GROUND_Y, 0x7a5a12);
+    this.placeProp('lollipop-blue', 250, 0.9, 7);
+    this.placeProp('lollipop', 620, 0.75, 7);
+    this.placeProp('candy-tree', 970, 1.05, 7);
+    this.placeProp('lollipop', 80, 1.2, 11);
+
+    // Foreground fringe (closer lollipops that frame the shot)
+    this.placeProp('candy-tree', 40, 1.7, 11);
+    this.placeProp('lollipop-blue', 1010, 1.6, 11);
+    this.placeProp('lollipop', 1060, 1.9, 12);
+
+    const player = this.createPlayer(130, GROUND_Y - 56);
+
+    // Cotton candy sparkles drifting up
     this.setupEmitter('sparkle-pink', {
-      y: { min: -30, max: 200 }, lifespan: 5000, speed: { min: 3, max: 12 },
-      scale: { start: 0.5, end: 0 }, alpha: { start: 0.7, end: 0 },
-      frequency: 200, blendMode: 'ADD', tint: 0xff88cc, depth: 15
+      y: { min: 460, max: 560 }, x: { min: 0, max: 1024 },
+      lifespan: 4200, speed: { min: -26, max: -12 },
+      scale: { start: 0.6, end: 0 }, alpha: { start: 0.6, end: 0 },
+      frequency: 320, blendMode: 'ADD', tint: 0xffc4e0, depth: 3
     });
+
+    this.setupVignette(0.45, 89);
 
     audioManager.playAmbientCandyLand();
 
@@ -74,7 +99,8 @@ export class CandyLandScene extends BaseScene {
 
   walkForest() {
     // Script beat: River starts walking on the forest path when they encounter a gingerbread man
-    const jin = this.createNPC(400, 380, 'jin', 'Jin', 'portrait-jin');
+    const jin = this.createNPC(560, GROUND_Y - 56, 'jin', 'Jin', 'portrait-jin');
+    jin.talkable = false;
 
     this.showDialogue('Narrator', 'River walks along the red licorice forest path. Something small and brown steps out from behind a lollipop bush.', [
       { text: 'Continue', callback: () => this.jinIntro() }
@@ -612,5 +638,6 @@ export class CandyLandScene extends BaseScene {
   update() {
     this.handleMovement(200);
     this.updateParallax();
+    this.updateNPCs();
   }
 }

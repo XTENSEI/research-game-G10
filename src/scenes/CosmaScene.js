@@ -1,4 +1,4 @@
-import { BaseScene } from './BaseScene.js';
+import { BaseScene, GROUND_Y } from './BaseScene.js';
 import { audioManager } from '../audio/AudioManager.js';
 import { RiddleBox } from '../ui/RiddleBox.js';
 import cosmaRiddleData from '../../riddles/cosma-riddles.json';
@@ -8,6 +8,7 @@ const COSMA_RIDDLES = cosmaRiddleData.riddles;
 const POEMS = rainbowData.poems;
 const STARS_NEEDED = rainbowData.stars_needed || 15;
 const MAX_LIVES = rainbowData.lives || 3;
+const COSMA_Y = GROUND_Y - 56;
 
 export class CosmaScene extends BaseScene {
   constructor() {
@@ -18,63 +19,84 @@ export class CosmaScene extends BaseScene {
     super.create(data);
 
     this.cameras.main.fadeIn(1500);
-    this.cameras.main.setBackgroundColor('#020208');
+    this.cameras.main.setBackgroundColor('#05021c');
+    this.setTheme('#b78dff', '#5b3aa8');
 
-    this.setupGround(0x0a0a1e, 450);
+    this.setupSky('sky-cosma');
 
-    // Deep space parallax
-    this.setupParallax([
-      { key: 'particle', speed: 0.005, y: 0, depth: -5, tint: 0x0a0a2a, alpha: 0.5 },
-      { key: 'particle', speed: 0.03, y: 60, depth: -4, tint: 0x222244, alpha: 0.4 },
-      { key: 'sparkle-gold', speed: 0.08, y: 150, depth: -3, tint: 0xffdd00, alpha: 0.3 },
-      { key: 'particle', speed: 0.15, y: 300, depth: -2, tint: 0x444466, alpha: 0.3 },
-      { key: 'particle', speed: 0.35, y: 430, depth: -1, tint: 0x666688, alpha: 0.2 }
-    ]);
+    // Layered starfields (parallax)
+    this.addBand('stars-far', 250, 500, -8, 1, 0.012);
+    this.addBand('stars-near', 300, 500, -6, 0.9, 0.04);
 
-    const player = this.createPlayer(100, 400);
+    // Distant ruined towers + a ringed planet
+    this.addBand('ridge-cosma', 470, 220, -5, 0.95, 0.07);
+    const ring = this.add.image(150, 210, 'neon-ring').setScrollFactor(0).setDepth(-4).setScale(1.1);
+    this.tweens.add({ targets: ring, angle: 6, duration: 6000, yoyo: true, repeat: -1 });
 
-    this.riddleBox = new RiddleBox(this);
-    this.riddleQueue = [];
+    // Neon walkway (narrow stone strip against the void)
+    this.setupGround('tile-neon', GROUND_Y, 0x05030f);
 
-    // Neon star particles (multi-colored)
+    // Floating stones bobbing around the walkway
+    const floaters = [
+      { key: 'floatstone', x: 70, y: 340, s: 1.2, d: -2 },
+      { key: 'floatstone', x: 280, y: 250, s: 0.9, d: -1 },
+      { key: 'floatstone', x: 760, y: 300, s: 1.0, d: -1 },
+      { key: 'floatstone', x: 980, y: 240, s: 1.3, d: -2 }
+    ];
+    floaters.forEach((f, i) => {
+      const st = this.add.image(f.x, f.y, f.key).setDepth(f.d).setScrollFactor(0).setScale(f.s);
+      this.tweens.add({
+        targets: st, y: st.y - 14, x: st.x + Math.sin(i) * 8,
+        duration: 2600 + i * 400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+      });
+    });
+
+    // Crystals growing at the road's edge
+    this.placeProp('crystal-neon', 130, 1.0, 7);
+    this.placeProp('crystal-neon', 890, 1.3, 7);
+
+    // Ambient colored stars + dust
     this.setupEmitter('sparkle-gold', {
       y: { min: 0, max: 576 },
-      lifespan: 3500,
+      lifespan: 3800,
       speed: { min: 1, max: 5 },
-      scale: { start: 0.4, end: 0 },
-      alpha: { start: 0.7, end: 0 },
-      frequency: 180,
+      scale: { start: 0.5, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      frequency: 220,
       blendMode: 'ADD',
-      tint: [0xffdd00, 0x44aaff, 0xff4444, 0xffffff],
+      tint: [0xffdd00, 0x44aaff, 0xff4444, 0xffffff, 0xb78dff],
       depth: 13
     });
 
-    // Floating dust
     this.setupEmitter('particle', {
       y: { min: 0, max: 576 },
-      lifespan: 5000,
+      lifespan: 6000,
       speed: { min: 1, max: 3 },
       scale: { start: 0.2, end: 0 },
-      alpha: { start: 0.3, end: 0 },
-      frequency: 400,
+      alpha: { start: 0.25, end: 0 },
+      frequency: 500,
       blendMode: 'ADD',
       tint: 0x8888aa,
       depth: 1
     });
 
-    this.setupVignette(0.6, 89);
+    this.setupVignette(0.62, 89);
 
     audioManager.playAmbientCosma();
 
-    // Torches
+    const player = this.createPlayer(90, COSMA_Y);
+
+    // Torches on the walkway
     this.torches = [];
     for (let i = 0; i < 3; i++) {
-      const torch = this.physics.add.sprite(380 + i * 130, 380, 'torch-unlit');
+      const torch = this.physics.add.sprite(380 + i * 130, GROUND_Y - 20, 'torch-unlit');
       torch.setScale(3);
       torch.setImmovable(true);
       torch.setDepth(10);
       torch.lit = false;
       this.torches.push(torch);
+      // Podium glow disc
+      this.add.ellipse(torch.x, GROUND_Y - 2, 60, 12, 0x2a1f55, 0.9).setDepth(9).setScrollFactor(0);
     }
 
     this.starsCaught = 0;
@@ -326,5 +348,6 @@ export class CosmaScene extends BaseScene {
   update() {
     this.handleMovement(180);
     this.updateParallax();
+    this.updateNPCs();
   }
 }
