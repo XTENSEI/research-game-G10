@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { generateArt } from '../art/proc.js';
 
 export class PreloaderScene extends Phaser.Scene {
   constructor() {
@@ -6,8 +7,8 @@ export class PreloaderScene extends Phaser.Scene {
   }
 
   create(data) {
+    generateArt(this);
     this.generateCharacterPortraits();
-    this.generateUI();
     this.generateEnvironment();
     this.scene.start(data.nextScene || 'IntroScene');
   }
@@ -224,49 +225,6 @@ export class PreloaderScene extends Phaser.Scene {
       g.arc(w * 0.42, h * 0.5, 7, 0.2, Math.PI - 0.4, false);
       g.strokePath();
     });
-  }
-
-  // ─── UI Assets ───────────────────────────────────────────
-
-  generateUI() {
-    const g = this.make.graphics({ x: 0, y: 0, add: false });
-
-    // Player sprite (stylized character)
-    g.clear();
-    // Body
-    g.fillStyle(0x4488ff, 1);
-    g.fillRoundedRect(4, 16, 24, 28, 4);
-    // Head
-    g.fillStyle(0xc68642, 1);
-    g.fillCircle(16, 10, 10);
-    // Hair
-    g.fillStyle(0x2a1a0a, 1);
-    g.fillEllipse(16, 6, 16, 8);
-    // Eyes
-    g.fillStyle(0xffffff, 1);
-    g.fillCircle(13, 10, 2.5);
-    g.fillCircle(19, 10, 2.5);
-    g.fillStyle(0x1a0a00, 1);
-    g.fillCircle(13, 10, 1.2);
-    g.fillCircle(19, 10, 1.2);
-    g.generateTexture('player', 32, 48);
-    g.clear();
-
-    // NPC base (green body, friendly)
-    g.fillStyle(0x44aa44, 1);
-    g.fillRoundedRect(4, 16, 24, 28, 4);
-    g.fillStyle(0xd2691e, 1);
-    g.fillCircle(16, 10, 10);
-    g.fillStyle(0xffffff, 1);
-    g.fillCircle(13, 10, 2.5);
-    g.fillCircle(19, 10, 2.5);
-    g.fillStyle(0x1a0a00, 1);
-    g.fillCircle(13, 10, 1.2);
-    g.fillCircle(19, 10, 1.2);
-    g.generateTexture('npc', 32, 48);
-    g.clear();
-
-    g.destroy();
   }
 
   // ─── Environment Textures ────────────────────────────────
