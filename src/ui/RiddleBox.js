@@ -15,6 +15,8 @@ export class RiddleBox {
     this.optionEls = [];
     this.keyCleanup = [];
     this.onComplete = null;
+    this.ac = scene.uiAccent || '#ffdd00';
+    this.acNum = parseInt(this.ac.replace('#', ''), 16);
   }
 
   show({ title = 'Riddle', question, options, correct, explanation, onComplete }) {
@@ -36,13 +38,13 @@ export class RiddleBox {
     const panel = this.scene.add.graphics().setDepth(121).setScrollFactor(0);
     panel.fillStyle(0x0d0d2a, 0.97);
     panel.fillRoundedRect(80, 28, w - 160, 158, 12);
-    panel.lineStyle(2, 0xffdd00, 0.7);
+    panel.lineStyle(2, this.acNum, 0.7);
     panel.strokeRoundedRect(80, 28, w - 160, 158, 12);
     this.elements.push(panel);
 
     const titleText = this.scene.add.text(w / 2, 46, `\u2726 ${title} \u2726`, {
       fontFamily: '"Courier New", monospace', fontSize: '15px', fontStyle: 'bold',
-      color: '#ffdd00'
+      color: this.ac
     }).setOrigin(0.5).setDepth(122).setScrollFactor(0);
     this.elements.push(titleText);
 
@@ -72,9 +74,9 @@ export class RiddleBox {
         bg.clear();
         bg.fillStyle(0x2a1a4a, 0.98);
         bg.fillRoundedRect(w / 2 - 320, by, 640, 44, 8);
-        bg.lineStyle(2, 0xffdd00, 1);
+        bg.lineStyle(2, this.acNum, 1);
         bg.strokeRoundedRect(w / 2 - 320, by, 640, 44, 8);
-        label.setColor('#ffdd00');
+        label.setColor(this.ac);
       });
       zone.on('pointerout', () => {
         bg.clear();
@@ -125,11 +127,11 @@ export class RiddleBox {
     }).setOrigin(0.5).setDepth(124).setScrollFactor(0);
     this.elements.push(exText);
 
-    const btn = this.scene.add.rectangle(w / 2, h - 60, 220, 46, 0xffdd00, 0.15)
-      .setStrokeStyle(2, 0xffdd00, 0.8)
+    const btn = this.scene.add.rectangle(w / 2, h - 60, 220, 46, this.acNum, 0.15)
+      .setStrokeStyle(2, this.acNum, 0.8)
       .setDepth(124).setScrollFactor(0).setInteractive({ useHandCursor: true });
     const btnText = this.scene.add.text(w / 2, h - 60, 'Continue', {
-      fontFamily: '"Courier New", monospace', fontSize: '16px', color: '#ffdd00'
+      fontFamily: '"Courier New", monospace', fontSize: '16px', color: this.ac
     }).setOrigin(0.5).setDepth(125).setScrollFactor(0);
     this.elements.push(btn, btnText);
 
@@ -138,8 +140,8 @@ export class RiddleBox {
       this.destroy();
       if (cb) cb(isCorrect);
     });
-    btn.on('pointerover', () => btn.setFillStyle(0xffdd00, 0.35));
-    btn.on('pointerout', () => btn.setFillStyle(0xffdd00, 0.15));
+    btn.on('pointerover', () => btn.setFillStyle(this.acNum, 0.35));
+    btn.on('pointerout', () => btn.setFillStyle(this.acNum, 0.15));
 
     // Space/Enter also advance
     const advance = () => {

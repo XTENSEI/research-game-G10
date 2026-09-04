@@ -34,6 +34,15 @@ export class IntroScene extends Phaser.Scene {
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
 
+    // Warm storybook backdrop behind the text
+    if (this.textures.exists('sky-house')) {
+      this.add.image(w / 2, h / 2, 'sky-house').setDepth(-2).setAlpha(0.5);
+      this.add.rectangle(w / 2, h / 2, w, h, 0x000000, 0.5).setDepth(-1);
+    }
+    if (this.textures.exists('vignette')) {
+      this.add.image(w / 2, h / 2, 'vignette').setDepth(8).setAlpha(0.75).setDisplaySize(w, h);
+    }
+
     // Letterbox bars
     this.add.rectangle(w / 2, 0, w, 50, 0x000000).setOrigin(0.5, 0).setDepth(5);
     this.add.rectangle(w / 2, h, w, 50, 0x000000).setOrigin(0.5, 1).setDepth(5);
