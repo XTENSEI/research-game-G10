@@ -11,6 +11,7 @@ use crate::game::{Progress, jin_battle, gate, maze, cosma};
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum Phase {
+    Title,
     /// Walking in a biome overworld.
     Explore,
     /// Cutscene-ish dialogue only (intro, wake-up, guards, kandy, trapdoor...).
@@ -105,6 +106,9 @@ pub struct Game {
 
     amb_playing: Option<&'static str>,
     fade: f32,
+    pub title_sel: usize,
+    pub shake_t: f32,
+    save_exists: bool,
 }
 
 const AMB_VOL: f32 = 0.12;
@@ -114,7 +118,7 @@ impl Game {
         let tex = Textures::load();
         let audio = crate::audio::load().await;
         Self {
-            phase: Phase::Scene,
+            phase: Phase::Title,
             biome: Biome::Candy,
             progress: Progress::new(),
             tex,
@@ -169,7 +173,77 @@ impl Game {
             end_line: 0,
             amb_playing: None,
             fade: 1.0,
+            title_sel: 0,
+            shake_t: 0.0,
+            save_exists: crate::game::save::load().is_some(),
         }
+    }
+
+    /// Apply a loaded save.
+    pub fn apply_save(&mut self, d: crate::game::save::SaveData) {
+        self.progress.has_horse = d.has_horse;
+        crate::game::set_horse(d.has_horse);
+        self.progress.candy_riddles_done = d.candy_riddles;
+        self.progress.aqua_riddles_done = d.aqua_riddles;
+        self.progress.cosma_riddles_done = d.cosma_riddles;
+        self.progress.gate_solved = d.gate_solved;
+        self.progress.maze_solved = d.maze_solved;
+        self.progress.ingredients = d.ingredients;
+        self.biome = d.biome.to_biome();
+        self.world = World::new(self.biome);
+        self.world.player.0 = d.player_x.clamp(60.0, self.world.length - 60.0);
+        self.world.cam = self.world.target_cam();
+        self.amb_playing = None;
+        let amb = match self.biome { Biome::Candy => "candy", Biome::Aquarius => "aqua", Biome::Cosma => "cosma", Biome::Home => "house" };
+        self.amb(amb);
+        self.phase = Phase::Explore;
+        self.fade = 0.0;
+    }
+
+    /// Snapshot the current run into SaveData.
+    pub fn snapshot(&self) -> crate::game::save::SaveData {
+        crate::game::save::SaveData {
+            has_horse: self.progress.has_horse,
+            candy_riddles: self.progress.candy_riddles_done,
+            aqua_riddles: self.progress.aqua_riddles_done,
+            cosma_riddles: self.progress.cosma_riddles_done,
+            gate_solved: self.progress.gate_solved,
+            maze_solved: self.progress.maze_solved,
+            ingredients: self.progress.ingredients,
+            biome: crate::game::save::BiomeId::from_biome(self.biome),
+            player_x: self.world.player.0,
+        }
+    }
+
+    /// Save and mark progression checkpoints automatically.
+    pub fn autosave(&self) {
+        let _ = crate::game::save::save(&self.snapshot());
+    }
+
+    /// Wipe save and reset the run (called from title "new game").
+    pub fn reset_run(&mut self) {
+        crate::game::save::clear();
+        crate::game::set_horse(false);
+        self.progress = Progress::new();
+        self.biome = Biome::Candy;
+        self.world = World::new(Biome::Candy);
+        self.phase = Phase::Scene;
+        self.scene_lines = script::INTRO_SCENE;
+        self.scene_i = 0;
+        self.intro_i = 0;
+        self.intro_t = 0.0;
+        self.amb_playing = None;
+        self.fade = 1.0;
+        self.jin_done = false;
+        self.jin_offer = false;
+        self.jin_losses = 0;
+        self.jin_set_reduced = false;
+        self.kandy_asked = false;
+        self.kandy_reaction = None;
+        self.end_line = 0;
+        self.cosma_fail = false;
+        self.poem = 0;
+        self.slab = 0;
     }
 
     fn amb(&mut self, which: &'static str) {
@@ -202,7 +276,9 @@ impl Game {
 
     pub fn update(&mut self, dt: f32) {
         self.fade = (self.fade + dt * 2.0).min(1.0);
+        self.shake_t = (self.shake_t - dt).max(0.0);
         match self.phase {
+            Phase::Title => self.up_title(),
             Phase::Scene => self.up_scene(),
             Phase::Explore => self.up_explore(),
             Phase::JinMeet => self.up_jin_meet(),
@@ -222,6 +298,7 @@ impl Game {
 
     pub fn draw(&self) {
         match self.phase {
+            Phase::Title => self.dr_title(),
             Phase::Scene => {
                 if self.scene_lines.as_ptr() == script::INTRO_SCENE.as_ptr() {
                     self.dr_intro();
@@ -255,15 +332,21 @@ impl Game {
         }
     }
 
+    fn shake_off(&self) -> f32 {
+        if self.shake_t > 0.0 {
+            rand::gen_range(-4.0, 4.0) * (self.shake_t / 0.35)
+        } else { 0.0 }
+    }
+
     fn dr_world(&self) {
         draw_biome_bg(self.biome, get_time() as f32);
-        self.world.draw(&self.tex, get_time() as f32);
+        self.world.draw(&self.tex, get_time() as f32, self.shake_off());
         self.dlg.draw();
     }
 
     fn dr_world_behind(&self) {
         draw_biome_bg(self.biome, get_time() as f32);
-        self.world.draw(&self.tex, get_time() as f32);
+        self.world.draw(&self.tex, get_time() as f32, self.shake_off());
     }
 
     fn draw_hud(&self) {
@@ -367,11 +450,21 @@ impl Game {
     // ---------- EXPLORE ----------
     fn up_explore(&mut self) {
         self.world.update(get_frame_time(), false);
+        if self.world.step_hit {
+            self.world.step_hit = false;
+            play_sound(&self.audio.sfx.blip, PlaySoundParams { looped: false, volume: 0.07 });
+        }
+        // F5 quicksave
+        if is_key_pressed(KeyCode::F5) {
+            self.autosave();
+            self.world.set_hint("saved.");
+        }
         if !Self::adv_pressed() {
             return;
         }
-        let Some((dist, action)) = self.world.nearest() else { return };
-        let _ = dist;
+        if self.world.interact_cd > 0.0 { return; }
+        let Some(action) = self.world.nearest_action() else { return };
+        self.world.interact_cd = 0.35;
         match action {
             "jin" => {
                 self.dlg.close();
@@ -384,6 +477,7 @@ impl Game {
                 self.play_scene(script::GUARDS, Phase::Explore);
                 self.progress.done.insert("guards");
                 self.world.actors.retain(|a| a.action != "guards");
+                self.autosave();
             }
             "kandy" => self.play_scene(script::KANDY_INTRO_SCENE, Phase::KandyBridge),
             "riddle" => self.enter_riddle(),
@@ -403,7 +497,7 @@ impl Game {
             }
             "clue" => {
                 // NPC clue from nearest actor label
-                let label = self.world.nearest_label().unwrap_or("");
+                let label = self.world.nearest_info().map(|(l, _, _)| l).unwrap_or("");
                 let lines: &'static [script::Line] = match label {
                     "Gillbert" => script::CLUE_GILL,
                     "Scalleon" => script::CLUE_SCAL,
@@ -417,6 +511,12 @@ impl Game {
                 } else {
                     self.enter_stars();
                 }
+            }
+            "nadia" => {
+                self.end_line = 0;
+                self.dlg.close();
+                self.phase = Phase::Ending;
+                self.fade = 0.0;
             }
             "portal" => {
                 if self.progress.ingredients >= 3 {
@@ -433,7 +533,7 @@ impl Game {
         self.riddle_set = match self.biome {
             Biome::Candy => 0,
             Biome::Aquarius => 1,
-            Biome::Cosma => 2,
+            Biome::Cosma | Biome::Home => 2,
         };
         self.riddle_sel = 0;
         self.riddle_answered = false;
@@ -503,7 +603,15 @@ impl Game {
     fn submit_riddle(&mut self, answer: usize) {
         self.riddle_answered = true;
         self.riddle_right = Some(self.riddle_sel == answer);
-        if self.riddle_right == Some(true) { self.good_play(); } else { self.bad_play(); }
+        if self.riddle_right == Some(true) {
+            self.good_play();
+            self.world.burst(self.world.player.0, self.world.player.1 + 20.0, 2, 14);
+        } else {
+            self.bad_play();
+            self.shake_t = 0.35;
+            self.world.burst(self.world.player.0, self.world.player.1 + 20.0, 0, 10);
+        }
+        self.autosave();
     }
 
     fn dr_riddle(&self) {
@@ -652,8 +760,10 @@ impl Game {
         if self.jin_sel as usize == correct {
             self.good_play();
             self.jin_correct += 1;
+            self.world.burst(self.world.player.0, self.world.player.1 + 20.0, 2, 10);
         } else {
             self.bad_play();
+            self.shake_t = 0.3;
         }
         self.jin_i += 1;
         self.jin_sel = 0;
@@ -684,6 +794,7 @@ impl Game {
             if self.jin_losses == 0 && self.jin_correct == self.jin_qs.len() as u32 {
                 self.progress.has_horse = true;
                 crate::game::set_horse(true);
+                self.autosave();
                 self.dlg.say("Jin", script::JIN_PERFECT[0].text, &self.tex);
             } else {
                 self.dlg.say("Jin", script::JIN_LOST_ONE[0].text, &self.tex);
@@ -758,6 +869,8 @@ impl Game {
                     self.progress.ingredients += 1;
                     self.progress.done.insert("gate");
                     self.world.set_hint("The Throne Gate grinds open!");
+                    self.world.burst(2050.0, 470.0, 2, 30);
+                    self.autosave();
                     self.phase = Phase::Explore;
                     self.fade = 0.0;
                     // remove gate prop so the path is clear
@@ -865,6 +978,8 @@ impl Game {
             self.progress.ingredients += 1;
             self.progress.done.insert("maze");
             self.world.set_hint("The cave opens to the far current!");
+            self.world.burst(self.world.player.0, self.world.player.1 + 20.0, 1, 24);
+            self.autosave();
             self.phase = Phase::Explore;
             self.fade = 0.0;
             self.world.props.retain(|p| p.id != "cave");
@@ -1027,6 +1142,8 @@ impl Game {
                     self.phase = Phase::Explore;
                     self.fade = 0.0;
                     self.world.set_hint("A component hums in your hand. Reach the stone circle!");
+                    self.world.burst(self.world.player.0, self.world.player.1 + 20.0, 3, 30);
+                    self.autosave();
                 } else {
                     self.bad_play();
                     self.cosma_fail = true;
@@ -1146,8 +1263,13 @@ impl Game {
     fn up_crumble(&mut self, dt: f32) {
         self.crumble_t += dt;
         if Self::adv_pressed() && self.crumble_t > 1.5 {
-            self.phase = Phase::Ending;
+            // run back to an explorable home
+            self.biome = Biome::Home;
+            self.world = World::new(Biome::Home);
             self.fade = 0.0;
+            self.amb("house");
+            self.phase = Phase::Explore;
+            self.autosave();
         }
     }
 
@@ -1195,6 +1317,53 @@ impl Game {
 }
 
 impl Game {
+    fn up_title(&mut self) {
+        self.amb("house");
+        let opts = if self.save_exists { 2 } else { 1 };
+        if is_key_pressed(KeyCode::Up) { self.title_sel = self.title_sel.saturating_sub(1); }
+        if is_key_pressed(KeyCode::Down) { self.title_sel = self.title_sel.min(opts - 1); }
+        if self.title_sel >= opts { self.title_sel = opts - 1; }
+        if is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Enter) {
+            self.good_play();
+            if self.save_exists && self.title_sel == 0 {
+                if let Some(d) = crate::game::save::load() {
+                    self.apply_save(d);
+                    return;
+                }
+            }
+            self.reset_run();
+        }
+    }
+
+    fn dr_title(&self) {
+        let w = screen_width();
+        let h = screen_height();
+        clear_background(Color::from_rgba(24, 16, 20, 255));
+        // the heirloom book, glowing
+        let glow = 0.5 + 0.5 * (get_time() as f32 * 1.6).sin();
+        draw_circle(w * 0.5, 240.0, 90.0 + glow * 16.0, Color::from_rgba(255, 240, 180, (28.0 + glow * 40.0) as u8));
+        draw_rectangle(w * 0.5 - 48.0, 180.0, 96.0, 124.0, Color::from_rgba(140, 40, 40, 255));
+        draw_rectangle(w * 0.5 - 6.0, 180.0, 12.0, 124.0, Color::from_rgba(90, 20, 20, 255));
+        draw_text("GIFT OF EDUCATION", w * 0.5 - measure_text("GIFT OF EDUCATION", None, 44, 1.0).width * 0.5, 110.0, 44.0, PINK);
+        draw_text("a literacy rpg", w * 0.5 - measure_text("a literacy rpg", None, 20, 1.0).width * 0.5, 360.0, 20.0,
+            Color::from_rgba(230, 200, 210, 200));
+
+        let items: [(&str, bool); 2] = [("continue", self.save_exists), ("new game", true)];
+        let mut y = 430.0;
+        for (i, (label, enabled)) in items.iter().enumerate() {
+            if !enabled { y += 44.0; continue; }
+            let sel = i == self.title_sel;
+            let c = if sel { WHITE } else { Color::from_rgba(190, 190, 200, 255) };
+            let label_s = label.to_string();
+            let tw = measure_text(&label_s, None, 24, 1.0).width;
+            if sel { draw_text(">", w * 0.5 - tw * 0.5 - 30.0, y, 24.0, PINK); }
+            draw_text(&label_s, w * 0.5 - tw * 0.5, y, 24.0, c);
+            y += 44.0;
+        }
+        draw_text("wasd move - z confirm - 1-4 pick", w * 0.5 - measure_text("wasd move - z confirm - 1-4 pick", None, 16, 1.0).width * 0.5,
+            h - 30.0, 16.0, Color::from_rgba(160, 150, 160, 160));
+    }
+
     fn page_play(&self) {
         play_sound(&self.audio.sfx.page, PlaySoundParams { looped: false, volume: 0.5 });
     }
