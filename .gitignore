@@ -3,4 +3,5 @@ dist/
 target/
 Cargo.lock
 *.log
+save.txt
 .freebuff/

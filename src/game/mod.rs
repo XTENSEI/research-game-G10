@@ -6,10 +6,11 @@ pub mod jin_battle;
 pub mod ui;
 pub mod world;
 pub mod run;
+pub mod save;
 
 /// Shared run state that persists across scenes.
 pub struct Progress {
-    #[allow(dead_code)]
+    /// True when the Jin battle was cleared with zero losses.
     pub has_horse: bool,
     /// Riddle results per biome (one-try only).
     pub candy_riddles_done: u32,
