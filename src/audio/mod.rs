@@ -59,6 +59,7 @@ fn mix(chunks: &[Vec<f32>]) -> Vec<f32> {
 }
 
 pub struct Sfx {
+    #[allow(dead_code)]
     pub blip: Sound,
     pub good: Sound,
     pub bad: Sound,

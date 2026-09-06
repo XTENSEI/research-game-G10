@@ -8,6 +8,7 @@ pub struct MazeQ {
 }
 
 pub struct MazeClue {
+    #[allow(dead_code)]
     pub who: &'static str,
     pub text: &'static str,
 }

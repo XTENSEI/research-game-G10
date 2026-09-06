@@ -218,6 +218,7 @@ impl Textures {
     }
 
     /// Big dialogue portrait for a speaker name.
+    #[allow(dead_code)]
     pub fn portrait(&self, who: &str) -> Option<&Texture2D> {
         Some(match who {
             "River" => &self.river,
