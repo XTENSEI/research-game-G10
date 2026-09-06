@@ -235,6 +235,24 @@ impl Textures {
     }
 }
 
+fn draw_cosma_stars(t: f32) {
+    let mut seed = 7u64;
+    for _ in 0..90 {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let x = (seed >> 33) % 1024;
+        let sy = (seed >> 20) % 720;
+        let pick = (seed >> 8) % 4;
+        let c = match pick {
+            0 => Color::from_rgba(255, 230, 90, 255),
+            1 => Color::from_rgba(90, 160, 255, 255),
+            2 => Color::from_rgba(255, 90, 110, 255),
+            _ => Color::from_rgba(240, 240, 255, 255),
+        };
+        let tw = 0.5 + 0.5 * (t * 2.0 + (x % 10) as f32).sin();
+        draw_rectangle(x as f32, sy as f32, 2.0, 2.0, Color::new(c.r, c.g, c.b, c.a * tw));
+    }
+}
+
 /// Vertical gradient backdrop per biome, drawn each frame (cheap, 2 rects + sky fill).
 pub fn draw_biome_bg(biome: Biome, t: f32) {
     match biome {
@@ -275,24 +293,35 @@ pub fn draw_biome_bg(biome: Biome, t: f32) {
                 draw_circle(x + 16.0, 646.0, 12.0, Color::from_rgba(120, 220, 180, 255));
             }
         }
+        Biome::Home => {
+            // warm interior wall
+            draw_rectangle(0.0, 0.0, W, 400.0, Color::from_rgba(122, 82, 56, 255));
+            draw_rectangle(0.0, 400.0, W, 40.0, Color::from_rgba(96, 62, 42, 255));
+            // window with light
+            draw_rectangle(180.0, 120.0, 150.0, 170.0, Color::from_rgba(255, 236, 190, 255));
+            draw_rectangle(180.0, 120.0, 150.0, 170.0, Color::from_rgba(255, 236, 190, 30));
+            draw_rectangle_lines(180.0, 120.0, 150.0, 170.0, 6.0, Color::from_rgba(80, 50, 34, 255));
+            draw_rectangle(251.0, 120.0, 6.0, 170.0, Color::from_rgba(80, 50, 34, 255));
+            draw_rectangle(180.0, 200.0, 150.0, 6.0, Color::from_rgba(80, 50, 34, 255));
+            // framed family picture
+            draw_rectangle(520.0, 140.0, 110.0, 90.0, Color::from_rgba(90, 58, 38, 255));
+            draw_rectangle(528.0, 148.0, 94.0, 74.0, Color::from_rgba(230, 214, 180, 255));
+            // picture contents: three figures
+            draw_rectangle(548.0, 176.0, 10.0, 26.0, Color::from_rgba(91, 60, 140, 255));
+            draw_rectangle(570.0, 170.0, 10.0, 32.0, Color::from_rgba(255, 170, 190, 255));
+            draw_rectangle(592.0, 180.0, 10.0, 22.0, Color::from_rgba(120, 90, 60, 255));
+            // shelf with the heirloom book glowing
+            let glow = 0.5 + 0.5 * (t * 2.0).sin();
+            draw_rectangle(700.0, 250.0, 130.0, 10.0, Color::from_rgba(96, 62, 42, 255));
+            draw_circle(765.0, 244.0, 16.0 + glow * 6.0, Color::from_rgba(255, 240, 180, (30.0 + glow * 40.0) as u8));
+            draw_rectangle(752.0, 226.0, 26.0, 24.0, Color::from_rgba(140, 40, 40, 255));
+            draw_rectangle(762.0, 226.0, 4.0, 24.0, Color::from_rgba(90, 20, 20, 255));
+            // lower wall
+            draw_rectangle(0.0, 400.0, W, H - 400.0, Color::from_rgba(210, 196, 170, 255));
+        }
         Biome::Cosma => {
             draw_rectangle(0.0, 0.0, W, H, Color::from_rgba(6, 4, 14, 255));
-            // neon stars: deterministic pseudo-random twinkle
-            let mut seed = 7u64;
-            for _ in 0..90 {
-                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-                let x = (seed >> 33) % 1024;
-                let sy = (seed >> 20) % 720;
-                let pick = (seed >> 8) % 4;
-                let c = match pick {
-                    0 => Color::from_rgba(255, 230, 90, 255),
-                    1 => Color::from_rgba(90, 160, 255, 255),
-                    2 => Color::from_rgba(255, 90, 110, 255),
-                    _ => Color::from_rgba(240, 240, 255, 255),
-                };
-                let tw = 0.5 + 0.5 * (t * 2.0 + (x % 10) as f32).sin();
-                draw_rectangle(x as f32, sy as f32, 2.0, 2.0, Color::new(c.r, c.g, c.b, c.a * tw));
-            }
+            draw_cosma_stars(t);
             // castle walkway
             draw_rectangle(0.0, 560.0, 1024.0, 24.0, Color::from_rgba(70, 66, 90, 255));
             draw_rectangle(0.0, 584.0, 1024.0, 136.0, Color::from_rgba(40, 38, 55, 255));

@@ -202,7 +202,7 @@ pub struct Riddle {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum Biome { Candy, Aquarius, Cosma }
+pub enum Biome { Candy, Aquarius, Cosma, Home }
 
 pub const CANDY_RIDDLES: &[Riddle] = &[
     Riddle {
