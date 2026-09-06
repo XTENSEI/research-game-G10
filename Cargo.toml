@@ -1,0 +1,17 @@
+[package]
+name = "literacy-rpg"
+version = "0.1.0"
+edition = "2021"
+description = "Educational RPG prototype: three biomes, riddles and puzzles to cure Nadia's illiteracy"
+
+[dependencies]
+macroquad = "0.4"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 1
