@@ -530,7 +530,8 @@ impl Game {
 
     // ---------- JIN ----------
     fn up_jin_meet(&mut self) {
-        if let Some(_) = self.dlg.update(get_frame_time()) {
+        if let Some(p) = self.dlg.update(get_frame_time()) {
+            if !p.is_empty() { self.last_choice = p.clone(); }
             match self.jin_step {
                 0 => self.dlg.say("Jin", script::JIN_INTRO[1].text, &self.tex),
                 1 => {
@@ -688,7 +689,8 @@ impl Game {
                 self.dlg.say("Jin", script::JIN_LOST_ONE[0].text, &self.tex);
             }
         }
-        if let Some(_) = self.dlg.update(get_frame_time()) {
+        if let Some(p) = self.dlg.update(get_frame_time()) {
+            if !p.is_empty() { self.last_choice = p.clone(); }
             self.after_stage += 1;
             match self.after_stage {
                 1 => self.dlg.say("(Narration)", script::JIN_BOOK_OFFER[0].text, &self.tex),
@@ -1067,7 +1069,7 @@ impl Game {
             return;
         }
         if let Some(p) = self.dlg.update(get_frame_time()) {
-            let _ = p;
+            if !p.is_empty() { self.last_choice = p.clone(); }
             if self.kandy_reaction.is_none() {
                 let texts: &'static [script::Line] = match self.last_choice.as_str() {
                     "g" => script::KANDY_GREAT_TEXTS,
