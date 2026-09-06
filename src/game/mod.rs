@@ -4,13 +4,12 @@ pub mod maze;
 pub mod cosma;
 pub mod jin_battle;
 pub mod ui;
+pub mod world;
 pub mod run;
 
 /// Shared run state that persists across scenes.
 pub struct Progress {
-    /// Tutorial battle: how many times River lost to Jin.
-    pub jin_losses: u32,
-    /// True when the Jin battle was cleared with zero losses.
+    #[allow(dead_code)]
     pub has_horse: bool,
     /// Riddle results per biome (one-try only).
     pub candy_riddles_done: u32,
@@ -20,14 +19,15 @@ pub struct Progress {
     pub gate_solved: bool,
     /// Maze puzzle solved.
     pub maze_solved: bool,
-    /// Elixir components collected (one per biome boss/puzzle).
+    /// Elixir components collected (one per biome).
     pub ingredients: u32,
+    /// Encounters already completed this run (by action id).
+    pub done: std::collections::HashSet<&'static str>,
 }
 
 impl Progress {
     pub fn new() -> Self {
         Self {
-            jin_losses: 0,
             has_horse: false,
             candy_riddles_done: 0,
             aqua_riddles_done: 0,
@@ -35,6 +35,18 @@ impl Progress {
             gate_solved: false,
             maze_solved: false,
             ingredients: 0,
+            done: std::collections::HashSet::new(),
         }
     }
+}
+
+/// Global flag so the world knows travel speed. Set when Jin's horse is earned.
+use std::sync::atomic::{AtomicBool, Ordering};
+static HORSE: AtomicBool = AtomicBool::new(false);
+
+pub fn set_horse(on: bool) {
+    HORSE.store(on, Ordering::Relaxed);
+}
+pub fn ride_unlocked() -> bool {
+    HORSE.load(Ordering::Relaxed)
 }
