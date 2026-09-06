@@ -12,8 +12,18 @@ pub const fn l(who: &'static str, text: &'static str) -> Line {
 
 // ============ CANDY LAND OPENING ============
 
+pub const WAKE_SCENE: &[Line] = &[
+    l("River", "Where... where am I?"),
+    l("River", "This isn't home. This isn't even Earth."),
+    l("(Narration)", "River looks around their surroundings and notices a castle."),
+    l("(Narration)", "River starts walking on the forest path."),
+];
+
+#[allow(dead_code)]
 pub const WAKE: Line = l("River", "Where... where am I?");
+#[allow(dead_code)]
 pub const WAKE2: Line = l("River", "This isn't home. This isn't even Earth.");
+#[allow(dead_code)]
 pub const LOOK: Line = l("(Narration)", "River looks around their surroundings and notices a castle.");
 
 // ============ JIN ENCOUNTER ============
@@ -83,6 +93,31 @@ pub const JIN_BOOK_RETURN: &[Line] = &[
 
 // ============ GUARDS ============
 
+pub const KANDY_INTRO_SCENE: &[Line] = &[
+    l("Kandy Kween", "WHO GOES THERE..?"),
+    l("(Narration)", "*Lights turn on*"),
+    l("Kandy Kween", "Matt, who is this?"),
+    l("Matt", "I am unaware madame."),
+    l("Matt", "Whoever it is, they made it through the guards and trials."),
+    l("Kandy Kween", "Well that isn't very reassuring, I made those myself."),
+    l("(Narration)", "River notices that Kandy Kween's necklace contains an essential ingredient for the elixir."),
+];
+
+pub const CLUE_GILL: &[Line] = &[
+    l("Gillbert", "hey, do you know where wild sea berries grow?"),
+];
+pub const CLUE_SCAL: &[Line] = &[
+    l("Scalleon", "hmm, I believe it's in the *west*, i think?"),
+];
+pub const CLUE_LADY: &[Line] = &[
+    l("Market Lady", "real ones grow from the *North*. And the city hall? It faces the *east*."),
+];
+
+pub const PORTAL_SCENE: &[Line] = &[
+    l("(Narration)", "The stone circle blazes to life. The Rainbow Road ignites."),
+    l("(Narration)", "But the world itself starts to shake..."),
+];
+
 pub const GUARDS: &[Line] = &[
     l("Guard 1", "One of us speaks truth, the other-"),
     l("Guard 2", "you don't seem like you're from around here"),
@@ -97,6 +132,7 @@ pub const GUARDS: &[Line] = &[
 
 // ============ KANDY KWEEN ============
 
+#[allow(dead_code)]
 pub const KANDY_INTRO: &[Line] = &[
     l("Kandy Kween", "WHO GOES THERE..?"),
     l("(Narration)", "*Lights turn on*"),
@@ -143,6 +179,9 @@ pub const DRAGGED: &[Line] = &[
 
 // ============ INTRO (house) ============
 
+/// Marker scene: the intro renders as picture panels, not dialogue.
+pub const INTRO_SCENE: &[Line] = &[l("(Intro)", "intro")];
+
 pub const INTRO_LINES: &[&str] = &[
     "Nadia has fallen sick.",
     "The doctors call it \"illiteracy\".",
@@ -152,12 +191,13 @@ pub const INTRO_LINES: &[&str] = &[
     "Until they try to read it...",
 ];
 
-// ============ RIDDLES ============
+// ============ RIDDLES (one-try only) ============
 
 pub struct Riddle {
     pub question: &'static str,
     pub options: &'static [&'static str],
     pub answer: usize,
+    #[allow(dead_code)]
     pub biome: Biome,
 }
 
