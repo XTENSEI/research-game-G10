@@ -3,9 +3,10 @@
 use macroquad::prelude::*;
 use macroquad::audio::{play_sound, PlaySoundParams};
 use crate::art::{Textures, draw_biome_bg};
+use crate::art::fx::Fx;
 use crate::audio::AudioSys;
 use crate::game::script::{self, Biome};
-use crate::game::ui::{DialogueBox, draw_wrapped, draw_option_row, quiz_header};
+use crate::game::ui::{DialogueBox, draw_wrapped, draw_wrapped_col, wrapped_line_count, draw_option_row, quiz_header, quiz_header_skinned, draw_option_row_skinned, Skin, draw_tag, draw_dlg_text, dlg_width, tag_width};
 use crate::game::world::World;
 use crate::game::{Progress, jin_battle, gate, maze, cosma};
 
@@ -26,6 +27,8 @@ pub enum Phase {
     StarCatch,
     Genie,
     Qte,
+    /// Aquarius teaser card after the trapdoor plunge (gated unless --full).
+    NextEpisode,
     Crumble,
     Ending,
 }
@@ -36,6 +39,8 @@ pub struct Game {
     progress: Progress,
     tex: Textures,
     audio: AudioSys,
+    /// Screen-space effects: post-processing, camera feel, transitions.
+    fx: Fx,
     dlg: DialogueBox,
     world: World,
 
@@ -105,26 +110,36 @@ pub struct Game {
     end_line: usize,
 
     amb_playing: Option<&'static str>,
+    /// Characters revealed last frame, for the typewriter blips.
+    dlg_chars: usize,
     fade: f32,
     pub title_sel: usize,
     pub shake_t: f32,
     save_exists: bool,
+    full_aqua: bool,
+    debug_overlay: bool,
+    /// Clicked an actor farther than arm's reach: (target x, action once arrived).
+    pending_talk: Option<(f32, &'static str)>,
 }
 
 const AMB_VOL: f32 = 0.12;
 
 impl Game {
     pub async fn new() -> Self {
-        let tex = Textures::load();
+        crate::game::ui::ensure_fonts().await;
+        let tex = Textures::load().await;
         let audio = crate::audio::load().await;
+        let world = World::new(Biome::Candy, &tex);
+        let fx = Fx::new(screen_width(), screen_height()).await;
         Self {
             phase: Phase::Title,
             biome: Biome::Candy,
             progress: Progress::new(),
             tex,
             audio,
+            fx,
             dlg: DialogueBox::new(),
-            world: World::new(Biome::Candy),
+            world,
             return_phase: Phase::Explore,
             scene_lines: script::INTRO_SCENE,
             scene_i: 0,
@@ -172,11 +187,67 @@ impl Game {
             crumble_t: 0.0,
             end_line: 0,
             amb_playing: None,
+            dlg_chars: 0,
             fade: 1.0,
             title_sel: 0,
             shake_t: 0.0,
             save_exists: crate::game::save::load().is_some(),
+            full_aqua: std::env::var("LITERACY_FULL").is_ok(),
+            debug_overlay: false,
+            pending_talk: None,
         }
+    }
+
+    /// Jump straight into a free Candy Land overworld (for --shot debugging).
+    pub fn boot_candy(&mut self) {
+        self.boot_biome(Biome::Candy);
+    }
+
+    /// The last fully composited frame, for debug screenshots.
+    pub fn shot_image(&self) -> Image {
+        self.fx.capture()
+    }
+
+    /// Jump straight into the Aquarius overworld (for --shot-aqua QA).
+    pub fn boot_aqua(&mut self) {
+        self.boot_biome(Biome::Aquarius);
+        self.world.player.0 = 1500.0;
+        self.world.cam = self.world.target_cam();
+    }
+
+    /// Jump straight into the Cosma void overworld (for --shot-cosma QA).
+    pub fn boot_cosma(&mut self) {
+        self.boot_biome(Biome::Cosma);
+        self.world.player.0 = 620.0;
+        self.world.cam = self.world.target_cam();
+    }
+
+    fn boot_biome(&mut self, biome: Biome) {
+        self.phase = Phase::Explore;
+        self.biome = biome;
+        self.world = World::new(biome, &self.tex);
+        self.fade = 0.0;
+        let amb = match biome {
+            Biome::Candy => "candy",
+            Biome::Aquarius => "aqua",
+            Biome::Cosma => "cosma",
+            Biome::Home => "house",
+        };
+        self.amb(amb);
+        self.fx.iris_open();
+        self.fx.punch(0.035);
+    }
+
+    /// Open a demo dialogue over the world so UI can be screenshotted.
+    pub fn demo_dialog(&mut self) {
+        self.boot_candy();
+        self.world.player.0 = 610.0;
+        self.dlg.ask(
+            "Jin",
+            "Howdy! I was just in the forest grabbing licorice. The whole dialogue panel, typewriter and choices get one last look before we ship.",
+            &[("Where am I", "where"), ("No", "no")],
+            &self.tex,
+        );
     }
 
     /// Apply a loaded save.
@@ -190,7 +261,7 @@ impl Game {
         self.progress.maze_solved = d.maze_solved;
         self.progress.ingredients = d.ingredients;
         self.biome = d.biome.to_biome();
-        self.world = World::new(self.biome);
+        self.world = World::new(self.biome, &self.tex);
         self.world.player.0 = d.player_x.clamp(60.0, self.world.length - 60.0);
         self.world.cam = self.world.target_cam();
         self.amb_playing = None;
@@ -226,7 +297,7 @@ impl Game {
         crate::game::set_horse(false);
         self.progress = Progress::new();
         self.biome = Biome::Candy;
-        self.world = World::new(Biome::Candy);
+        self.world = World::new(Biome::Candy, &self.tex);
         self.phase = Phase::Scene;
         self.scene_lines = script::INTRO_SCENE;
         self.scene_i = 0;
@@ -244,6 +315,7 @@ impl Game {
         self.cosma_fail = false;
         self.poem = 0;
         self.slab = 0;
+        self.pending_talk = None;
     }
 
     fn amb(&mut self, which: &'static str) {
@@ -256,6 +328,19 @@ impl Game {
             };
             play_sound(snd, PlaySoundParams { looped: true, volume: AMB_VOL });
             self.amb_playing = Some(which);
+        }
+    }
+
+    /// Typewriter blips, driven from one place: any screen that shows dialogue
+    /// gets them, and the pitch-ish variation comes from sounding only every
+    /// other character advancing.
+    fn typewriter_sfx(&mut self) {
+        let shown = self.dlg.chars_shown();
+        if shown != self.dlg_chars {
+            if shown > self.dlg_chars && shown % 2 == 0 {
+                play_sound(&self.audio.sfx.blip, PlaySoundParams { looped: false, volume: 0.09 });
+            }
+            self.dlg_chars = shown;
         }
     }
 
@@ -274,9 +359,36 @@ impl Game {
         self.dlg.say(ln.who, ln.text, &self.tex);
     }
 
-    pub fn update(&mut self, dt: f32) {
+    pub fn update(&mut self, dt_raw: f32) {
+        self.fx.tick(dt_raw);
+        // Hit-stop: an impact drops the world into slow-motion for a few
+        // frames. It is the cheapest way to make a right answer feel like it
+        // landed, and it needs no new state on any puzzle.
+        let dt = if self.fx.freeze > 0.0 { dt_raw * 0.07 } else { dt_raw };
         self.fade = (self.fade + dt * 2.0).min(1.0);
         self.shake_t = (self.shake_t - dt).max(0.0);
+        if is_key_pressed(KeyCode::F1) {
+            self.debug_overlay = !self.debug_overlay;
+        }
+        // F2 toggles the full episode arc (Aquarius + Cosma). Lives as a key
+        // because env-var gates don't exist on wasm.
+        if is_key_pressed(KeyCode::F2) {
+            self.full_aqua = !self.full_aqua;
+            self.world.set_hint(if self.full_aqua { "Debug: full arc unlocked" } else { "Debug: arc gated at Aquarius" });
+        }
+        // F3 cycles biomes (playtest QA): Candy -> Aquarius -> Cosma -> Home
+        if is_key_pressed(KeyCode::F3) {
+            let next = match self.biome {
+                Biome::Candy => Biome::Aquarius,
+                Biome::Aquarius => Biome::Cosma,
+                Biome::Cosma => Biome::Home,
+                Biome::Home => Biome::Candy,
+            };
+            self.biome = next;
+            self.world = World::new(next, &self.tex);
+            self.phase = Phase::Explore;
+            self.fade = 0.0;
+        }
         match self.phase {
             Phase::Title => self.up_title(),
             Phase::Scene => self.up_scene(),
@@ -291,12 +403,18 @@ impl Game {
             Phase::StarCatch => self.up_star_catch(dt),
             Phase::Genie => self.up_genie(),
             Phase::Qte => self.up_qte(dt),
+            Phase::NextEpisode => self.up_next(),
             Phase::Crumble => self.up_crumble(dt),
             Phase::Ending => self.up_ending(),
         }
+        self.typewriter_sfx();
     }
 
-    pub fn draw(&self) {
+    pub fn draw(&mut self) {
+        // The scene goes into an offscreen buffer first; the effects layer then
+        // composites it with bloom, the biome colour grade, a vignette, film
+        // grain and the transition iris.
+        self.fx.begin();
         match self.phase {
             Phase::Title => self.dr_title(),
             Phase::Scene => {
@@ -322,14 +440,14 @@ impl Game {
             Phase::StarCatch => self.dr_stars(),
             Phase::Genie => self.dr_genie(),
             Phase::Qte => self.dr_qte(),
+            Phase::NextEpisode => self.dr_next(),
             Phase::Crumble => self.dr_crumble(),
             Phase::Ending => self.dr_ending(),
         }
-        // fade-in veil for scene transitions
-        if self.fade < 1.0 {
-            let a = (1.0 - self.fade) * 0.9;
-            draw_rectangle(0.0, 0.0, screen_width(), screen_height(), Color::new(0.0, 0.0, 0.0, a));
+        if self.debug_overlay {
+            self.dr_debug();
         }
+        self.fx.finish(self.fade);
     }
 
     fn shake_off(&self) -> f32 {
@@ -339,54 +457,74 @@ impl Game {
     }
 
     fn dr_world(&self) {
-        draw_biome_bg(self.biome, get_time() as f32);
-        self.world.draw(&self.tex, get_time() as f32, self.shake_off());
+        let t = get_time() as f32;
+        draw_biome_bg(self.biome, t, self.world.cam, &self.fx);
+        self.world.draw(&self.tex, &self.fx, t, self.shake_off());
         self.dlg.draw();
     }
 
     fn dr_world_behind(&self) {
-        draw_biome_bg(self.biome, get_time() as f32);
-        self.world.draw(&self.tex, get_time() as f32, self.shake_off());
+        let t = get_time() as f32;
+        draw_biome_bg(self.biome, t, self.world.cam, &self.fx);
+        self.world.draw(&self.tex, &self.fx, t, self.shake_off());
     }
 
     fn draw_hud(&self) {
-        // ingredient counter
-        let msg = format!("Elixir components: {}/3", self.progress.ingredients);
-        draw_rectangle(14.0, 12.0, measure_text(&msg, None, 16, 1.0).width + 20.0, 26.0,
-            Color::from_rgba(0, 0, 0, 150));
-        draw_text(&msg, 24.0, 30.0, 16.0, Color::from_rgba(255, 230, 120, 255));
+        let w = screen_width();
+        let msg = format!("elixir {}/3", self.progress.ingredients);
+        let tw = tag_width(&msg, 13) + 26.0;
+        draw_rectangle(14.0, 12.0, tw, 30.0, Color::from_rgba(255, 246, 233, 235));
+        draw_rectangle_lines(14.0, 12.0, tw, 30.0, 2.0, Color::from_rgba(74, 42, 99, 255));
+        draw_tag(&msg, 27.0, 31.0, 13, Color::from_rgba(74, 42, 99, 255));
         if self.progress.has_horse {
-            draw_text("horse: yes", 24.0, 56.0, 14.0, Color::from_rgba(200, 255, 200, 200));
+            draw_dlg_text("riding the horse", 20.0, 54.0, 22, Color::from_rgba(255, 214, 230, 230));
+        }
+        if w < 1100.0 && self.world.hint_t > 0.0 {
+            let _ = w;
         }
     }
 
     fn dr_intro(&self) {
         let w = screen_width();
         let h = screen_height();
+        // storybook page: plum night around a cream card
+        clear_background(Color::from_rgba(26, 14, 43, 255));
+        draw_rectangle(0.0, 0.0, w, 120.0, Color::from_rgba(46, 26, 71, 255));
+        draw_rectangle(0.0, h - 120.0, w, 120.0, Color::from_rgba(46, 26, 71, 255));
         if self.intro_i < script::INTRO_LINES.len() {
-            clear_background(Color::from_rgba(24, 16, 20, 255));
+            let cw = 820.0;
+            let ch = 470.0;
+            let cx = (w - cw) / 2.0;
+            let cy = (h - ch) / 2.0 + 6.0;
+            // card
+            draw_rectangle(cx - 6.0, cy + 6.0, cw + 12.0, ch + 12.0, Color::from_rgba(226, 106, 156, 90));
+            draw_rectangle(cx, cy, cw, ch, Color::from_rgba(255, 246, 233, 255));
+            draw_rectangle_lines(cx - 2.0, cy - 2.0, cw + 4.0, ch + 4.0, 4.0, Color::from_rgba(74, 42, 99, 255));
+            // picture zone on the card
+            let py = cy + 52.0;
             match self.intro_i {
-                0..=1 => draw_texture_ex(&self.tex.nadia, w * 0.5 - 48.0, h * 0.32, WHITE,
-                    DrawTextureParams { dest_size: Some(Vec2::new(96.0, 144.0)), ..Default::default() }),
-                2..=3 => draw_texture_ex(&self.tex.grandparent, w * 0.5 - 48.0, h * 0.30, WHITE,
-                    DrawTextureParams { dest_size: Some(Vec2::new(96.0, 144.0)), ..Default::default() }),
+                0..=1 => draw_texture_ex(&self.tex.nadia, w * 0.5 - 57.0, py, WHITE,
+                    DrawTextureParams { dest_size: Some(Vec2::new(114.0, 171.0)), ..Default::default() }),
+                2..=3 => draw_texture_ex(&self.tex.grandparent, w * 0.5 - 57.0, py, WHITE,
+                    DrawTextureParams { dest_size: Some(Vec2::new(114.0, 171.0)), ..Default::default() }),
                 _ => {
                     let glow = 0.5 + 0.5 * (get_time() as f32 * 2.0).sin();
-                    draw_circle(w * 0.5, h * 0.42, 60.0 + glow * 14.0,
-                        Color::from_rgba(255, 240, 180, (40.0 + glow * 40.0) as u8));
-                    draw_rectangle(w * 0.5 - 34.0, h * 0.42 - 44.0, 68.0, 88.0,
-                        Color::from_rgba(140, 40, 40, 255));
-                    draw_rectangle(w * 0.5 - 4.0, h * 0.42 - 44.0, 8.0, 88.0,
-                        Color::from_rgba(90, 20, 20, 255));
+                    draw_circle(w * 0.5, py + 78.0, 72.0 + glow * 16.0, Color::from_rgba(255, 224, 140, (50.0 + glow * 50.0) as u8));
+                    draw_rectangle(w * 0.5 - 40.0, py + 16.0, 80.0, 112.0, Color::from_rgba(178, 66, 66, 255));
+                    draw_rectangle(w * 0.5 - 8.0, py + 16.0, 16.0, 112.0, Color::from_rgba(110, 30, 30, 255));
                 }
             }
-            draw_wrapped(script::INTRO_LINES[self.intro_i], w * 0.5 - 300.0, h * 0.72, 600.0, 30.0);
+            draw_rectangle(w * 0.5 - 150.0, py + 196.0, 300.0, 2.0, Color::from_rgba(255, 214, 230, 255));
+            // narration in ink below the picture
+            let txt = script::INTRO_LINES[self.intro_i];
+            draw_wrapped_col(txt, w * 0.5 - 320.0, py + 216.0, 640.0, 36.0, 34, Color::from_rgba(46, 26, 71, 255));
         } else {
+            // final white-to-night page turn
             let a = (1.0 - self.intro_t).clamp(0.0, 1.0);
-            clear_background(Color::new(1.0, 1.0, 1.0, a));
+            draw_rectangle(0.0, 0.0, w, h, Color::new(a, a * 0.97, a * 0.92, 1.0));
         }
         if (get_time() * 2.0) as i32 % 2 == 0 {
-            draw_text("z / click", w - 130.0, h - 24.0, 16.0, Color::from_rgba(255, 200, 220, 160));
+            draw_tag("z / click", w - 150.0, h - 34.0, 12, Color::from_rgba(255, 214, 230, 200));
         }
     }
 
@@ -403,7 +541,7 @@ impl Game {
                 if self.intro_i >= script::INTRO_LINES.len() + 1 {
                     // arrive in candy land
                     self.biome = Biome::Candy;
-                    self.world = World::new(Biome::Candy);
+                    self.world = World::new(Biome::Candy, &self.tex);
                     self.fade = 0.0;
                     self.amb("candy");
                     self.play_scene(script::WAKE_SCENE, Phase::Explore);
@@ -452,19 +590,72 @@ impl Game {
         self.world.update(get_frame_time(), false);
         if self.world.step_hit {
             self.world.step_hit = false;
-            play_sound(&self.audio.sfx.blip, PlaySoundParams { looped: false, volume: 0.07 });
+            self.step_play();
+        }
+        // Esc: back out of a pending click-to-walk, or close a prompt
+        if is_key_pressed(KeyCode::Escape) {
+            if self.world.click.is_some() {
+                self.world.click = None;
+                self.ui_back();
+            }
         }
         // F5 quicksave
         if is_key_pressed(KeyCode::F5) {
             self.autosave();
             self.world.set_hint("saved.");
         }
-        if !Self::adv_pressed() {
+        let mdown = is_mouse_button_pressed(MouseButton::Left);
+        let kb_adv = is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Enter);
+        let (mx, my) = mouse_position();
+        let mut action: Option<&'static str> = None;
+        let mut force = false;
+
+        if self.world.interact_cd <= 0.0 && (kb_adv || mdown) {
+            // A click can target a person or thing directly (walk there, then talk).
+            if mdown {
+                match self.world.hit_click(mx, my) {
+                    Some((wx, act)) => {
+                        if (self.world.player.0 - wx).abs() <= crate::game::world::REACH * 1.5 {
+                            action = Some(act);
+                            force = true;
+                        } else if !kb_adv {
+                            self.world.click = Some(wx);
+                            self.pending_talk = Some((wx, act));
+                        }
+                    }
+                    None => {
+                        if !kb_adv {
+                            let tx = (self.world.cam + mx).clamp(60.0, self.world.length - 60.0);
+                            self.world.click = Some(tx);
+                        }
+                    }
+                }
+            }
+            // Keyboard: only interacts when already within reach of something.
+            if action.is_none() && kb_adv {
+                if let Some(a) = self.world.nearest_action() {
+                    action = Some(a);
+                    force = true;
+                }
+            }
+        }
+        // Arrived at a click-to-talk destination.
+        if action.is_none() {
+            if let Some((tx, act)) = self.pending_talk {
+                if (self.world.player.0 - tx).abs() <= crate::game::world::REACH + 24.0 {
+                    self.pending_talk = None;
+                    self.world.click = None;
+                    action = Some(act);
+                    force = true;
+                }
+            }
+        }
+        if !force {
             return;
         }
-        if self.world.interact_cd > 0.0 { return; }
-        let Some(action) = self.world.nearest_action() else { return };
+        self.pending_talk = None;
         self.world.interact_cd = 0.35;
+        let action = action.unwrap();
         match action {
             "jin" => {
                 self.dlg.close();
@@ -539,6 +730,7 @@ impl Game {
         self.riddle_answered = false;
         self.riddle_right = None;
         self.phase = Phase::Riddle;
+        self.ask_play();
     }
 
     fn riddle_set_ref(&self) -> &'static [script::Riddle] {
@@ -571,8 +763,10 @@ impl Game {
         let idx = self.riddles_done() as usize % set.len();
         let r = &set[idx];
         if !self.riddle_answered {
+            let before = self.riddle_sel;
             if is_key_pressed(KeyCode::Up) { self.riddle_sel = self.riddle_sel.saturating_sub(1); }
             if is_key_pressed(KeyCode::Down) { self.riddle_sel = (self.riddle_sel + 1).min(3); }
+            if self.riddle_sel != before { self.ui_move(); }
             for i in 0..4 {
                 let k = match i { 0 => KeyCode::Key1, 1 => KeyCode::Key2, 2 => KeyCode::Key3, _ => KeyCode::Key4 };
                 if is_key_pressed(k) {
@@ -603,13 +797,19 @@ impl Game {
     fn submit_riddle(&mut self, answer: usize) {
         self.riddle_answered = true;
         self.riddle_right = Some(self.riddle_sel == answer);
+        let px = self.world.player.0;
+        let py = self.world.player.1 + 20.0;
         if self.riddle_right == Some(true) {
             self.good_play();
-            self.world.burst(self.world.player.0, self.world.player.1 + 20.0, 2, 14);
+            // burst for the spark, ring for the shockwave: together they read as
+            // one event with a direction rather than a puff of pixels
+            self.world.burst(px, py, 2, 14);
+            self.world.ring(px, py, 2, 16, 210.0);
         } else {
             self.bad_play();
             self.shake_t = 0.35;
-            self.world.burst(self.world.player.0, self.world.player.1 + 20.0, 0, 10);
+            self.world.burst(px, py, 0, 10);
+            self.world.ring(px, py, 0, 12, 150.0);
         }
         self.autosave();
     }
@@ -619,19 +819,29 @@ impl Game {
         let set = self.riddle_set_ref();
         let idx = self.riddles_done() as usize % set.len();
         let r = &set[idx];
-        let title = match self.riddle_set { 0 => "CANDY LAND RIDDLE", 1 => "AQUARIUS RIDDLE", _ => "COSMA RIDDLE" };
-        quiz_header(title, r.question);
+        let (title, skin) = match self.riddle_set {
+            0 => ("CANDY LAND RIDDLE", Skin::Plum),
+            1 => ("AQUARIUS RIDDLE", Skin::PearlSand),
+            _ => ("COSMA RIDDLE", Skin::NeonSlab),
+        };
+        quiz_header_skinned(title, r.question, skin);
         let w = screen_width();
+        // long story-riddles wrap to several lines: push options below them
+        let qlines = wrapped_line_count(r.question, 660.0, 28) as f32;
+        let q_end = 122.0 + qlines * 28.0 + 14.0;
+        let row0 = q_end.max(250.0);
         for (i, o) in r.options.iter().enumerate() {
-            draw_option_row(i, o, 250.0 + i as f32 * 44.0,
+            draw_option_row_skinned(i, o, row0 + i as f32 * 44.0,
                 i == self.riddle_sel,
-                if self.riddle_answered { Some(i != r.answer) } else { None });
+                if self.riddle_answered { Some(i != r.answer) } else { None },
+                skin);
         }
         if self.riddle_answered {
             let right = self.riddle_right == Some(true);
+            let msg_y = row0 + 4.0 * 44.0 + 22.0;
             draw_text(
                 if right { "Correct! z to return" } else { "Wrong. One try only. z restarts this stone's riddles" },
-                w * 0.5 - 180.0, 470.0, 24.0,
+                w * 0.5 - 180.0, msg_y, 24.0,
                 if right { GREEN } else { RED });
         }
     }
@@ -834,6 +1044,7 @@ impl Game {
 
     // ---------- GATE ----------
     fn enter_gate(&mut self) {
+        self.ask_play();
         self.gate_marks.clear();
         self.gate_slot = 0;
         self.gate_sel = 0;
@@ -851,8 +1062,10 @@ impl Game {
         opts.rotate_left(rot);
         self.gate_options = opts;
 
+        let gprev = self.gate_sel;
         if is_key_pressed(KeyCode::Up) { self.gate_sel = self.gate_sel.saturating_sub(1); }
         if is_key_pressed(KeyCode::Down) { self.gate_sel = (self.gate_sel + 1).min(4); }
+        if self.gate_sel != gprev { self.ui_click(); }
         for i in 0..5 {
             let k = match i { 0 => KeyCode::Key1, 1 => KeyCode::Key2, 2 => KeyCode::Key3, 3 => KeyCode::Key4, _ => KeyCode::Key5 };
             if is_key_pressed(k) { self.gate_sel = i; }
@@ -867,6 +1080,7 @@ impl Game {
                 if self.gate_slot >= gate::THRONE_GATE.slots.len() {
                     self.progress.gate_solved = true;
                     self.progress.ingredients += 1;
+                    self.reward_play();
                     self.progress.done.insert("gate");
                     self.world.set_hint("The Throne Gate grinds open!");
                     self.world.burst(2050.0, 470.0, 2, 30);
@@ -959,6 +1173,7 @@ impl Game {
 
     // ---------- MAZE ----------
     fn enter_maze(&mut self) {
+        self.ask_play();
         self.maze_order = (0..maze::MAZE_QUESTIONS.len()).collect();
         let mut seed = (get_time() * 1000.0) as u64 | 1;
         for i in (1..self.maze_order.len()).rev() {
@@ -976,6 +1191,7 @@ impl Game {
         if self.maze_step >= n {
             self.progress.maze_solved = true;
             self.progress.ingredients += 1;
+            self.reward_play();
             self.progress.done.insert("maze");
             self.world.set_hint("The cave opens to the far current!");
             self.world.burst(self.world.player.0, self.world.player.1 + 20.0, 1, 24);
@@ -986,8 +1202,10 @@ impl Game {
             return;
         }
         let q = &maze::MAZE_QUESTIONS[self.maze_order[self.maze_step]];
+        let mprev = self.maze_sel;
         if is_key_pressed(KeyCode::Up) { self.maze_sel = (self.maze_sel + 3) % 4; }
         if is_key_pressed(KeyCode::Down) { self.maze_sel = (self.maze_sel + 1) % 4; }
+        if self.maze_sel != mprev { self.ui_click(); }
         for i in 0..4 {
             let k = match i { 0 => KeyCode::Key1, 1 => KeyCode::Key2, 2 => KeyCode::Key3, _ => KeyCode::Key4 };
             if is_key_pressed(k) { self.maze_sel = i; }
@@ -1011,12 +1229,12 @@ impl Game {
         let w = screen_width();
         // cave darkness
         draw_rectangle(0.0, 0.0, w, screen_height(), Color::from_rgba(6, 10, 20, 235));
-        quiz_header("THE GRAVE CAVE MAZE OF CRAZE", "Choose the path. Wrong: you are silently sent back.");
+        quiz_header_skinned("THE GRAVE CAVE MAZE OF CRAZE", "Choose the path. Wrong: you are silently sent back.", Skin::PearlSand);
         let step = self.maze_step.min(self.maze_order.len().saturating_sub(1));
         let q = &maze::MAZE_QUESTIONS[self.maze_order[step]];
         draw_wrapped(q.question, w * 0.5 - 300.0, 220.0, 600.0, 28.0);
         for i in 0..4 {
-            draw_option_row(i, maze::DIR_NAMES[i], 340.0 + i as f32 * 44.0, i == self.maze_sel, None);
+            draw_option_row_skinned(i, maze::DIR_NAMES[i], 340.0 + i as f32 * 44.0, i == self.maze_sel, None, Skin::PearlSand);
         }
         draw_rectangle(w - 44.0, 200.0, 14.0, 300.0, Color::from_rgba(255, 255, 255, 40));
         draw_rectangle(w - 44.0, 500.0 - self.maze_depth, 14.0, self.maze_depth.max(6.0), PINK);
@@ -1028,6 +1246,7 @@ impl Game {
 
     // ---------- COSMA ----------
     fn enter_stars(&mut self) {
+        self.ask_play();
         self.stars.clear();
         self.star_meter = 0;
         self.lives = cosma::LIVES;
@@ -1093,9 +1312,9 @@ impl Game {
         self.dr_world_behind();
         let _w = screen_width();
         let p = &cosma::POEMS[self.poem];
-        quiz_header("THE RAINBOW ROAD",
+        quiz_header_skinned("THE RAINBOW ROAD",
             &format!("Catch stars, avoid dying stars. Lives: {}. Slab {}/{}",
-                self.lives, self.slab + 1, cosma::SLABS));
+                self.lives, self.slab + 1, cosma::SLABS), Skin::NeonSlab);
         for (i, line) in p.lines.iter().enumerate() {
             let c = if i < self.slab as usize { WHITE } else { Color::from_rgba(255, 255, 255, 70) };
             draw_text(line, 40.0, 160.0 + i as f32 * 24.0, 18.0, c);
@@ -1138,6 +1357,7 @@ impl Game {
                 if self.genie_sel == p.answer {
                     self.good_play();
                     self.progress.ingredients += 1;
+                    self.reward_play();
                     self.progress.done.insert("portal");
                     self.phase = Phase::Explore;
                     self.fade = 0.0;
@@ -1166,9 +1386,9 @@ impl Game {
             return;
         }
         let p = &cosma::POEMS[self.poem];
-        quiz_header("GENIE'S QUESTION", p.question);
+        quiz_header_skinned("GENIE'S QUESTION", p.question, Skin::NeonSlab);
         for (i, o) in p.options.iter().enumerate() {
-            draw_option_row(i, o, 300.0 + i as f32 * 44.0, i == self.genie_sel, None);
+            draw_option_row_skinned(i, o, 300.0 + i as f32 * 44.0, i == self.genie_sel, None, Skin::NeonSlab);
         }
     }
 
@@ -1219,13 +1439,10 @@ impl Game {
                     let ln = &script::DRAGGED[idx];
                     self.dlg.say(ln.who, ln.text, &self.tex);
                 } else {
-                    // arrive in Aquarius
-                    self.biome = Biome::Aquarius;
-                    self.world = World::new(Biome::Aquarius);
+                    // the drag ends: teaser card gates Aquarius (LITERACY_FULL unlocks)
                     self.fade = 0.0;
-                    self.amb("aqua");
                     self.dlg.close();
-                    self.phase = Phase::Explore;
+                    self.phase = Phase::NextEpisode;
                 }
             }
             return;
@@ -1265,7 +1482,7 @@ impl Game {
         if Self::adv_pressed() && self.crumble_t > 1.5 {
             // run back to an explorable home
             self.biome = Biome::Home;
-            self.world = World::new(Biome::Home);
+            self.world = World::new(Biome::Home, &self.tex);
             self.fade = 0.0;
             self.amb("house");
             self.phase = Phase::Explore;
@@ -1319,11 +1536,39 @@ impl Game {
 impl Game {
     fn up_title(&mut self) {
         self.amb("house");
+        let w = screen_width();
         let opts = if self.save_exists { 2 } else { 1 };
-        if is_key_pressed(KeyCode::Up) { self.title_sel = self.title_sel.saturating_sub(1); }
-        if is_key_pressed(KeyCode::Down) { self.title_sel = self.title_sel.min(opts - 1); }
+        if is_key_pressed(KeyCode::Up) {
+            let before = self.title_sel;
+            self.title_sel = self.title_sel.saturating_sub(1);
+            if self.title_sel != before { self.ui_move(); }
+        }
+        if is_key_pressed(KeyCode::Down) {
+            let before = self.title_sel;
+            self.title_sel = (self.title_sel + 1).min(opts - 1);
+            if self.title_sel != before { self.ui_move(); }
+        }
         if self.title_sel >= opts { self.title_sel = opts - 1; }
-        if is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Enter) {
+
+        // Hover picks the row under the cursor.
+        let (mx, my) = mouse_position();
+        let mut hover: Option<usize> = None;
+        let mut y = 470.0;
+        let entries: [(&str, bool); 2] = [("continue", self.save_exists), ("new game", true)];
+        for (i, (label, enabled)) in entries.iter().enumerate() {
+            if !*enabled { y += 56.0; continue; }
+            let lw = tag_width(label, 18) + 56.0;
+            let x = w * 0.5 - lw / 2.0;
+            if my >= y - 6.0 && my <= y + 42.0 && mx >= x - 10.0 && mx <= x + lw + 10.0 {
+                hover = Some(i);
+            }
+            y += 56.0;
+        }
+        if let Some(h) = hover {
+            self.title_sel = h;
+        }
+        let click_fire = hover.is_some() && is_mouse_button_pressed(MouseButton::Left);
+        if is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Enter) || click_fire {
             self.good_play();
             if self.save_exists && self.title_sel == 0 {
                 if let Some(d) = crate::game::save::load() {
@@ -1338,42 +1583,274 @@ impl Game {
     fn dr_title(&self) {
         let w = screen_width();
         let h = screen_height();
-        clear_background(Color::from_rgba(24, 16, 20, 255));
-        // the heirloom book, glowing
-        let glow = 0.5 + 0.5 * (get_time() as f32 * 1.6).sin();
-        draw_circle(w * 0.5, 240.0, 90.0 + glow * 16.0, Color::from_rgba(255, 240, 180, (28.0 + glow * 40.0) as u8));
-        draw_rectangle(w * 0.5 - 48.0, 180.0, 96.0, 124.0, Color::from_rgba(140, 40, 40, 255));
-        draw_rectangle(w * 0.5 - 6.0, 180.0, 12.0, 124.0, Color::from_rgba(90, 20, 20, 255));
-        draw_text("GIFT OF EDUCATION", w * 0.5 - measure_text("GIFT OF EDUCATION", None, 44, 1.0).width * 0.5, 110.0, 44.0, PINK);
-        draw_text("a literacy rpg", w * 0.5 - measure_text("a literacy rpg", None, 20, 1.0).width * 0.5, 360.0, 20.0,
-            Color::from_rgba(230, 200, 210, 200));
-
-        let items: [(&str, bool); 2] = [("continue", self.save_exists), ("new game", true)];
-        let mut y = 430.0;
-        for (i, (label, enabled)) in items.iter().enumerate() {
-            if !enabled { y += 44.0; continue; }
-            let sel = i == self.title_sel;
-            let c = if sel { WHITE } else { Color::from_rgba(190, 190, 200, 255) };
-            let label_s = label.to_string();
-            let tw = measure_text(&label_s, None, 24, 1.0).width;
-            if sel { draw_text(">", w * 0.5 - tw * 0.5 - 30.0, y, 24.0, PINK); }
-            draw_text(&label_s, w * 0.5 - tw * 0.5, y, 24.0, c);
-            y += 44.0;
+        // deep plum gradient sky
+        let top = Color::from_rgba(74, 42, 99, 255);
+        let bot = Color::from_rgba(26, 14, 43, 255);
+        for i in 0..48 {
+            let f = i as f32 / 48.0;
+            let c = Color::new(top.r + (bot.r - top.r) * f, top.g + (bot.g - top.g) * f, top.b + (bot.b - top.b) * f, 1.0);
+            draw_rectangle(0.0, i as f32 * h / 48.0, w, h / 48.0 + 1.0, c);
         }
-        draw_text("wasd move - z confirm - 1-4 pick", w * 0.5 - measure_text("wasd move - z confirm - 1-4 pick", None, 16, 1.0).width * 0.5,
-            h - 30.0, 16.0, Color::from_rgba(160, 150, 160, 160));
-    }
-
-    fn page_play(&self) {
+        // drifting pink sparkles
+        let t = get_time() as f32;
+        let mut seed = 12u64;
+        for _ in 0..46 {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let x = ((seed >> 33) % 1024) as f32;
+            let y = (((seed >> 20) % 720) as f32 + t * (14.0 + (seed % 12) as f32)) % h;
+            let tw = 0.4 + 0.6 * (t * 2.0 + (seed % 8) as f32).sin().abs();
+            draw_rectangle(x, y, 2.0, 2.0, Color::new(1.0, 0.72, 0.84, tw * 0.8));
+        }
+        // heirloom book glowing behind the title block
+        let glow = 0.5 + 0.5 * (get_time() as f32 * 1.6).sin();
+        draw_circle(w * 0.5, 128.0, 120.0 + glow * 18.0, Color::from_rgba(255, 224, 140, (26.0 + glow * 34.0) as u8));
+        draw_rectangle(w * 0.5 - 40.0, 74.0, 80.0, 100.0, Color::from_rgba(178, 66, 66, 255));
+        draw_rectangle(w * 0.5 - 6.0, 74.0, 12.0, 100.0, Color::from_rgba(110, 30, 30, 255));
+        draw_rectangle(w * 0.5 - 26.0, 88.0, 52.0, 6.0, Color::from_rgba(255, 224, 170, 180));
+        draw_rectangle(w * 0.5 - 26.0, 100.0, 40.0, 6.0, Color::from_rgba(255, 224, 170, 140));
+        // title in Press Start, cream on plum; hard-capped so it can never
+        // overflow on backends whose glyph rendering outgrows the metrics
+        let title = "GIFT OF EDUCATION";
+        let ts: u16 = 26;
+        let tw = tag_width(title, ts);
+        draw_tag(title, w * 0.5 - tw / 2.0, 206.0, ts, Color::from_rgba(255, 246, 233, 255));
+        draw_rectangle(w * 0.5 - tw * 0.25, 258.0, tw * 0.5, 3.0, Color::from_rgba(226, 106, 156, 255));
+        let sub = "a literacy rpg";
+        let sw = dlg_width(sub, 30);
+        draw_dlg_text(sub, w * 0.5 - sw / 2.0, 278.0, 30, Color::from_rgba(255, 214, 230, 220));
+        // characters standing either side of the menu
+        draw_texture_ex(&self.tex.nadia, w * 0.5 - 380.0, 430.0, WHITE,
+            DrawTextureParams { dest_size: Some(Vec2::new(90.0, 135.0)), ..Default::default() });
+        draw_texture_ex(&self.tex.river, w * 0.5 + 290.0, 430.0, WHITE,
+            DrawTextureParams { dest_size: Some(Vec2::new(90.0, 135.0)), ..Default::default() });
+        // menu chips
+        let items: [(&str, bool); 2] = [("continue", self.save_exists), ("new game", true)];
+        let mut y = 470.0;
+        for (i, (label, enabled)) in items.iter().enumerate() {
+            if !enabled { y += 56.0; continue; }
+            let sel = i == self.title_sel;
+            let lw = tag_width(label, 18) + 56.0;
+            let x = w * 0.5 - lw / 2.0;
+            if sel {
+                draw_rectangle(x, y, lw, 36.0, Color::from_rgba(226, 106, 156, 255));
+                draw_rectangle_lines(x - 2.0, y - 2.0, lw + 4.0, 40.0, 2.0, Color::from_rgba(255, 246, 233, 255));
+                draw_tag(label, w * 0.5 - tag_width(label, 18) / 2.0, y + 24.0, 18, Color::from_rgba(46, 26, 71, 255));
+            } else {
+                draw_tag(label, w * 0.5 - tag_width(label, 18) / 2.0, y + 24.0, 18, Color::from_rgba(200, 186, 214, 255));
+            }
+            y += 56.0;
+        }
+        let ctrl = "wasd move  z confirm  1-4 pick  f1 debug";
+        let cw2 = dlg_width(ctrl, 24);
+        draw_dlg_text(ctrl, w * 0.5 - cw2 / 2.0, h - 34.0, 24, Color::from_rgba(200, 186, 214, 150));
+    }    fn page_play(&mut self) {
         play_sound(&self.audio.sfx.page, PlaySoundParams { looped: false, volume: 0.5 });
     }
-    fn good_play(&self) {
+
+    /// Right answer: bright flash, a small punch-in and a few frames of
+    /// hit-stop, so the confirmation reads as a hit rather than a label swap.
+    fn good_play(&mut self) {
         play_sound(&self.audio.sfx.good, PlaySoundParams { looped: false, volume: 0.5 });
+        self.fx.accent(true);
     }
-    fn bad_play(&self) {
+
+    /// Wrong answer: red flash, camera kick, longer hit-stop.
+    fn bad_play(&mut self) {
         play_sound(&self.audio.sfx.bad, PlaySoundParams { looped: false, volume: 0.5 });
+        self.fx.accent(false);
     }
-    fn splash_play(&self) {
+
+    /// Footsteps. The surface follows the biome, and the two variants alternate
+    /// with a small volume jitter so a walk does not read as one looped sample.
+    fn step_play(&mut self) {
+        let n = self.audio.sfx.steps.len();
+        if n < 8 {
+            return;
+        }
+        // riding swaps the whole set for a harder, woodier contact
+        let base = match (self.biome, crate::game::ride_unlocked()) {
+            (Biome::Candy, true) => 6,
+            (Biome::Candy, false) => 0,
+            (Biome::Aquarius, _) => 2,
+            (Biome::Cosma, _) => 4,
+            (Biome::Home, _) => 6,
+        };
+        let idx = (base + (rand::gen_range(0.0, 2.0) as usize)) % n;
+        let vol = if crate::game::ride_unlocked() && self.biome == Biome::Candy {
+            0.30 + rand::gen_range(0.0, 0.08)
+        } else {
+            0.22 + rand::gen_range(0.0, 0.09)
+        };
+        play_sound(&self.audio.sfx.steps[idx], PlaySoundParams { looped: false, volume: vol });
+    }
+
+    /// A generic UI blip for prompt advances and menu moves.
+    fn ui_click(&mut self) {
+        play_sound(&self.audio.sfx.click, PlaySoundParams { looped: false, volume: 0.35 });
+        self.fx.punch(0.006);
+    }
+
+    fn ui_move(&mut self) {
+        play_sound(&self.audio.sfx.select, PlaySoundParams { looped: false, volume: 0.28 });
+    }
+
+    fn ui_back(&mut self) {
+        play_sound(&self.audio.sfx.back, PlaySoundParams { looped: false, volume: 0.30 });
+    }
+
+    /// Awarded when an elixir ingredient is banked.
+    fn reward_play(&mut self) {
+        play_sound(&self.audio.sfx.coin, PlaySoundParams { looped: false, volume: 0.45 });
+    }
+
+    /// A question is about to be asked.
+    fn ask_play(&mut self) {
+        play_sound(&self.audio.sfx.question, PlaySoundParams { looped: false, volume: 0.38 });
+    }
+
+    /// The trapdoor plunge: a full camera dunk in water.
+    fn splash_play(&mut self) {
         play_sound(&self.audio.sfx.splash, PlaySoundParams { looped: false, volume: 0.5 });
+        self.fx.shake_for(11.0, 0.5);
+        self.fx.punch(0.05);
+        self.fx.hit_stop(0.16);
+        self.fx.flash(Color::new(0.62, 0.86, 1.0, 1.0), 0.34);
+    }
+}
+
+impl Game {
+    fn up_next(&mut self) {
+        if Self::adv_pressed() {
+            if self.full_aqua {
+                self.biome = Biome::Aquarius;
+                self.world = World::new(Biome::Aquarius, &self.tex);
+                self.amb("aqua");
+                self.phase = Phase::Explore;
+            } else {
+                // episode one ends: back to the title, save intact
+                self.phase = Phase::Title;
+                self.save_exists = crate::game::save::load().is_some();
+            }
+            self.fade = 0.0;
+        }
+    }
+
+    /// Aquarius teaser card after the trapdoor plunge.
+    fn dr_next(&self) {
+        let w = screen_width();
+        let h = screen_height();
+        let t = get_time() as f32;
+        // deep sea gradient + drifting light rays
+        for i in 0..48 {
+            let f = i as f32 / 48.0;
+            let c = Color::new(0.07 + 0.2 * f, 0.28 + 0.12 * f, 0.42 + 0.06 * f, 1.0);
+            draw_rectangle(0.0, i as f32 * h / 48.0, w, h / 48.0 + 1.0, c);
+        }
+        for i in 0..4 {
+            let x = 140.0 + i as f32 * 260.0 + (t * 0.5 + i as f32).sin() * 30.0;
+            draw_rectangle(x, 0.0, 70.0, h, Color::new(0.7, 0.86, 1.0, 0.05));
+        }
+        for i in 0..22 {
+            let x = (i as f32 * 137.0 + t * 26.0) % (w + 40.0) - 20.0;
+            let y = h - ((t * 40.0 + i as f32 * 60.0) % h);
+            draw_circle_lines(x, y, 2.0 + (i % 3) as f32, 1.2, Color::new(0.7, 0.9, 1.0, 0.4));
+        }
+        // teaser text
+        let head = "AQUARIUS";
+        let hw = tag_width(head, 46);
+        draw_tag(head, w * 0.5 - hw / 2.0, 210.0, 46, Color::from_rgba(214, 240, 255, 255));
+        let sub = "the grave cave maze of craze";
+        let sw = dlg_width(sub, 34);
+        draw_dlg_text(sub, w * 0.5 - sw / 2.0, 300.0, 34, Color::from_rgba(150, 210, 235, 255));
+        draw_rectangle(w * 0.5 - 160.0, 344.0, 320.0, 2.0, Color::from_rgba(120, 190, 220, 120));
+        let body = if self.full_aqua {
+            "river sinks into a world under the skywater."
+        } else {
+            "river sinks into a world under the skywater..."
+        };
+        let bw = dlg_width(body, 30);
+        draw_dlg_text(body, w * 0.5 - bw / 2.0, 366.0, 30, Color::from_rgba(180, 214, 235, 220));
+        let hint = if self.full_aqua {
+            "z: dive into aquarius"
+        } else {
+            "z: back to title - episode two comes next"
+        };
+        let hintw = dlg_width(hint, 26);
+        draw_dlg_text(hint, w * 0.5 - hintw / 2.0, 470.0, 26, Color::from_rgba(214, 240, 255, 200));
+        // river sinking at the bottom edge
+        let bob = (t * 2.0).sin() * 8.0;
+        draw_texture_ex(&self.tex.river, w * 0.5 - 51.0, h - 150.0 + bob, WHITE,
+            DrawTextureParams { dest_size: Some(Vec2::new(102.0, 153.0)), ..Default::default() });
+    }
+
+    fn phase_name(&self) -> &'static str {
+        match self.phase {
+            Phase::Title => "title",
+            Phase::Explore => "explore",
+            Phase::Scene => "scene",
+            Phase::JinMeet => "jin meet",
+            Phase::JinBattle => "jin battle",
+            Phase::JinAfter => "jin after",
+            Phase::Riddle => "riddle",
+            Phase::KandyBridge => "kandy bridge",
+            Phase::GatePuzzle => "throne gate",
+            Phase::MazePuzzle => "cave maze",
+            Phase::StarCatch => "rainbow road",
+            Phase::Genie => "genie",
+            Phase::Qte => "qte plunge",
+            Phase::NextEpisode => "episode card",
+            Phase::Crumble => "crumble",
+            Phase::Ending => "ending",
+        }
+    }
+
+    fn dr_debug(&self) {
+        let w = screen_width();
+        let mut lines: Vec<String> = Vec::new();
+        lines.push(format!("phase: {}", self.phase_name()));
+        lines.push(format!("biome: {}", match self.biome {
+            Biome::Candy => "candy", Biome::Aquarius => "aquarius",
+            Biome::Cosma => "cosma", Biome::Home => "home",
+        }));
+        if self.phase == Phase::Explore || self.phase == Phase::Scene {
+            lines.push(format!("pos: {:.0} / {:.0}", self.world.player.0, self.world.length));
+        }
+        let goal = if self.dlg.open {
+            format!("speaking: {}", self.dlg_speaker_name())
+        } else if self.phase == Phase::Explore {
+            match self.world.nearest_info() {
+                Some((l, _, _)) => format!("near: {}", l),
+                None => format!("go: x{:.0}", self.world.next_target_x()),
+            }
+        } else {
+            String::new()
+        };
+        if !goal.is_empty() {
+            lines.push(goal);
+        }
+        lines.push(format!(
+            "candy riddles {}/2  gate {}  ing {}/3  horse {}",
+            self.progress.candy_riddles_done,
+            if self.progress.gate_solved { "open" } else { "locked" },
+            self.progress.ingredients,
+            if self.progress.has_horse { "yes" } else { "no" },
+        ));
+        lines.push("f1: hide".to_string());
+        let lh = 20.0;
+        let box_w = 340.0;
+        let box_h = lines.len() as f32 * lh + 16.0;
+        let x = w - box_w - 12.0;
+        let y = 12.0;
+        draw_rectangle(x, y, box_w, box_h, Color::new(0.06, 0.05, 0.1, 0.85));
+        draw_rectangle_lines(x, y, box_w, box_h, 2.0, Color::from_rgba(226, 106, 156, 160));
+        let mut ly = y + 20.0;
+        for ln in &lines {
+            draw_dlg_text(ln, x + 12.0, ly, 20, Color::from_rgba(255, 246, 233, 235));
+            ly += lh;
+        }
+    }
+
+    fn dlg_speaker_name(&self) -> &str {
+        self.dlg.speaker()
     }
 }

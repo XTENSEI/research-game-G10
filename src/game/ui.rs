@@ -1,5 +1,6 @@
-//! Undertale-style dialogue: bordered box, portrait, typewriter text, choice list.
-//! Click anywhere / press Z / Enter to advance. Number keys pick choices.
+//! Dialogue UI. Undertale-style panel restyled to the cream/plum/pink tokens:
+//! VT323 for spoken text, Press Start 2P for speaker chips, cream panel with a
+//! plum border. Public API and geometry are unchanged for the run loop.
 
 use macroquad::prelude::*;
 use crate::art::Textures;
@@ -8,6 +9,14 @@ use std::sync::OnceLock;
 
 const BOX_H: f32 = 190.0;
 const BOX_MARGIN: f32 = 20.0;
+
+const CREAM: Color = Color::new(1.0, 0.96, 0.91, 0.99);
+const CREAM_DIM: Color = Color::new(0.94, 0.84, 0.75, 1.0);
+const PLUM: Color = Color::from_rgba(74, 42, 99, 255);
+const INK: Color = Color::from_rgba(46, 26, 71, 255);
+const INK_SOFT: Color = Color::from_rgba(96, 74, 120, 255);
+const PINK: Color = Color::from_rgba(226, 106, 156, 255);
+const PINK_PALE: Color = Color::from_rgba(255, 214, 230, 255);
 
 /// Leak the portrait textures so DialogueBox can hold 'static refs.
 static PORTRAITS: OnceLock<HashMap<String, Texture2D>> = OnceLock::new();
@@ -24,8 +33,74 @@ fn portraits(tex: &Textures) -> &'static HashMap<String, Texture2D> {
         m.insert("Guard 2".to_string(), tex.guard_b.clone());
         m.insert("Nadia".to_string(), tex.nadia.clone());
         m.insert("Grandparent".to_string(), tex.grandparent.clone());
+        m.insert("Gillbert".to_string(), tex.gill.clone());
+        m.insert("Scalleon".to_string(), tex.scal.clone());
+        m.insert("Market Lady".to_string(), tex.lady.clone());
         m
     })
+}
+
+// --- pixel fonts -----------------------------------------------------------
+
+static F_DIALOG: OnceLock<Font> = OnceLock::new();
+static F_TAG: OnceLock<Font> = OnceLock::new();
+
+/// Load the pixel fonts through macroquad's file loader (works natively and on
+/// wasm, where std::fs does not exist). Must be awaited once before drawing.
+pub async fn ensure_fonts() {
+    if F_DIALOG.get().is_some() && F_TAG.get().is_some() {
+        return;
+    }
+    if let Ok(bytes) = macroquad::file::load_file("assets/fonts/VT323-Regular.ttf").await {
+        if let Ok(f) = load_ttf_font_from_bytes(&bytes) {
+            let _ = F_DIALOG.set(f);
+        }
+    }
+    if let Ok(bytes) = macroquad::file::load_file("assets/fonts/PressStart2P-Regular.ttf").await {
+        if let Ok(f) = load_ttf_font_from_bytes(&bytes) {
+            let _ = F_TAG.set(f);
+        }
+    }
+    assert!(F_DIALOG.get().is_some(), "VT323 font failed to load");
+    assert!(F_TAG.get().is_some(), "Press Start 2P font failed to load");
+}
+
+fn dialog_font() -> &'static Font {
+    F_DIALOG.get().expect("fonts loaded")
+}
+fn tag_font() -> &'static Font {
+    F_TAG.get().expect("fonts loaded")
+}
+
+fn ttext_w(text: &str, font: &Font, size: u16) -> f32 {
+    measure_text(text, Some(font), size, 1.0).width
+}
+
+fn ttext(text: &str, x: f32, y: f32, font: &Font, size: u16, color: Color) {
+    draw_text_ex(text, x, y, TextParams {
+        font: Some(font),
+        font_size: size,
+        color,
+        ..Default::default()
+    });
+}
+
+/// Press Start 2P text (chips, titles, HUD).
+pub fn draw_tag(text: &str, x: f32, y: f32, size: u16, color: Color) {
+    ttext(text, x, y, tag_font(), size, color);
+}
+
+/// VT323 text (narrative, labels).
+pub fn draw_dlg_text(text: &str, x: f32, y: f32, size: u16, color: Color) {
+    ttext(text, x, y, dialog_font(), size, color);
+}
+
+pub fn dlg_width(text: &str, size: u16) -> f32 {
+    ttext_w(text, dialog_font(), size)
+}
+
+pub fn tag_width(text: &str, size: u16) -> f32 {
+    ttext_w(text, tag_font(), size)
 }
 
 pub struct DialogueBox {
@@ -35,11 +110,9 @@ pub struct DialogueBox {
     shown: usize,
     timer: f32,
     portrait: Option<&'static Texture2D>,
-    choices: Vec<(String, String)>, // (label, payload)
+    choices: Vec<(String, String)>,
     choice_sel: usize,
     pub resolved: Option<String>,
-    /// Blue frame like the Undertale battle box.
-    border: Color,
 }
 
 impl DialogueBox {
@@ -54,7 +127,6 @@ impl DialogueBox {
             choices: Vec::new(),
             choice_sel: 0,
             resolved: None,
-            border: Color::from_rgba(40, 200, 255, 255),
         }
     }
 
@@ -80,29 +152,36 @@ impl DialogueBox {
         self.choices.clear();
     }
 
+    pub fn speaker(&self) -> &str {
+        &self.speaker
+    }
+
+    /// How many characters of the line are currently revealed. The game watches
+    /// this to fire typewriter blips, so every screen that shows dialogue gets
+    /// the sound without each call site having to opt in.
+    pub fn chars_shown(&self) -> usize {
+        if self.open { self.shown } else { 0 }
+    }
+
     /// Returns Some(payload) when the player finishes the line, or picks a choice payload.
     pub fn update(&mut self, dt: f32) -> Option<String> {
         if !self.open {
             return None;
         }
 
-        // Typewriter: 40 chars/sec, blip every 3rd char handled by scene.
         if self.shown < self.text.len() {
             self.timer += dt;
-            let want = (self.timer * 40.0) as usize;
+            let want = (self.timer * 46.0) as usize;
             if want > self.shown {
                 self.shown = want.min(self.text.len());
             }
         }
 
         let done = self.shown >= self.text.len();
-
-        // Skip / advance.
         let advance = is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Enter)
             || is_mouse_button_pressed(MouseButton::Left);
 
         if !self.choices.is_empty() && done {
-            // Choice navigation.
             if is_key_pressed(KeyCode::Up) { self.choice_sel = self.choice_sel.saturating_sub(1); }
             if is_key_pressed(KeyCode::Down) {
                 self.choice_sel = (self.choice_sel + 1).min(self.choices.len() - 1);
@@ -112,9 +191,8 @@ impl DialogueBox {
             if is_key_pressed(KeyCode::Key3) && self.choices.len() > 2 { self.choice_sel = 2; }
             if is_key_pressed(KeyCode::Key4) && self.choices.len() > 3 { self.choice_sel = 3; }
 
-            // Mouse hover pick.
             let (mx, my) = mouse_position();
-            for (i, (_, _)) in self.choices.iter().enumerate() {
+            for (i, _) in self.choices.iter().enumerate() {
                 let r = self.choice_rect(i);
                 if r.contains(Vec2::new(mx, my)) {
                     self.choice_sel = i;
@@ -139,7 +217,7 @@ impl DialogueBox {
             return Some(String::new());
         }
         if !done && advance {
-            self.shown = self.text.len(); // skip typewriter
+            self.shown = self.text.len();
         }
         None
     }
@@ -147,8 +225,8 @@ impl DialogueBox {
     fn choice_rect(&self, i: usize) -> Rect {
         let w = screen_width();
         let x = w * 0.5 - 260.0 + 30.0;
-        let y = screen_height() - BOX_H - BOX_MARGIN + 60.0 + i as f32 * 30.0;
-        Rect::new(x, y, 460.0, 26.0)
+        let y = screen_height() - BOX_H - BOX_MARGIN + 64.0 + i as f32 * 32.0;
+        Rect::new(x, y, 460.0, 28.0)
     }
 
     pub fn draw(&self) {
@@ -159,97 +237,285 @@ impl DialogueBox {
         let h = screen_height();
         let box_y = h - BOX_H - BOX_MARGIN;
         let box_w = w - BOX_MARGIN * 2.0;
+        let f = dialog_font();
 
-        // Outer black + animated border.
-        draw_rectangle(BOX_MARGIN - 4.0, box_y - 4.0, box_w + 8.0, BOX_H + 8.0, BLACK);
-        let pulse = 0.6 + 0.4 * (get_time() as f32 * 3.0).sin();
-        draw_rectangle_lines(BOX_MARGIN - 4.0, box_y - 4.0, box_w + 8.0, BOX_H + 8.0,
-            3.0, Color::new(self.border.r, self.border.g, self.border.b, pulse));
-        draw_rectangle(BOX_MARGIN, box_y, box_w, BOX_H, Color::from_rgba(8, 8, 14, 245));
+        // soft drop shadow, cream panel, plum border
+        draw_rectangle(BOX_MARGIN - 5.0, box_y - 3.0, box_w + 10.0, BOX_H + 10.0, Color::from_rgba(46, 26, 71, 70));
+        let pulse = 0.75 + 0.25 * (get_time() as f32 * 2.4).sin();
+        draw_rectangle(BOX_MARGIN - 4.0, box_y - 4.0, box_w + 8.0, BOX_H + 8.0,
+            Color::new(PLUM.r, PLUM.g, PLUM.b, pulse));
+        draw_rectangle(BOX_MARGIN, box_y, box_w, BOX_H, CREAM);
+        draw_rectangle(BOX_MARGIN + 4.0, box_y + 4.0, box_w - 8.0, 2.0, PINK_PALE);
 
-        // Portrait.
-        let mut text_x = BOX_MARGIN + 24.0;
+        // Portrait (keeps its 2:3 aspect, no stretching).
+        let mut text_x = BOX_MARGIN + 28.0;
         if let Some(p) = self.portrait {
-            let pw = 140.0;
             let ph = 150.0;
-            draw_texture_ex(&p, BOX_MARGIN + 18.0, box_y + 20.0, WHITE,
+            let pw = ph * 2.0 / 3.0;
+            draw_texture_ex(p, BOX_MARGIN + 26.0, box_y + 22.0, WHITE,
                 DrawTextureParams { dest_size: Some(Vec2::new(pw, ph)), ..Default::default() });
-            text_x += pw + 20.0;
+            // soft accent panel behind the portrait
+            draw_rectangle_lines(BOX_MARGIN + 22.0, box_y + 18.0, pw + 8.0, ph + 8.0, 2.0, CREAM_DIM);
+            text_x += pw + 34.0;
         }
 
-        // Speaker tag.
+        // Speaker chip (Press Start 2P).
         if !self.speaker.is_empty() && self.speaker != "(Narration)" {
-            let tag_w = measure_text(&self.speaker, None, 20, 1.0).width + 24.0;
-            draw_rectangle(text_x, box_y - 14.0, tag_w, 28.0, Color::from_rgba(255, 105, 180, 255));
-            draw_text(&self.speaker, text_x + 12.0, box_y + 5.0, 20.0, Color::from_rgba(30, 10, 25, 255));
+            let tag = self.speaker.as_str();
+            let tf = tag_font();
+            let size: u16 = 15;
+            let tw = ttext_w(tag, tf, size);
+            let chip_w = tw + 30.0;
+            let chip_y = box_y - 18.0;
+            draw_rectangle(BOX_MARGIN + 8.0, chip_y, chip_w, 30.0, PINK);
+            draw_rectangle_lines(BOX_MARGIN + 8.0, chip_y, chip_w, 30.0, 2.0, PLUM);
+            ttext(tag, BOX_MARGIN + 23.0, chip_y + 22.0, tf, size, CREAM);
         }
 
-        // Body text with word wrap + typewriter.
+        // Body text (VT323), typewriter + wrap in plum ink.
         let visible = &self.text[..self.shown.min(self.text.len())];
-        draw_wrapped(visible, text_x, box_y + 34.0, w - text_x - 40.0, 24.0);
+        draw_wrapped_col(visible, text_x, box_y + 40.0, w - text_x - 56.0, 34.0, 32, INK);
 
-        // Choices.
+        // Choices
         for (i, (label, _)) in self.choices.iter().enumerate() {
             let r = self.choice_rect(i);
             let sel = i == self.choice_sel;
             if sel {
-                draw_rectangle(r.x - 10.0, r.y - 2.0, r.w + 20.0, r.h, Color::from_rgba(255, 105, 180, 60));
-                draw_text(">", r.x - 22.0, r.y + 18.0, 22.0, PINK);
+                draw_rectangle(r.x - 12.0, r.y - 4.0, r.w + 24.0, 34.0, PINK_PALE);
+                ttext(">", r.x - 28.0, r.y + 30.0, f, 32, PINK);
             }
-            draw_text(label, r.x, r.y + 18.0, 20.0,
-                if sel { WHITE } else { Color::from_rgba(200, 200, 210, 255) });
+            ttext(label, r.x, r.y + 30.0, f, 32,
+                if sel { INK } else { INK_SOFT });
         }
 
-        // Advance hint.
+        // Advance hint
         let done = self.shown >= self.text.len();
         if done && self.choices.is_empty() {
             let blink = (get_time() * 2.0) as i32 % 2 == 0;
             if blink {
-                draw_text("z / click", w - 130.0, box_y + BOX_H - 12.0, 16.0,
-                    Color::from_rgba(120, 200, 255, 200));
+                ttext("z / click", w - 150.0, box_y + BOX_H - 14.0, f, 26, INK_SOFT);
             }
         }
     }
 }
 
-/// Simple greedy word wrap.
-pub fn draw_wrapped(text: &str, x: f32, mut y: f32, max_w: f32, line_h: f32) {
-    let size = 20;
+/// Line count a text will occupy after greedy wrap (mirrors draw_wrapped_col).
+pub fn wrapped_line_count(text: &str, max_w: f32, size: u16) -> usize {
+    let f = dialog_font();
+    let mut count = 0usize;
+    for para in text.split('\n') {
+        let mut line = String::new();
+        count += 1;
+        for word in para.split(' ') {
+            let candidate = if line.is_empty() { word.to_string() } else { format!("{} {}", line, word) };
+            if ttext_w(&candidate, f, size) > max_w && !line.is_empty() {
+                count += 1;
+                line = word.to_string();
+            } else {
+                line = candidate;
+            }
+        }
+    }
+    count
+}
+
+/// Greedy word wrap in the dialogue font, colored.
+pub fn draw_wrapped_col(text: &str, x: f32, mut y: f32, max_w: f32, line_h: f32, size: u16, color: Color) {
+    let f = dialog_font();
     for para in text.split('\n') {
         let mut line = String::new();
         for word in para.split(' ') {
             let candidate = if line.is_empty() { word.to_string() } else { format!("{} {}", line, word) };
-            if measure_text(&candidate, None, size, 1.0).width > max_w && !line.is_empty() {
-                draw_text(&line, x, y, size as f32, WHITE);
+            if ttext_w(&candidate, f, size) > max_w && !line.is_empty() {
+                ttext(&line, x, y, f, size, color);
                 y += line_h;
                 line = word.to_string();
             } else {
                 line = candidate;
             }
         }
-        draw_text(&line, x, y, size as f32, WHITE);
+        ttext(&line, x, y, f, size, color);
         y += line_h;
     }
 }
 
-/// Centered quiz option row (for riddles + battles).
-pub fn draw_option_row(i: usize, label: &str, y: f32, selected: bool, disabled: Option<bool>) {
+/// Wrapper kept for quiz screens: white text (default font no longer used).
+pub fn draw_wrapped(text: &str, x: f32, y: f32, max_w: f32, line_h: f32) {
+    draw_wrapped_col(text, x, y, max_w, line_h, 30, WHITE);
+}
+
+/// Diegetic quiz skins. Every quiz screen shares the dialogue tokens (VT323
+/// body, Press Start 2P title chip, framed stage) but wears its biome's
+/// materials: Candy keeps the plum veil, Aquarius dresses as pearl-and-sand,
+/// Cosma sits on a neon circuit slab.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Skin {
+    Plum,
+    PearlSand,
+    NeonSlab,
+}
+
+impl Skin {
+    fn veil(self) -> Color {
+        match self {
+            Skin::Plum => Color::from_rgba(36, 18, 56, 210),
+            Skin::PearlSand => Color::from_rgba(7, 22, 36, 218),
+            Skin::NeonSlab => Color::from_rgba(10, 6, 22, 228),
+        }
+    }
+    /// (outer frame, inner frame)
+    fn frame(self) -> (Color, Color) {
+        match self {
+            Skin::Plum => (Color::from_rgba(255, 214, 230, 110), Color::from_rgba(226, 106, 156, 70)),
+            Skin::PearlSand => (Color::from_rgba(226, 240, 246, 150), Color::from_rgba(130, 214, 226, 80)),
+            Skin::NeonSlab => (Color::from_rgba(150, 110, 255, 170), Color::from_rgba(110, 230, 255, 90)),
+        }
+    }
+    /// title chip (fill, border, text)
+    fn chip(self) -> (Color, Color, Color) {
+        match self {
+            Skin::Plum => (PINK, PLUM, CREAM),
+            Skin::PearlSand => (
+                Color::from_rgba(235, 242, 246, 255),
+                Color::from_rgba(58, 118, 138, 255),
+                Color::from_rgba(14, 48, 66, 255),
+            ),
+            Skin::NeonSlab => (
+                Color::from_rgba(24, 16, 44, 255),
+                Color::from_rgba(110, 230, 255, 255),
+                Color::from_rgba(238, 246, 255, 255),
+            ),
+        }
+    }
+    /// selection band behind the chosen row
+    fn hi(self) -> Color {
+        match self {
+            Skin::Plum => Color::from_rgba(226, 106, 156, 70),
+            Skin::PearlSand => Color::from_rgba(190, 230, 240, 55),
+            Skin::NeonSlab => Color::from_rgba(150, 110, 255, 60),
+        }
+    }
+    fn caret(self) -> Color {
+        match self {
+            Skin::Plum => PINK,
+            Skin::PearlSand => Color::from_rgba(140, 225, 235, 255),
+            Skin::NeonSlab => Color::from_rgba(110, 230, 255, 255),
+        }
+    }
+    /// (selected text, unselected text, disabled text, subtitle text)
+    fn text(self) -> (Color, Color, Color, Color) {
+        match self {
+            Skin::Plum => (WHITE, Color::from_rgba(200, 200, 210, 255), Color::from_rgba(130, 130, 140, 255), Color::from_rgba(255, 236, 244, 255)),
+            Skin::PearlSand => (
+                Color::from_rgba(242, 250, 253, 255),
+                Color::from_rgba(168, 198, 212, 255),
+                Color::from_rgba(96, 118, 132, 255),
+                Color::from_rgba(214, 238, 244, 255),
+            ),
+            Skin::NeonSlab => (
+                Color::from_rgba(238, 246, 255, 255),
+                Color::from_rgba(170, 182, 222, 255),
+                Color::from_rgba(100, 108, 140, 255),
+                Color::from_rgba(218, 230, 255, 255),
+            ),
+        }
+    }
+    fn rule(self) -> Color {
+        match self {
+            Skin::Plum => Color::from_rgba(226, 106, 156, 150),
+            Skin::PearlSand => Color::from_rgba(140, 225, 235, 140),
+            Skin::NeonSlab => Color::from_rgba(110, 230, 255, 160),
+        }
+    }
+}
+
+/// Centered quiz option row (riddles + battles), in the given biome skin.
+/// Long options auto-shrink so they never overflow the frame edge.
+pub fn draw_option_row_skinned(i: usize, label: &str, y: f32, selected: bool, disabled: Option<bool>, skin: Skin) {
     let w = screen_width();
     let x = w * 0.5 - 300.0;
+    let f = dialog_font();
+    let (sel_c, dim_c, off_c, _) = skin.text();
     let color = match disabled {
-        Some(true) => Color::from_rgba(120, 120, 130, 255),
-        _ => if selected { WHITE } else { Color::from_rgba(190, 190, 200, 255) },
+        Some(true) => off_c,
+        _ => if selected { sel_c } else { dim_c },
     };
-    if selected {
-        draw_rectangle(x - 12.0, y - 22.0, 620.0, 30.0, Color::from_rgba(255, 105, 180, 50));
-        draw_text(">", x - 26.0, y, 22.0, PINK);
-    }
     let tag = format!("{}. {}", i + 1, label);
-    draw_text(&tag, x, y, 20.0, color);
+    let mut size: u16 = 34;
+    let tw0 = ttext_w(&tag, f, size);
+    if tw0 > 640.0 {
+        size = ((size as f32 * 640.0 / tw0) as u16).max(20);
+    }
+    if selected {
+        draw_rectangle(x - 12.0, y - 24.0, 620.0, 34.0, skin.hi());
+        ttext(">", x - 30.0, y + 2.0, f, 34, skin.caret());
+    }
+    ttext(&tag, x, y + 2.0, f, size, color);
+}
+
+/// Centered quiz option row, default plum skin.
+pub fn draw_option_row(i: usize, label: &str, y: f32, selected: bool, disabled: Option<bool>) {
+    draw_option_row_skinned(i, label, y, selected, disabled, Skin::Plum);
 }
 
 pub fn quiz_header(title: &str, sub: &str) {
+    quiz_header_skinned(title, sub, Skin::Plum);
+}
+
+pub fn quiz_header_skinned(title: &str, sub: &str, skin: Skin) {
     let w = screen_width();
-    draw_text(title, w * 0.5 - measure_text(title, None, 34, 1.0).width * 0.5, 70.0, 34.0, PINK);
-    draw_wrapped(sub, w * 0.5 - 330.0, 110.0, 660.0, 26.0);
+    let h = screen_height();
+    let (f_out, f_in) = skin.frame();
+    let (c_fill, c_border, c_text) = skin.chip();
+    let (_, _, _, sub_c) = skin.text();
+    // biome veil + hairline frame: every quiz screen sits on its biome's stage
+    draw_rectangle(0.0, 0.0, w, h, skin.veil());
+    let fx = 24.0;
+    let fy = 120.0;
+    let fw = w - 48.0;
+    let fh = h - 262.0;
+    draw_rectangle_lines(fx, fy, fw, fh, 2.0, f_out);
+    draw_rectangle_lines(fx + 6.0, fy + 6.0, fw - 12.0, fh - 12.0, 1.0, f_in);
+    // signature details, one per skin, kept quiet:
+    if skin == Skin::PearlSand {
+        // a string of sea-pearls threaded along the top rule
+        let ry = 101.0;
+        for k in 0..9 {
+            let px = w * 0.5 - 144.0 + k as f32 * 36.0;
+            let gl = 0.8 + 0.2 * (get_time() as f32 * 1.4 + k as f32).sin();
+            draw_circle(px, ry, 2.4, Color::new(0.94, 0.97, 0.99, gl));
+            draw_circle(px - 0.8, ry - 0.8, 0.9, Color::from_rgba(255, 255, 255, 230));
+        }
+    } else if skin == Skin::NeonSlab {
+        // circuit corner ticks, like the Neon Node panels inlaid in the walkway
+        let c = Color::from_rgba(110, 230, 255, 220);
+        let tick = 14.0;
+        for (cx, cy, dx, dy) in [
+            (fx, fy, 1.0, 1.0),
+            (fx + fw, fy, -1.0, 1.0),
+            (fx, fy + fh, 1.0, -1.0),
+            (fx + fw, fy + fh, -1.0, -1.0),
+        ] {
+            let hx = if dx > 0.0 { cx } else { cx - tick };
+            let hy = if dy > 0.0 { cy } else { cy - tick };
+            draw_rectangle(hx, cy - 1.5, tick, 3.0, c);
+            draw_rectangle(cx - 1.5, hy, 3.0, tick, c);
+        }
+    }
+    // title: Press Start 2P chip when it fits, otherwise cream VT323
+    let ts = tag_width(title, 18);
+    let f = dialog_font();
+    if ts < w - 240.0 {
+        let cw = ts + 52.0;
+        let cy = 34.0;
+        let cx = w * 0.5 - cw / 2.0;
+        draw_rectangle(cx, cy, cw, 38.0, c_fill);
+        draw_rectangle_lines(cx - 2.0, cy - 2.0, cw + 4.0, 42.0, 2.0, c_border);
+        draw_tag(title, w * 0.5 - ts / 2.0, cy + 27.0, 18, c_text);
+    } else {
+        ttext(title, w * 0.5 - ttext_w(title, f, 40) * 0.5, 60.0, f, 40, CREAM);
+    }
+    // rule + subtitle in the skin's tones
+    draw_rectangle(w * 0.5 - 150.0, 100.0, 300.0, 2.0, skin.rule());
+    draw_wrapped_col(sub, w * 0.5 - 330.0, 122.0, 660.0, 28.0, 28, sub_c);
 }
