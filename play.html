@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gift of Education — a literacy rpg</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #1a0f26; overflow: hidden; }
+  #wrap { height: 100%; display: flex; align-items: center; justify-content: center; }
+  /* The canvas stays at the native 1024x720 layout (identical to the desktop
+     window); #stage is scaled to fit the pane by the JS fitter below. */
+  #stage { transform-origin: center center; }
+  canvas#glcanvas {
+    image-rendering: pixelated;
+    background: #1a0f26;
+    box-shadow: 0 0 60px rgba(226, 106, 156, .25);
+    width: 1024px;
+    height: 720px;
+    display: block;
+  }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage"><canvas id="glcanvas" width="1024" height="720" tabindex="1"></canvas></div></div>
+<script>
+  const stage = document.getElementById('stage');
+  function fit() {
+    const s = Math.min(window.innerWidth / 1024, window.innerHeight / 720);
+    stage.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+</script>
+<script src="web/gl.js"></script>
+<!-- quad-snd's WebAudio backend. It only registers itself with miniquad, so it
+     must be loaded AFTER gl.js or every sound call is a no-op. -->
+<script src="web/macroquad_audio.js"></script>
+<script>load("web/literacy-rpg.wasm?v=" + Date.now());</script>
+</body>
+</html>

@@ -5,3 +5,12 @@ Cargo.lock
 *.log
 save.txt
 .freebuff/
+shot_*.png
+
+# build output kept out of git (play.html needs the two glue scripts, not this)
+target-wasm/
+web/*.wasm
+
+# junk that ships inside downloaded asset packs
+Thumbs.db
+*.unitypackage
