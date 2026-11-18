@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2021"
 description = "Educational RPG prototype: three biomes, riddles and puzzles to cure Nadia's illiteracy"
 
+# "audio" is not in macroquad's default feature set. Without it macroquad
+# compiles a dummy audio backend that silently drops every play_sound call, so
+# the game ran completely mute. Enabling it gives real WebAudio in the browser.
 [dependencies]
-macroquad = "0.4"
+macroquad = { version = "0.4", features = ["audio"] }
 
 [profile.release]
 opt-level = "z"
