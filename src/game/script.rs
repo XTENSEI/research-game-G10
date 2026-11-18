@@ -177,6 +177,31 @@ pub const DRAGGED: &[Line] = &[
     l("(Narration)", "*pitch black*"),
 ];
 
+/// Script: "[Eye lids open, we see blurry lights] [Shot of Rivers eye]
+/// [River finds themselves...]" - the hand-off from the plunge into Aquarius.
+pub const AQUA_WAKE: &[Line] = &[
+    l("(Narration)", "Eyelids open. Blurry lights."),
+    l("(Narration)", "A shot of River's eye."),
+    l("River", "...It's water. The whole sky is water."),
+    l("(Narration)", "River finds themselves on the sand of Aquarius."),
+];
+
+/// Aquarius to Cosma: the current opens onto the neon void.
+pub const COSMA_ARRIVE: &[Line] = &[
+    l("(Narration)", "The last cave opens, and the water simply stops."),
+    l("(Narration)", "Beyond it: black space, and neon stars for a sky."),
+    l("River", "Cosma. The last component is here."),
+];
+
+/// The elixir is finally mixed, at home, at Nadia's bedside.
+pub const ENDING: &[Line] = &[
+    l("(Narration)", "River mixes the three components into the Gift of Education."),
+    l("River", "Nadia. Drink this. Please."),
+    l("Nadia", "...River? I... I can read it. I can read the whole thing!"),
+    l("River", "Welcome back, Nadia."),
+    l("(Narration)", "The Gift of Education worked. The world is quiet again."),
+];
+
 // ============ INTRO (house) ============
 
 /// Marker scene: the intro renders as picture panels, not dialogue.
