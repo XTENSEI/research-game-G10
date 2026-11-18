@@ -113,6 +113,9 @@ pub struct DialogueBox {
     choices: Vec<(String, String)>,
     choice_sel: usize,
     pub resolved: Option<String>,
+    /// Set by the autoplay harness: treat this frame as if the advance key was
+    /// pressed. Cleared as soon as it is read.
+    pub force_advance: bool,
 }
 
 impl DialogueBox {
@@ -127,6 +130,7 @@ impl DialogueBox {
             choices: Vec::new(),
             choice_sel: 0,
             resolved: None,
+            force_advance: false,
         }
     }
 
@@ -178,8 +182,9 @@ impl DialogueBox {
         }
 
         let done = self.shown >= self.text.len();
-        let advance = is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Enter)
+        let advance = self.force_advance || is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Enter)
             || is_mouse_button_pressed(MouseButton::Left);
+        self.force_advance = false;
 
         if !self.choices.is_empty() && done {
             if is_key_pressed(KeyCode::Up) { self.choice_sel = self.choice_sel.saturating_sub(1); }
@@ -339,11 +344,6 @@ pub fn draw_wrapped_col(text: &str, x: f32, mut y: f32, max_w: f32, line_h: f32,
     }
 }
 
-/// Wrapper kept for quiz screens: white text (default font no longer used).
-pub fn draw_wrapped(text: &str, x: f32, y: f32, max_w: f32, line_h: f32) {
-    draw_wrapped_col(text, x, y, max_w, line_h, 30, WHITE);
-}
-
 /// Diegetic quiz skins. Every quiz screen shares the dialogue tokens (VT323
 /// body, Press Start 2P title chip, framed stage) but wears its biome's
 /// materials: Candy keeps the plum veil, Aquarius dresses as pearl-and-sand,
@@ -420,6 +420,9 @@ impl Skin {
             ),
         }
     }
+    pub fn edge(self) -> Color {
+        self.frame().0
+    }
     fn rule(self) -> Color {
         match self {
             Skin::Plum => Color::from_rgba(226, 106, 156, 150),
@@ -468,18 +471,19 @@ pub fn quiz_header_skinned(title: &str, sub: &str, skin: Skin) {
     let (f_out, f_in) = skin.frame();
     let (c_fill, c_border, c_text) = skin.chip();
     let (_, _, _, sub_c) = skin.text();
-    // biome veil + hairline frame: every quiz screen sits on its biome's stage
+    // biome veil + hairline frame: every quiz screen sits on its biome's stage.
+    // The frame starts below the subtitle so text never sits on the rule.
     draw_rectangle(0.0, 0.0, w, h, skin.veil());
     let fx = 24.0;
-    let fy = 120.0;
+    let fy = 152.0;
     let fw = w - 48.0;
-    let fh = h - 262.0;
+    let fh = h - 282.0;
     draw_rectangle_lines(fx, fy, fw, fh, 2.0, f_out);
     draw_rectangle_lines(fx + 6.0, fy + 6.0, fw - 12.0, fh - 12.0, 1.0, f_in);
     // signature details, one per skin, kept quiet:
     if skin == Skin::PearlSand {
         // a string of sea-pearls threaded along the top rule
-        let ry = 101.0;
+        let ry = 153.0;
         for k in 0..9 {
             let px = w * 0.5 - 144.0 + k as f32 * 36.0;
             let gl = 0.8 + 0.2 * (get_time() as f32 * 1.4 + k as f32).sin();
@@ -516,6 +520,131 @@ pub fn quiz_header_skinned(title: &str, sub: &str, skin: Skin) {
         ttext(title, w * 0.5 - ttext_w(title, f, 40) * 0.5, 60.0, f, 40, CREAM);
     }
     // rule + subtitle in the skin's tones
-    draw_rectangle(w * 0.5 - 150.0, 100.0, 300.0, 2.0, skin.rule());
-    draw_wrapped_col(sub, w * 0.5 - 330.0, 122.0, 660.0, 28.0, 28, sub_c);
+    draw_rectangle(w * 0.5 - 150.0, 96.0, 300.0, 2.0, skin.rule());
+    if !sub.is_empty() {
+        let sl = wrapped_line_count(sub, 760.0, 25) as f32;
+        draw_wrapped_col(sub, w * 0.5 - 380.0, 124.0, 760.0, 25.0, 25, sub_c);
+        let _ = sl;
+    }
+}
+
+/// Like `draw_wrapped_col` but treats `*word*` as emphasis (accent colour) and
+/// prints the word without its asterisks. The maze questions carry the
+/// script's own emphasis markers, which used to show up literally.
+pub fn draw_wrapped_rich(text: &str, x0: f32, mut y: f32, max_w: f32, line_h: f32, size: u16, base: Color, accent: Color) {
+    let f = dialog_font();
+    let max_x = x0 + max_w;
+    let space = ttext_w(" ", f, size);
+    for para in text.split('\n') {
+        let mut x = x0;
+        for word in para.split(' ') {
+            // emphasis can wrap punctuation (`*west*,`), so strip the markers
+            // wherever they sit instead of only on a bare *word*
+            let emph = word.contains('*');
+            let clean: String = word.chars().filter(|ch| *ch != '*').collect();
+            let ww = ttext_w(&clean, f, size);
+            if x + ww > max_x && x > x0 {
+                x = x0;
+                y += line_h;
+            }
+            ttext(&clean, x, y, f, size, if emph { accent } else { base });
+            x += ww + space;
+        }
+        y += line_h;
+    }
+}
+
+// --- item art --------------------------------------------------------------
+// Everything here is drawn on a small integer grid (a "pixel" is `k` screen
+// pixels) so it keeps the hard edges of the pixel fonts at any size instead of
+// turning into a flat vector rectangle. The old gift was a red draw_rectangle.
+
+/// The Family Heirloom storybook. `bottom` is the base of the book.
+/// The grid is 32 wide by 40 tall.
+pub fn draw_storybook(cx: f32, bottom: f32, k: f32, glow: f32) {
+    let left = cx - 16.0 * k;
+    let top = bottom - 40.0 * k;
+    let r = |x: f32, y: f32, w: f32, h: f32, c: Color| {
+        draw_rectangle(left + x * k, top + y * k, w * k, h * k, c);
+    };
+    let gold = Color::from_rgba(238, 193, 100, 255);
+    let gold_lo = Color::from_rgba(170, 124, 48, 255);
+    let leather = Color::from_rgba(82, 40, 116, 255);
+    let leather_hi = Color::from_rgba(112, 60, 154, 255);
+    let leather_lo = Color::from_rgba(52, 22, 78, 255);
+    let page = Color::from_rgba(251, 240, 214, 255);
+    let page_lo = Color::from_rgba(212, 190, 152, 255);
+
+    // warm halo so the book reads as the hero object, not a UI sprite
+    draw_circle(cx + 2.0 * k, bottom - 20.0 * k, 24.0 * k,
+        Color::new(1.0, 0.84, 0.48, 0.05 + glow * 0.09));
+
+    // page block sits proud of the cover on the right, with page edges
+    r(9.0, 5.0, 20.0, 32.0, page);
+    r(9.0, 5.0, 20.0, 1.0, page_lo);
+    for i in 0..5 {
+        r(11.0, 9.0 + i as f32 * 5.5, 16.0, 0.8, page_lo);
+    }
+    r(28.0, 5.0, 1.0, 32.0, page_lo);
+
+    // covers
+    r(4.0, 2.0, 23.0, 36.0, leather_lo);
+    r(4.0, 4.0, 20.0, 33.0, leather);
+    // spine with raised bands
+    r(6.0, 4.0, 4.0, 33.0, leather_hi);
+    r(6.0, 4.0, 1.0, 33.0, Color::from_rgba(140, 84, 184, 255));
+    r(6.0, 6.0, 4.0, 2.0, gold_lo);
+    r(6.0, 32.0, 4.0, 2.0, gold_lo);
+
+    // gilt frame and emblem
+    r(13.0, 8.0, 1.0, 25.0, gold_lo);
+    r(25.0, 8.0, 1.0, 25.0, gold_lo);
+    r(13.0, 8.0, 13.0, 1.0, gold_lo);
+    r(13.0, 32.0, 13.0, 1.0, gold_lo);
+    draw_poly(cx + 4.0 * k, top + 19.0 * k, 4, 5.0 * k, 0.78, gold);
+    draw_poly(cx + 4.0 * k, top + 19.0 * k, 4, 2.4 * k, 0.78, leather);
+    draw_circle(cx + 4.0 * k, top + 19.0 * k, 0.9 * k, gold);
+
+    // clasp and ribbon bookmark
+    r(26.0, 17.0, 4.0, 6.0, gold);
+    r(26.0, 19.0, 4.0, 2.0, gold_lo);
+    r(19.0, 36.0, 3.0, 4.0, Color::from_rgba(214, 74, 132, 255));
+    r(19.0, 36.0, 3.0, 1.0, Color::from_rgba(246, 130, 176, 255));
+}
+
+/// One of the three elixir vials in the HUD. `filled` is 0..1.
+/// The grid is 10 wide by 20 tall.
+pub fn draw_vial(cx: f32, bottom: f32, h: f32, filled: f32) {
+    let k = h / 20.0;
+    let top = bottom - h;
+    let left = cx - 5.0 * k;
+    let glass = Color::from_rgba(240, 246, 252, 225);
+    let glass_lo = Color::from_rgba(150, 128, 176, 200);
+    let f = filled.clamp(0.0, 1.0);
+
+    // cork
+    draw_rectangle(left + 3.0 * k, top, 4.0 * k, 3.0 * k, Color::from_rgba(158, 108, 66, 255));
+    draw_rectangle(left + 3.0 * k, top, 4.0 * k, 1.0 * k, Color::from_rgba(196, 142, 92, 255));
+    // neck + body silhouette
+    draw_rectangle(left + 2.0 * k, top + 3.0 * k, 6.0 * k, 3.0 * k, glass);
+    draw_rectangle(left + 1.0 * k, top + 6.0 * k, 8.0 * k, 11.0 * k, glass);
+    draw_rectangle(left + 2.0 * k, top + 17.0 * k, 6.0 * k, 1.0 * k, glass);
+    draw_rectangle(left + 3.0 * k, top + 18.0 * k, 4.0 * k, 1.0 * k, glass_lo);
+    draw_rectangle(left, top + 6.0 * k, 1.0 * k, 11.0 * k, glass_lo);
+    draw_rectangle(left + 9.0 * k, top + 6.0 * k, 1.0 * k, 11.0 * k, glass_lo);
+
+    // glowing contents, filled from the base up
+    if f > 0.01 {
+        let body_top = top + 6.0 * k;
+        let body_h = 13.0 * k * f;
+        let y = top + 19.0 * k - body_h;
+        draw_rectangle(left + 1.0 * k, y, 8.0 * k, body_h, Color::from_rgba(255, 150, 200, 235));
+        draw_rectangle(left + 1.0 * k, y, 8.0 * k, 1.0 * k, Color::from_rgba(255, 214, 236, 255));
+        draw_rectangle(left + 1.0 * k, y, 2.0 * k, body_h, Color::from_rgba(255, 196, 226, 235));
+        // a spark near the surface
+        draw_circle(left + 6.0 * k, y + 2.0 * k, 0.8 * k, Color::from_rgba(255, 246, 252, 220));
+        let _ = body_top;
+    }
+    // specular stripe down the glass
+    draw_rectangle(left + 2.5 * k, top + 7.0 * k, 1.0 * k, 8.0 * k, Color::from_rgba(255, 255, 255, 190));
 }
