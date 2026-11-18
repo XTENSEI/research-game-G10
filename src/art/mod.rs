@@ -22,9 +22,8 @@ pub struct TilePack {
     pub flower_a: Texture2D,
     pub flower_b: Texture2D,
     pub flower_c: Texture2D,
-    pub bush_top: Texture2D,
-    pub bush_mid: Texture2D,
-    pub bush_base: Texture2D,
+    /// Authored hedge clumps used for the Candy Land horizon.
+    pub hedges: Vec<Texture2D>,
     pub stone: Texture2D,
     pub stone_alt: Texture2D,
     // Home interior furniture (verified visually in the roguelike band probe)
@@ -220,6 +219,15 @@ fn crisp(tex: &mut Texture2D) {
     tex.set_filter(FilterMode::Nearest);
 }
 
+/// Larger painted pieces (hedges, props) keep the linear filter so their
+/// curved edges do not stair-step when scaled.
+async fn tile_tex_linear(name: &str) -> Texture2D {
+    let path = format!("assets/game/tiles/{}.png", name);
+    macroquad::texture::load_texture(&path)
+        .await
+        .unwrap_or_else(|e| panic!("missing art asset {}: {:?}", path, e))
+}
+
 async fn tile_tex(name: &str) -> Texture2D {
     let path = format!("assets/game/tiles/{}.png", name);
     let mut t = macroquad::texture::load_texture(&path)
@@ -238,9 +246,11 @@ async fn load_tiles() -> TilePack {
         flower_a: tile_tex("flower_a").await,
         flower_b: tile_tex("flower_b").await,
         flower_c: tile_tex("flower_c").await,
-        bush_top: tile_tex("bush_top").await,
-        bush_mid: tile_tex("bush_mid").await,
-        bush_base: tile_tex("bush_base").await,
+        hedges: vec![
+            tile_tex_linear("bush_soft_a").await,
+            tile_tex_linear("bush_soft_b").await,
+            tile_tex_linear("bush_soft_c").await,
+        ],
         stone: tile_tex("stone").await,
         stone_alt: tile_tex("stone_alt").await,
         bed_head: tile_tex("bed_head").await,

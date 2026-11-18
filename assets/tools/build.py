@@ -314,6 +314,48 @@ for _i, _name in enumerate(('flower_a', 'flower_b', 'flower_c')):
     blossom(_i).save(os.path.join(OUT_TILES, _name + '.png'))
 print('candy ground + blossom tiles emitted')
 
+# ---- candy hedges -----------------------------------------------------------
+# The roguelike sheet has no bush that reads as foliage: the cells that looked
+# like shrubs crop to striped crates, so the Candy Land horizon turned into a
+# row of boxes. These three hedge clumps are authored in the token palette
+# instead: overlapping mounds in three pinks with sugar speckles on top.
+HEDGE = [
+    ((0xD8, 0x4A, 0x86), (0xF0, 0x7C, 0xA8), (0xFF, 0xC2, 0xD8)),
+    ((0xC8, 0x3F, 0x7A), (0xE6, 0x6E, 0x9C), (0xFF, 0xB4, 0xD0)),
+    ((0xE0, 0x5C, 0x94), (0xF4, 0x8C, 0xB4), (0xFF, 0xCC, 0xE2)),
+]
+
+
+def hedge(idx):
+    """48x32 bush clump: three mounds, lit from the upper left."""
+    from PIL import ImageDraw
+    w, h = 48, 32
+    im = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    dark, mid, hi = HEDGE[idx % len(HEDGE)]
+    mounds = [(13, 22, 12, 9), (24, 18, 13, 11), (35, 23, 11, 8)]
+    # base silhouette first, one flat dark pass so the clump reads as one mass
+    for (cx, cy, rx, ry) in mounds:
+        ImageDraw.Draw(im).ellipse((cx - rx, cy - ry, cx + rx, cy + ry), fill=dark + (255,))
+    # fill the seam between mounds so no sky shows through the middle
+    ImageDraw.Draw(im).rectangle((10, 16, 40, 30), fill=dark + (255,))
+    for (cx, cy, rx, ry) in mounds:
+        ImageDraw.Draw(im).ellipse((cx - rx + 2, cy - ry + 1, cx + rx - 2, cy + ry - 3), fill=mid + (255,))
+    for (cx, cy, rx, ry) in mounds:
+        ImageDraw.Draw(im).ellipse((cx - rx + 5, cy - ry + 2, cx + rx - 12, cy + ry - 12), fill=hi + (255,))
+    d = im.load()
+    rng = random.Random(90 + idx)
+    sugar = [(255, 255, 255), (255, 236, 246), (255, 214, 232)]
+    for _ in range(9):
+        x, y = rng.randrange(6, 42), rng.randrange(8, 26)
+        if d[x, y][3] > 0:
+            d[x, y] = sugar[rng.randrange(len(sugar))] + (255,)
+    return im
+
+
+for _i, _name in enumerate(('bush_soft_a', 'bush_soft_b', 'bush_soft_c')):
+    hedge(_i).save(os.path.join(OUT_TILES, _name + '.png'))
+print('candy hedges emitted')
+
 # alpha-foot contact shadows: soft elliptical shadow baked from the alpha
 # bbox of each walk frame so every cast gets an exactly-fitted shadow.
 SHADOW_W = 96

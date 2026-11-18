@@ -110,6 +110,13 @@ pub struct World {
     pub click: Option<f32>,
     /// Spawn accumulator per particle family (indexed by kind).
     amb_acc: [f32; 8],
+    /// QA hook: a held direction fed through the same movement branch as the
+    /// keyboard, so the movement/pose tests exercise the real code path.
+    pub bot_dir: f32,
+    pub bot_y: f32,
+    /// Bottom edge the player's sprite was drawn at this frame, in screen
+    /// space. The pose test reads it to prove the feet do not slide.
+    pub drawn_bottom: std::cell::Cell<f32>,
 }
 
 impl World {
@@ -133,6 +140,9 @@ impl World {
             interact_cd: 0.0,
             click: None,
             amb_acc: [0.0; 8],
+            bot_dir: 0.0,
+            bot_y: 0.0,
+            drawn_bottom: std::cell::Cell::new(0.0),
         };
         match biome {
             Biome::Candy => { w.length = 3600.0; }
@@ -168,6 +178,7 @@ impl World {
                 self.props.push(Prop { id: "riddle1", x: 1850.0, y: 460.0, w: 60.0, h: 90.0, label: "Riddle Stone", action: "riddle" });
                 self.props.push(Prop { id: "riddle2", x: 2250.0, y: 460.0, w: 60.0, h: 90.0, label: "Riddle Stone", action: "riddle" });
                 self.props.push(Prop { id: "cave", x: 2700.0, y: 400.0, w: 170.0, h: 160.0, label: "Cave Entrance", action: "maze" });
+                self.props.push(Prop { id: "rift", x: 3080.0, y: 380.0, w: 120.0, h: 200.0, label: "Skywater Rift", action: "rift" });
             }
             Biome::Cosma => {
                 self.props.push(Prop { id: "riddle1", x: 700.0, y: 460.0, w: 60.0, h: 90.0, label: "Riddle Stone", action: "riddle" });
@@ -200,10 +211,15 @@ impl World {
             _ => WALK,
         };
         let mut dx = 0.0;
+        let mut dy = 0.0;
         if is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) { dx -= speed * dt; }
         if is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) { dx += speed * dt; }
-        if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) { self.player.1 -= 60.0 * dt; }
-        if is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) { self.player.1 += 60.0 * dt; }
+        if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) { dy -= 130.0 * dt; }
+        if is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) { dy += 130.0 * dt; }
+        // harness intent goes through the same branches as a held key
+        if self.bot_dir != 0.0 { dx = self.bot_dir * speed * dt; }
+        if self.bot_y != 0.0 { dy = self.bot_y * 130.0 * dt; }
+        self.player.1 += dy;
         // click-to-walk target
         if dx == 0.0 {
             if let Some(tx) = self.click {
@@ -527,7 +543,7 @@ impl World {
         next
     }
 
-    pub fn draw(&self, tex: &Textures, fx: &Fx, t: f32, shake: f32) {
+    pub fn draw(&self, tex: &Textures, fx: &Fx, t: f32, shake: f32, show_prompt: bool) {
         let cam_x = self.cam + shake;
         let (sw, sh) = (screen_width(), screen_height());
         let ground_y = 560.0; // decor baseline (props/plants stand on this line)
@@ -540,78 +556,90 @@ impl World {
                 // crenellations and a pink-roofed keep, tinted into the sky
                 // haze so they read as distant silhouette. Drawn first so the
                 // bush line overlaps its base.
+                // The far castle is a silhouette, not masonry: tiled stone at
+                // this size reads as stacked crates. Flat hazy towers with
+                // merlons, slits and one conical roof read as architecture.
                 let seg = 2260.0;
-                let tint = c(226, 176, 216, 255); // pulls lilac stone into the pink
+                let haze = c(219, 158, 196, 255);
+                let deep = c(198, 132, 176, 255);
+                let base_y = 468.0;
                 let mut tx = seg;
                 let mut ti = 0u32;
-                while tx < self.length + 200.0 {
+                while tx < self.length + 400.0 {
+                    let seed = ti.wrapping_mul(2654435761) as u64;
                     let sx = tx - cam_x;
-                    if sx > -170.0 && sx < sw + 170.0 {
-                        let seed = ti.wrapping_mul(2654435761) as u64;
-                        let tw_cols = 2 + (seed % 2) as i32; // 2-3 tiles wide
-                        let mut rows = 3 + (seed >> 8) % 3; // 3-5 tiles tall
-                        let is_keep = ti % 4 == 2;
-                        if is_keep { rows += 2; } // keeps: 5-7, roof stays in frame
-                        let base_y = 452.0;
-                        for r in 0..rows {
-                            let y = base_y - (r as f32 + 1.0) * 48.0;
-                            for ccol in 0..tw_cols {
-                                let tile = if (r as i32 + ccol) % 2 == 0 { &tp.stone } else { &tp.stone_alt };
-                                draw_texture_ex(tile, sx + ccol as f32 * 48.0, y, tint,
-                                    DrawTextureParams { dest_size: Some(Vec2::new(48.0, 48.0)), ..Default::default() });
+                    let is_keep = ti % 4 == 2;
+                    let cols = if is_keep { 5.0 } else { 3.0 };
+                    let tw = cols * 30.0;
+                    if sx > -tw - 80.0 && sx < sw + 80.0 {
+                        let tall = 130.0 + ((seed >> 9) % 80) as f32 + if is_keep { 40.0 } else { 0.0 };
+                        let top = base_y - tall;
+                        draw_rectangle(sx, top, tw, tall, haze);
+                        // merlons along the parapet
+                        let mut m = 0;
+                        while m as f32 * 30.0 < tw - 4.0 {
+                            if m % 2 == 0 {
+                                draw_rectangle(sx + m as f32 * 30.0, top - 14.0, 18.0, 14.0, haze);
                             }
-                        }
-                        // crenellations: merlons along the top
-                        let ytop = base_y - (rows as f32 + 1.0) * 48.0;
-                        for ccol in 0..tw_cols {
-                            if ccol % 2 == 0 {
-                                draw_texture_ex(&tp.stone_alt, sx + ccol as f32 * 48.0, ytop + 24.0, tint,
-                                    DrawTextureParams { dest_size: Some(Vec2::new(48.0, 24.0)), ..Default::default() });
-                            }
+                            m += 1;
                         }
                         if is_keep {
-                            // pink conical roof marks the keep
-                            let apex = Vec2::new(sx + tw_cols as f32 * 24.0, ytop - 52.0);
-                            let bl = Vec2::new(sx - 10.0, ytop + 22.0);
-                            let br = Vec2::new(sx + tw_cols as f32 * 48.0 + 10.0, ytop + 22.0);
-                            draw_triangle(apex, bl, br, c(214, 96, 156, 255));
-                        } else {
-                            // tiny dark window slit
-                            draw_rectangle(sx + tw_cols as f32 * 20.0,
-                                base_y - rows as f32 * 48.0 * 0.62, 8.0, 14.0, c(96, 62, 116, 255));
+                            // conical roof: the one landmark that says "castle"
+                            let apex = Vec2::new(sx + tw * 0.5, top - 96.0);
+                            draw_triangle(apex, Vec2::new(sx - 12.0, top - 12.0), Vec2::new(sx + tw + 12.0, top - 12.0), c(206, 92, 150, 255));
+                            draw_rectangle(sx + tw * 0.5 - 2.0, apex.y - 26.0, 4.0, 22.0, c(150, 62, 108, 255));
+                            draw_triangle(Vec2::new(sx + tw * 0.5 + 1.0, apex.y - 34.0),
+                                Vec2::new(sx + tw * 0.5 + 20.0, apex.y - 27.0),
+                                Vec2::new(sx + tw * 0.5 + 1.0, apex.y - 20.0), c(255, 214, 230, 255));
                         }
+                        // windows: two slim slits, darker than the wall
+                        let wx = sx + tw * 0.5 - 5.0;
+                        for k in 0..2 {
+                            draw_rectangle(wx, top + 34.0 + k as f32 * 46.0, 10.0, 22.0, deep);
+                        }
+                        draw_rectangle(sx, top + tall - 6.0, tw, 6.0, deep);
                     }
-                    tx += 250.0 + (ti % 3) as f32 * 90.0;
+                    tx += 230.0 + (ti % 3) as f32 * 110.0;
                     ti += 1;
                 }
-                // low curtain wall seam at the meadow line
+                // curtain wall that ties the towers to the meadow line
+                draw_rectangle(seg - cam_x, base_y - 26.0, self.length - seg + 40.0, 30.0, haze);
                 let mut x = seg;
                 while x < self.length {
                     let sx = x - cam_x;
-                    if sx > -48.0 && sx < sw + 48.0 {
-                        let tile = if ((x / 48.0) as i32) % 2 == 0 { &tp.stone } else { &tp.stone_alt };
-                        draw_texture_ex(tile, sx, 452.0, tint,
-                            DrawTextureParams { dest_size: Some(Vec2::new(48.0, 48.0)), ..Default::default() });
+                    if sx > -20.0 && sx < sw + 20.0 {
+                        draw_rectangle(sx, base_y - 36.0, 14.0, 12.0, haze);
                     }
-                    x += 48.0;
+                    x += 34.0;
                 }
-                // Distant candy bushes lining the meadow horizon.
-                for i in 0..((self.length / 140.0) as i32) {
-                    let x = i as f32 * 140.0 + 90.0;
-                    let sx = x - cam_x;
-                    if sx < -70.0 || sx > sw + 70.0 { continue; }
-                    match i % 4 {
-                        0 => draw_tile(&tp.bush_base, sx - 24.0, ground_y - 96.0, 48.0),
-                        1 => draw_tile(&tp.bush_top, sx - 24.0, ground_y - 96.0, 48.0),
-                        2 => {
-                            draw_tile(&tp.bush_top, sx - 24.0, ground_y - 144.0, 48.0);
-                            draw_tile(&tp.bush_base, sx - 24.0, ground_y - 96.0, 48.0);
-                        }
-                        _ => draw_tile(&tp.bush_mid, sx - 24.0, ground_y - 96.0, 48.0),
+                // Candy hedge line. Two overlapping rows of authored clumps: the
+                // roguelike "bush" cells are striped crates, and one row of them
+                // read as a row of boxes on the horizon.
+                let step = 44.0;
+                let rows: [(f32, f32, Color); 2] = [
+                    // (baseline offset, scale, tint) back row sits high and dim
+                    (ground_y - 62.0, 1.05, c(206, 146, 172, 255)),
+                    (ground_y - 46.0, 1.40, WHITE),
+                ];
+                for (ri, (base_y, scale, tint)) in rows.iter().enumerate() {
+                    let n = (self.length / step) as i32 + 2;
+                    for i in -1..n {
+                        let x = i as f32 * step + ri as f32 * 21.0;
+                        let sx = x - cam_x * if ri == 0 { 0.94 } else { 1.0 };
+                        if sx < -90.0 || sx > sw + 90.0 { continue; }
+                        let mut seed = (i as i64 + ri as i64 * 733).wrapping_mul(2654435761) as u64;
+                        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(11);
+                        let pick = ((seed >> 21) % tp.hedges.len() as u64) as usize;
+                        let hedge = &tp.hedges[pick];
+                        let s = scale + ((seed >> 33) % 70) as f32 / 100.0 * 0.30;
+                        let hw = hedge.width() * s;
+                        let hh = hedge.height() * s;
+                        draw_texture_ex(hedge, sx - hw / 2.0, base_y - hh, *tint,
+                            DrawTextureParams { dest_size: Some(Vec2::new(hw, hh)), ..Default::default() });
                     }
-                    // contact shadow: bushes sat on the meadow with no grounding
-                    draw_ellipse(sx, ground_y + 4.0, 30.0, 7.0, 0.0, c(70, 40, 20, 46));
                 }
+                // shallow shadow seam under the hedge so it sits on the meadow
+                draw_rectangle(0.0, ground_y - 50.0, sw, 6.0, Color::from_rgba(120, 60, 96, 40));
 
                 // Meadow midground: gumdrops, candy canes and lollipops. A single
                 // repeated bush shape read as a pattern rather than as a place,
@@ -634,8 +662,7 @@ impl World {
                             let col = [c(255, 128, 176, 255), c(146, 224, 214, 255),
                                 c(255, 200, 118, 255)][((seed >> 30) % 3) as usize];
                             let cy = ground_y - r * 0.52;
-                            fx.light_sprite(sx, cy, r * 3.6, Color::new(col.r, col.g, col.b, 0.13),
-                                ((seed >> 6) % 3) as usize);
+                            fx.glow_rect(sx, cy, r * 3.6, r * 3.6, Color::new(col.r, col.g, col.b, 0.13));
                             draw_ellipse(sx, ground_y + 2.0, r * 0.96, r * 0.20, 0.0, c(96, 44, 30, 40));
                             draw_ellipse(sx, cy, r, r * 0.94, 0.0, col);
                             draw_ellipse(sx - r * 0.26, cy + r * 0.16, r * 0.66, r * 0.60,
@@ -659,8 +686,18 @@ impl World {
                                 draw_rectangle(sx + 2.5, y, 2.5, 12.0,
                                     Color::new(1.0, 1.0, 1.0, 0.22));
                             }
-                            draw_circle_lines(sx + 2.0, top - 3.0, 12.0, 10.0, c(232, 62, 108, 255));
-                            draw_circle_lines(sx + 2.0, top - 3.0, 12.0, 4.0, c(255, 250, 246, 255));
+                            // crook: a real half-turn arc that meets the shaft
+                            // top. Two concentric circles read as a bullseye.
+                            let cr = 11.0;
+                            let ccx = sx + 2.0 - cr;
+                            let ccy = top - 2.0;
+                            // draw_arc(x, y, sides, radius, rotation deg,
+                            //          thickness, span deg, colour)
+                            draw_arc(ccx, ccy, 16, cr, 180.0, 6.0, 180.0, c(255, 250, 246, 255));
+                            for k in 0..3 {
+                                let a0 = 186.0 + k as f32 * 30.0;
+                                draw_arc(ccx, ccy, 4, cr, a0, 6.0, 14.0, c(232, 62, 108, 255));
+                            }
                         }
                         // swirl lollipop: real twirl sprite over a soft halo
                         _ => {
@@ -672,13 +709,18 @@ impl World {
                             let r = 28.0 + ((seed >> 30) % 16) as f32;
                             let cy = top - r * 0.34;
                             let tsw = t * 0.45 + (seed % 100) as f32 * 0.06;
-                            fx.light_sprite(sx, cy, r * 3.8, Color::new(1.0, 0.46, 0.72, 0.13),
-                                ((seed >> 9) % 3) as usize);
+                            fx.glow_rect(sx, cy, r * 3.8, r * 3.8, Color::new(1.0, 0.46, 0.72, 0.13));
+                            // the swirl is drawn as three tapering arcs, so the
+                            // head reads as candy rather than a target ring
                             draw_circle(sx, cy, r, c(255, 118, 170, 255));
-                            draw_circle(sx, cy, r * 0.86, c(255, 146, 190, 255));
-                            let sw2 = &fx.sprites.twirl[((seed >> 5) % 2) as usize];
-                            draw_spr(sw2, sx, cy, r * 1.9, tsw, Color::new(1.0, 0.97, 0.99, 0.88));
-                            draw_circle(sx - r * 0.34, cy - r * 0.36, r * 0.16,
+                            draw_circle(sx, cy, r * 0.94, c(255, 146, 190, 255));
+                            for k in 0..3 {
+                                let rr = r * (0.80 - k as f32 * 0.24);
+                                let a0 = tsw.to_degrees() + k as f32 * 126.0;
+                                draw_arc(sx, cy, 18, rr, a0, (r * 0.15).max(2.0), 206.0,
+                                    Color::new(1.0, 0.95, 0.98, 0.92));
+                            }
+                            draw_circle(sx - r * 0.34, cy - r * 0.36, r * 0.14,
                                 Color::new(1.0, 1.0, 1.0, 0.55));
                         }
                     }
@@ -1134,6 +1176,36 @@ impl World {
                     // sandy ramp shadow under the entrance
                     draw_ellipse(mouth_x, base - 4.0, 100.0, 12.0, 0.0, Color::from_rgba(20, 12, 30, 120));
                 }
+                "rift" => {
+                    // Aquarius to Cosma: a vertical tear in the current, wide in
+                    // the middle, with neon light leaking through from the void.
+                    let pulse = 0.5 + 0.5 * (t * 1.8).sin();
+                    let top = ground_y - p.h;
+                    let rows = 16;
+                    for i in 0..rows {
+                        let f = i as f32 / (rows - 1) as f32;
+                        let y = top + f * p.h;
+                        let swell = (f * std::f32::consts::PI).sin();
+                        let half = 12.0 + 30.0 * swell * (1.0 + pulse * 0.08);
+                        let a = (70.0 + 120.0 * swell) as u8;
+                        draw_rectangle(sx - half, y, half * 2.0, p.h / rows as f32 + 1.0,
+                            Color::from_rgba(18, 6, 30, 210));
+                        draw_rectangle_lines(sx - half, y, half * 2.0, p.h / rows as f32 + 1.0,
+                            1.4, Color::from_rgba(120, 240, 226, a));
+                    }
+                    fx.glow_rect(sx, top + p.h * 0.5, 300.0, 320.0,
+                        Color::new(0.30, 0.95, 0.90, 0.05 + pulse * 0.06));
+                    for i in 0..9 {
+                        let ph = t * 1.3 + i as f32 * 0.9;
+                        let rx = sx + (ph * 2.1).sin() * 30.0;
+                        let ry = top + 30.0 + ((i as f32 * 61.0 + t * 40.0) % (p.h - 50.0));
+                        let a = 0.35 + 0.5 * (t * 2.6 + i as f32).sin().abs();
+                        let spr = fx.sprites.star_at(i);
+                        draw_texture_ex(spr, rx - 7.0, ry - 7.0,
+                            Color::new(0.8, 1.0, 0.95, a),
+                            DrawTextureParams { dest_size: Some(Vec2::new(14.0, 14.0)), ..Default::default() });
+                    }
+                }
                 "portal" => {
                     // Stone circle that wakes when all three torches burn. In
                     // Cosma the standing stones are the void-castle block.
@@ -1273,49 +1345,65 @@ impl World {
 
         // actors: stand/walk frames + drop shadow + styled name chip
         let pxx = self.player.0;
-        for a in &self.actors {
+        for (ai, a) in self.actors.iter().enumerate() {
             let sx = a.x - cam_x;
             if sx < -110.0 || sx > sw + 110.0 { continue; }
             let scale = a.scale;
             let w = 48.0 * scale;
             let h = 72.0 * scale;            let walking = a.speed > 0.0 && (a.x - pxx).abs() > REACH * 1.4;
             let texid = if a.anim.is_empty() { None } else { tex.walk_of(a.anim) };
-            let breath = if walking {
-                (t * 6.0 + a.x * 0.03).sin() * 1.6
+            let feet = a.y + h;
+            // Idle is breathing, not levitation: the feet stay welded to the
+            // ground and the body grows and settles from the ankles up. Two
+            // seconds in, half a second hold at each end, one percent of the
+            // sprite's height - the slow, small motion the eye reads as alive.
+            let breath = 1.0 + (t * 1.7 + a.x * 0.01).sin() * 0.012;
+            // Walking is contact-down, passing-up: the body is lowest on the
+            // frame the lead foot lands and highest while the legs cross. The
+            // lift is the only thing that leaves the floor.
+            let stride = t * 6.2 + a.x * 0.02;
+            let ph = (stride / std::f32::consts::PI).fract();
+            let lift = if walking { (ph * std::f32::consts::PI).sin() * 3.0 } else { 0.0 };
+            let squash = if walking {
+                1.0 - (ph * std::f32::consts::TAU).cos() * 0.028
             } else {
-                (t * 2.6 + a.x * 0.01).sin() * 2.2
+                breath
             };
-            let sq = if walking { 1.0 + (t * 6.0 + a.x * 0.1).sin() * 0.05 } else { 1.0 };
+            // a slow weight shift, one pixel each way, so an idle NPCs
+            // silhouette changes instead of standing frozen
+            let sway = if walking { 0.0 } else { (t * 0.8 + a.x * 0.02).sin() * 1.3 };
             // baked contact shadow: cut from the sprite's own alpha feet, so it
             // is aligned per-character (Nadia small, Kandy wide, etc.)
-            let feet = a.y + h;
             if let Some(sh) = tex.shadow_of(a.anim) {
-                let sw2 = w * 1.02;
+                let sw2 = w * 1.02 * (1.0 - lift * 0.03);
                 draw_texture_ex(sh, sx - sw2 / 2.0, feet - 10.0 * scale, WHITE,
                     DrawTextureParams { dest_size: Some(Vec2::new(sw2, 22.0 * scale)), ..Default::default() });
             } else {
-                draw_ellipse(sx, feet + 3.0, w * 0.44 / sq, 5.0 * scale, 0.0, Color::from_rgba(60, 30, 40, 60));
+                draw_ellipse(sx, feet + 3.0, w * 0.44 * (1.0 - lift * 0.03), 5.0 * scale, 0.0, Color::from_rgba(60, 30, 40, 60));
             }
             // stride: w1/w2 alternate, the sprite contains the full stride
-            let phase = ((t * 5.2 + a.x * 0.02) * 2.0) as usize;
-            let step = phase % 2;
+            let step = (stride / std::f32::consts::PI) as usize % 2;
             let frame: &Texture2D = match texid {
                 Some(fr) if walking => &fr[step],
                 _ => &a.tex,
             };
-            let aw = w * a.face * sq;
-            draw_texture_ex(frame, sx - aw.abs() / 2.0, a.y + breath, WHITE,
-                DrawTextureParams { dest_size: Some(Vec2::new(aw, h / sq)), ..Default::default() });
-            // name chip
+            let aw = w * a.face * squash;
+            let dh = h * squash;
+            draw_texture_ex(frame, sx + sway - aw.abs() / 2.0, feet - dh - lift, WHITE,
+                DrawTextureParams { dest_size: Some(Vec2::new(aw, dh)), ..Default::default() });
+            // name chip: stagger it up when another actor stands close, so two
+            // guards side by side don't print one label on top of the other
+            let crowded = self.actors[..ai].iter().any(|b| (b.x - a.x).abs() < 96.0);
+            let chip_dy = if crowded { -40.0 } else { -22.0 };
             let tw = tag_width(a.label, 11);
             let chip_w = tw + 18.0;
-            draw_rectangle(sx - chip_w / 2.0, a.y - 22.0, chip_w, 17.0, Color::from_rgba(74, 42, 99, 205));
-            draw_rectangle_lines(sx - chip_w / 2.0, a.y - 22.0, chip_w, 17.0, 1.0, Color::from_rgba(255, 214, 230, 90));
-            draw_tag(a.label, sx - tw / 2.0, a.y - 10.0, 11, Color::from_rgba(255, 246, 233, 255));
+            draw_rectangle(sx - chip_w / 2.0, a.y + chip_dy, chip_w, 17.0, Color::from_rgba(74, 42, 99, 205));
+            draw_rectangle_lines(sx - chip_w / 2.0, a.y + chip_dy, chip_w, 17.0, 1.0, Color::from_rgba(255, 214, 230, 90));
+            draw_tag(a.label, sx - tw / 2.0, a.y + chip_dy + 12.0, 11, Color::from_rgba(255, 246, 233, 255));
             // "!" prompt bubble when in range
             if (a.x - pxx).abs() < REACH {
                 let bounce = (t * 5.0).sin() * 3.0;
-                let by = a.y - 40.0 + bounce;
+                let by = a.y + chip_dy - 18.0 + bounce;
                 draw_circle(sx, by, 11.0, Color::from_rgba(255, 214, 230, 248));
                 draw_circle_lines(sx, by, 11.0, 2.0, Color::from_rgba(74, 42, 99, 255));
                 draw_text("!", sx - 3.5, by + 4.5, 20.0, Color::from_rgba(74, 42, 99, 255));
@@ -1327,18 +1415,30 @@ impl World {
         let ride = self.biome == Biome::Candy && crate::game::ride_unlocked();
         let hopf = if ride { 11.0 } else { 7.0 };
         let hop_phase = self.bob_t * hopf;
-        let hop = if self.moving { hop_phase.sin() } else { (t * 2.0).sin() * 0.6 };
-        let py = self.player.1 + hop * 2.3;
-        // stride squash while moving, a slow breath while standing
-        let squash = 1.0 + if self.moving {
-            (hop_phase * 0.55).sin() * 0.05
-        } else {
-            (t * 2.0).sin() * 0.014
-        };
         let feet = self.player.1 + 72.0;
-        // shadow stays on the ground and breathes opposite the hop: the body
+        let step_ph = (hop_phase / std::f32::consts::PI).fract();
+        // Underwater River swims rather than walks: a slow float instead of the
+        // footstep bob, a slight body tilt into the stroke, and a bubble trail.
+        let swimming = self.biome == Biome::Aquarius;
+        // Contact pose sits low, passing pose rises: the same rule the NPCs
+        // use, so the whole cast walks on one rhythm.
+        let hop = if self.moving { (step_ph * std::f32::consts::PI).sin() } else { 0.0 };
+        let lift = if swimming { 7.0 + (t * 1.4).sin() * 3.5 } else { hop * 3.4 };
+        // Standing still breathes from the feet; walking squashes on contact.
+        let squash = if swimming {
+            1.0 + (t * 1.4).sin() * 0.010
+        } else {
+            1.0 + if self.moving {
+                -(step_ph * std::f32::consts::TAU).cos() * 0.03
+            } else {
+                (t * 1.8).sin() * 0.016
+            }
+        };
+        let body_h = 72.0 * squash;
+        let py = feet - body_h - lift;
+        // shadow stays on the ground and breathes opposite the lift: the body
         // rises, the shadow shrinks — read as contact with the ground.
-        let shadow_scale = if self.moving { 1.0 - hop.abs() * 0.18 } else { 1.0 };
+        let shadow_scale = 1.0 - lift * 0.045;
         if let Some(sh) = tex.shadow_of("river") {
             let sw2 = 50.0 * shadow_scale;
             draw_texture_ex(sh, px - sw2 / 2.0, feet - 10.0, Color::new(1.0, 1.0, 1.0, 0.9),
@@ -1364,8 +1464,24 @@ impl World {
             }
         } else { &tex.river };
         let pw = 48.0 * self.facing * squash;
+        let tilt = if swimming { -0.05 * self.facing } else { 0.0 };
         draw_texture_ex(frame, px - pw.abs() / 2.0, py, WHITE,
-            DrawTextureParams { dest_size: Some(Vec2::new(pw, 72.0 / squash)), ..Default::default() });
+            DrawTextureParams {
+                dest_size: Some(Vec2::new(pw, body_h)),
+                rotation: tilt,
+                ..Default::default()
+            });
+        if swimming {
+            for b in 0..3 {
+                let ph = (t * 0.9 + b as f32 * 0.37).fract();
+                let bx = px - self.facing * (10.0 + ph * 26.0) + (ph * 9.0).sin() * 3.0;
+                let by = py + body_h - 12.0 - ph * 30.0;
+                let a = (1.0 - ph) * 0.5;
+                draw_circle(bx, by, 2.2, Color::new(0.86, 0.97, 1.0, a));
+                draw_circle(bx - 0.7, by - 0.7, 0.8, Color::new(1.0, 1.0, 1.0, a));
+            }
+        }
+        self.drawn_bottom.set(py + body_h);
 
         // near-foreground fringe. It scrolls FASTER than the camera, so the
         // scene gains depth in front of the player as well as behind them -
@@ -1438,13 +1554,68 @@ impl World {
             }
         }
 
-        // guide arrow
+        // waypoint: a bobbing chevron pinned over the next objective, or one
+        // nudging in from the screen edge when it is off to the side
         let nx = self.next_target_x() - cam_x;
         let bounce = (t * 4.0).sin() * 6.0;
+        let mark = |x: f32, y: f32, dir: f32| {
+            let glow = 0.5 + 0.5 * (t * 3.0).sin();
+            draw_circle(x, y, 17.0, Color::new(1.0, 0.42, 0.68, 0.10 + glow * 0.08));
+            let tip = Vec2::new(x + dir * 4.0, y + 12.0);
+            let back = Vec2::new(x - dir * 10.0, y - 9.0);
+            draw_triangle(tip, back, Vec2::new(back.x, back.y + 12.0), Color::from_rgba(255, 105, 180, 235));
+            draw_triangle(Vec2::new(tip.x - dir * 3.0, tip.y - 6.0),
+                Vec2::new(back.x + dir * 3.0, back.y + 2.0),
+                Vec2::new(back.x + dir * 3.0, back.y + 9.0),
+                Color::from_rgba(255, 238, 246, 230));
+        };
         if nx > 60.0 && nx < sw + 60.0 {
-            draw_triangle(Vec2::new(nx, 150.0 + bounce), Vec2::new(nx - 14.0, 130.0 + bounce), Vec2::new(nx + 14.0, 130.0 + bounce), Color::from_rgba(255, 105, 180, 220));
+            mark(nx, 128.0 + bounce, 0.0);
         } else if nx >= sw + 60.0 {
-            draw_triangle(Vec2::new(sw - 30.0, 150.0 + bounce), Vec2::new(sw - 50.0, 130.0 + bounce), Vec2::new(sw - 14.0, 140.0 + bounce), Color::from_rgba(255, 105, 180, 220));
+            mark(sw - 34.0, 146.0 + bounce * 0.5, 1.0);
+        } else if nx < -60.0 {
+            mark(34.0, 146.0 + bounce * 0.5, -1.0);
+        }
+
+        // near-field candy: big soft lumps along the bottom edge give the
+        // meadow a foreground plane instead of one flat field to the horizon
+        if self.biome == Biome::Candy {
+            let span = 196.0;
+            let base = (cam_x * 1.12).rem_euclid(span);
+            for i in -1..(sw / span) as i32 + 2 {
+                let sx = i as f32 * span - base;
+                let seed = (i as i64).wrapping_mul(2654435761) as u64;
+                let kind = (seed >> 17) % 3;
+                let tint = Color::new(0.93, 0.86, 0.90, 1.0);
+                match kind {
+                    0 => {
+                        let r = 54.0 + ((seed >> 23) % 30) as f32;
+                        draw_ellipse(sx, 760.0, r, r * 0.86, 0.0, tint);
+                        draw_ellipse(sx - r * 0.3, 736.0, r * 0.4, r * 0.28, -0.4,
+                            Color::from_rgba(255, 255, 255, 150));
+                    }
+                    1 => {
+                        // out-of-focus lollipop: one filled head with a swirl,
+                        // pushed toward the sky's tint rather than UI pink
+                        let hh = 150.0 + ((seed >> 25) % 50) as f32;
+                        let top = 780.0 - hh;
+                        draw_rectangle(sx - 10.0, top, 20.0, hh, Color::new(0.88, 0.76, 0.82, 0.85));
+                        let r = 42.0;
+                        draw_circle(sx, top - 6.0, r, Color::new(0.90, 0.55, 0.68, 0.85));
+                        for k in 0..3 {
+                            let rr = r * (0.78 - k as f32 * 0.24);
+                            draw_arc(sx, top - 6.0, 18, rr, 40.0 + k as f32 * 126.0,
+                                6.0, 206.0, Color::new(1.0, 0.93, 0.96, 0.55));
+                        }
+                    }
+                    _ => {
+                        let ww = 120.0 + ((seed >> 29) % 60) as f32;
+                        draw_ellipse(sx, 776.0, ww, 62.0, 0.0, tint);
+                        draw_ellipse(sx - ww * 0.34, 752.0, ww * 0.30, 20.0, -0.2,
+                            Color::from_rgba(255, 255, 255, 120));
+                    }
+                }
+            }
         }
 
         // particles: every family is a real sprite from the Kenney particle
@@ -1514,8 +1685,9 @@ impl World {
             }
         }
 
-        // proximity prompt (styled chip)
-        if let Some((label, is_actor, _)) = self.nearest_info() {
+        // proximity prompt (styled chip), hidden while a scene or puzzle owns
+        // the screen: a "click / z" hint under a dialogue box is noise
+        if let (true, Some((label, is_actor, _))) = (show_prompt, self.nearest_info()) {
             let msg = if is_actor {
                 format!("click / z: talk to {}", label)
             } else {
@@ -1529,8 +1701,9 @@ impl World {
             draw_dlg_text(&msg, mx + 22.0, my + 22.0, 24, Color::from_rgba(74, 42, 99, 255));
         }
 
-        // hint toast (styled chip)
-        if self.hint_t > 0.0 && !self.hint.is_empty() {
+        // hint toast (styled chip). Only over the overworld: during a
+        // conversation it stacked a second panel on top of the dialogue one.
+        if show_prompt && self.hint_t > 0.0 && !self.hint.is_empty() {
             let hw = dlg_width(&self.hint, 26) + 48.0;
             let hx = (sw * 0.5 - hw / 2.0).clamp(6.0, sw - hw - 6.0);
             let hy = 86.0;
