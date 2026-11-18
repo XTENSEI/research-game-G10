@@ -332,6 +332,9 @@ pub struct Fx {
 
     /// Horizontal camera shake offset in pixels (read by the overworld draw).
     pub shake_x: f32,
+    /// Vertical camera lift in pixels: conversations push the world up so the
+    /// speaker's body clears the dialogue panel.
+    pub lift: f32,
     shake_amp: f32,
     shake_t: f32,
     shake_dur: f32,
@@ -419,6 +422,7 @@ impl Fx {
             h,
 
             shake_x: 0.0,
+            lift: 0.0,
             shake_amp: 0.0,
             shake_t: 0.0,
             shake_dur: 0.35,
@@ -543,22 +547,41 @@ impl Fx {
 
     /// Route every subsequent draw call into the offscreen scene buffer.
     pub fn begin(&mut self) {
+        // Start every frame from black. Without this the scene buffer keeps
+        // whatever a previous camera left in it, and UI that was drawn at a
+        // different offset reappears as a ghost panel.
+        clear_background(BLACK);
         let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, self.w, self.h));
         // punch-zoom renders a smaller slice of the scene into the buffer,
         // which is a real camera push rather than a post-hoc scale
         let zoom = self.punch.max(0.6);
         let dw = self.w / zoom;
         let dh = self.h / zoom;
-        cam.target = vec2(dw / 2.0 + self.shake_x * 0.35, dh / 2.0);
+        cam.target = vec2(dw / 2.0 + self.shake_x * 0.35, dh / 2.0 + self.lift / zoom);
         cam.zoom = vec2(2.0 / dw, -2.0 / dh);
         cam.render_target = Some(self.scene.clone());
         set_camera(&cam);
     }
 
-    fn blit(&self, src: &Texture2D, dst: &RenderTarget, tw: f32, th: f32) {
-        let cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, tw, th));
+    /// Re-point the camera at the same scene buffer with no lift and no punch:
+    /// UI drawn after the world (dialogue panels, quiz frames) stays put.
+    pub fn begin_ui(&self) {
+        let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, self.w, self.h));
+        cam.target = vec2(self.w / 2.0 + self.shake_x * 0.35, self.h / 2.0);
+        cam.zoom = vec2(2.0 / self.w, -2.0 / self.h);
+        cam.render_target = Some(self.scene.clone());
         set_camera(&cam);
-        let _ = &dst.render_pass;
+    }
+
+    /// Downsample `src` into `dst`. The camera has to name `dst` as its render
+    /// target: `set_camera` alone draws to the window, which left the bloom
+    /// targets holding stale pixels and smeared an old, flipped frame across
+    /// the screen (the "second UI" at the top).
+    fn blit(&self, src: &Texture2D, dst: &RenderTarget, tw: f32, th: f32) {
+        let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, tw, th));
+        cam.render_target = Some(dst.clone());
+        set_camera(&cam);
+        clear_background(Color::new(0.0, 0.0, 0.0, 0.0));
         draw_texture_ex(src, 0.0, 0.0, WHITE, DrawTextureParams {
             dest_size: Some(vec2(tw, th)),
             flip_y: FLIP,
@@ -615,14 +638,13 @@ impl Fx {
         // low - without a shader there is no brightness threshold, so a strong
         // mix would haze the whole frame rather than only the highlights. The
         // authored light sprites do the heavy lifting.
-        let tight = Color::new(1.0, 1.0, 1.0, 0.115);
-        let wide = Color::new(1.0, 1.0, 1.0, 0.075);
-        for _ in 0..2 {
-            self.screen_quad(&self.lo.texture, tight);
-        }
-        for _ in 0..2 {
-            self.screen_quad(&self.lo2.texture, wide);
-        }
+        // Now that the downsample lands in its own target, the bloom is a real
+        // aligned copy rather than a stale frame. It has to stay faint: an
+        // unthresholded copy at full weight just milks the whole image out.
+        let tight = Color::new(1.0, 1.0, 1.0, 0.055);
+        let wide = Color::new(1.0, 1.0, 1.0, 0.038);
+        self.screen_quad(&self.lo.texture, tight);
+        self.screen_quad(&self.lo2.texture, wide);
 
         // per-biome colour grade
         if self.grade.a > 0.001 {
