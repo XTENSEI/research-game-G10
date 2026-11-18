@@ -209,7 +209,9 @@ impl DialogueBox {
                 }
             }
 
-            if is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Enter) {
+            // `advance` already folds in the harness flag, the same as the
+            // non-choice path, so an automated run can actually pick an option
+            if advance {
                 let payload = self.choices[self.choice_sel].1.clone();
                 self.close();
                 return Some(payload);
