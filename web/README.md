@@ -13,7 +13,8 @@ Rebuild the wasm after any game change:
 ```bash
 cargo build --release --target wasm32-unknown-unknown
 cp target/wasm32-unknown-unknown/release/literacy-rpg.wasm web/literacy-rpg.wasm
-python3 assets/tools/devserver.py
+python3 assets/tools/devserver.py 5014
 ```
 
-Then open `http://127.0.0.1:8000/play.html`.
+Then open `http://127.0.0.1:5014/play.html`. The server sends no-cache headers so a
+reload always shows the build currently on disk.
