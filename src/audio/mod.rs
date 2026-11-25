@@ -1,15 +1,7 @@
-//! Sound. Two sources, layered:
-//!
-//! * SFX are real mastered CC0 samples (Kenney interface / impact / RPG audio)
-//!   emitted into `assets/game/audio/` by `assets/tools/build.py`. These are
-//!   loaded at runtime and fall back to a synthesized blip if a file is
-//!   missing, so a half-generated asset tree still boots and still makes noise.
-//!
-//! * Ambience is still synthesized, because no CC0 music pack is vendored. The
-//!   pads are built from partials quantized to a multiple of the loop period,
-//!   which makes the 4s loop mathematically seamless - no click at the wrap.
+//! Audio system: CC0 RPG & underwater music tracks, Kenney SFX,
+//! and character-pitched Undertale-style voice blips.
 
-use macroquad::audio::{load_sound, load_sound_from_bytes, Sound};
+use macroquad::audio::{load_sound, load_sound_from_bytes, play_sound, set_sound_volume, stop_sound, PlaySoundParams, Sound};
 
 const SAMPLE_RATE: u32 = 22050;
 
@@ -21,8 +13,8 @@ fn write_wav(samples: &[f32]) -> Vec<u8> {
     b.extend_from_slice(&(36 + data_len).to_le_bytes());
     b.extend_from_slice(b"WAVEfmt ");
     b.extend_from_slice(&16u32.to_le_bytes());
-    b.extend_from_slice(&1u16.to_le_bytes()); // PCM
-    b.extend_from_slice(&1u16.to_le_bytes()); // mono
+    b.extend_from_slice(&1u16.to_le_bytes());
+    b.extend_from_slice(&1u16.to_le_bytes());
     b.extend_from_slice(&SAMPLE_RATE.to_le_bytes());
     b.extend_from_slice(&(SAMPLE_RATE * 2).to_le_bytes());
     b.extend_from_slice(&2u16.to_le_bytes());
@@ -42,12 +34,11 @@ fn tone(freq: f32, dur: f32, vol: f32, decay: f32) -> Vec<f32> {
         .map(|i| {
             let t = i as f32 / SAMPLE_RATE as f32;
             let env = (-t * decay).min(1.0);
-            (t * freq * 2.0 * std::f32::consts::PI).sin() * vol * env
+            (t * freq * std::f32::consts::TAU).sin() * vol * env
         })
         .collect()
 }
 
-/// Cheap deterministic pseudo-random in [-0.5,0.5) from an index.
 fn prand(i: usize, salt: u64) -> f32 {
     let x = (i as u64).wrapping_mul(2654435761).wrapping_add(salt);
     ((x >> 16) & 0xffff) as f32 / 65536.0 - 0.5
@@ -67,24 +58,19 @@ fn mix(chunks: &[Vec<f32>]) -> Vec<f32> {
     out
 }
 
-/// Seamless loop pad. Every partial is snapped to a whole multiple of the loop
-/// rate (1/dur Hz), so the waveform is exactly periodic over `dur` and the loop
-/// point cannot click. `air` mixes in band-limited noise partials for texture
-/// (wind, water, room tone).
+/// Seamless fallback ambience pad in case an `.ogg` track is absent.
 fn pad(freqs: &[f32], detune: f32, dur: f32, air: f32, lfo_rate: f32, seed: u64) -> Vec<f32> {
     let n = (SAMPLE_RATE as f32 * dur) as usize;
-    let unit = 1.0 / dur; // Hz quantum that keeps the loop periodic
+    let unit = 1.0 / dur;
     let snap = |f: f32| (f / unit).round().max(1.0) * unit;
 
-    // partials: the chord, plus a couple of harmonics for warmth
-    let mut parts: Vec<(f32, f32, f32)> = Vec::new(); // (freq, amp, phase)
+    let mut parts: Vec<(f32, f32, f32)> = Vec::new();
     for (k, f) in freqs.iter().enumerate() {
         let ph = (k as f32 * 1.37) % std::f32::consts::TAU;
         parts.push((snap(*f), 1.0, ph));
         parts.push((snap(f + k as f32 * detune), 0.55, ph * 1.7));
         parts.push((snap(f * 2.0), 0.18, ph * 2.3));
     }
-    // air: 40 seeded partials spread over the top end
     let mut s = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
     for _ in 0..40 {
         s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
@@ -102,17 +88,23 @@ fn pad(freqs: &[f32], detune: f32, dur: f32, air: f32, lfo_rate: f32, seed: u64)
             for (f, a, ph) in &parts {
                 v += (t * f * std::f32::consts::TAU + ph).sin() * a;
             }
-            // slow breathing so the pad never sits perfectly still
             let lfo = 0.78 + 0.22 * (t * lfo_rate.min(unit * 4.0) * std::f32::consts::TAU).sin();
-            v * norm * lfo * 0.5
+            v * norm * lfo * 0.45
         })
         .collect()
 }
 
-/// The samples the game actually plays. Keeping this list tight matters on the
-/// web: every entry is another request before the first frame can draw.
-/// Sound is loaded through the async file API, so a missing file degrades to a
-/// synthesized stand-in rather than failing the boot.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MusicTrack {
+    Town,
+    Kelp,
+    Coral,
+    Cave,
+    Slums,
+    Rainbow,
+    Battle,
+}
+
 pub struct Sfx {
     pub blip: Sound,
     pub good: Sound,
@@ -124,9 +116,17 @@ pub struct Sfx {
     pub back: Sound,
     pub question: Sound,
     pub coin: Sound,
-    /// Footsteps: candy grass, aquarium sand, void stone, home wood - two
-    /// variants each, alternating so a walk does not sound like one sample.
     pub steps: Vec<Sound>,
+}
+
+pub struct MusicTracks {
+    pub town: Sound,
+    pub kelp: Sound,
+    pub coral: Sound,
+    pub cave: Sound,
+    pub slums: Sound,
+    pub rainbow: Sound,
+    pub battle: Sound,
 }
 
 pub struct Ambience {
@@ -138,11 +138,97 @@ pub struct Ambience {
 
 pub struct AudioSys {
     pub sfx: Sfx,
+    pub mus: MusicTracks,
     pub amb: Ambience,
+    pub blips: [Sound; 5],
+    active: Option<MusicTrack>,
+    pub muted: bool,
+    pub music_vol: f32,
+    pub sfx_vol: f32,
 }
 
-/// Load a real sample, or fall back to a synthesized stand-in so a missing
-/// asset degrades instead of panicking.
+impl AudioSys {
+    pub fn track_sound(&self, id: MusicTrack) -> &Sound {
+        match id {
+            MusicTrack::Town => &self.mus.town,
+            MusicTrack::Kelp => &self.mus.kelp,
+            MusicTrack::Coral => &self.mus.coral,
+            MusicTrack::Cave => &self.mus.cave,
+            MusicTrack::Slums => &self.mus.slums,
+            MusicTrack::Rainbow => &self.mus.rainbow,
+            MusicTrack::Battle => &self.mus.battle,
+        }
+    }
+
+    pub fn ensure_music(&mut self, id: MusicTrack) {
+        if self.active == Some(id) {
+            return;
+        }
+        if let Some(prev) = self.active {
+            stop_sound(self.track_sound(prev));
+        }
+        let vol = if self.muted { 0.0 } else { self.music_vol };
+        play_sound(self.track_sound(id), PlaySoundParams { looped: true, volume: vol });
+        self.active = Some(id);
+    }
+
+    #[allow(dead_code)]
+    pub fn stop_music(&mut self) {
+        if let Some(prev) = self.active.take() {
+            stop_sound(self.track_sound(prev));
+        }
+    }
+
+    pub fn toggle_mute(&mut self) -> bool {
+        self.muted = !self.muted;
+        self.apply_music_vol();
+        self.muted
+    }
+
+    pub fn set_music_vol(&mut self, v: f32) {
+        self.music_vol = v.clamp(0.0, 1.0);
+        self.apply_music_vol();
+    }
+
+    pub fn set_sfx_vol(&mut self, v: f32) {
+        self.sfx_vol = v.clamp(0.0, 1.0);
+    }
+
+    fn apply_music_vol(&self) {
+        if let Some(cur) = self.active {
+            let vol = if self.muted { 0.0 } else { self.music_vol };
+            set_sound_volume(self.track_sound(cur), vol);
+        }
+    }
+
+    pub fn play_sfx(&self, snd: &Sound, scale: f32) {
+        if self.muted {
+            return;
+        }
+        let vol = (scale * self.sfx_vol).clamp(0.0, 1.0);
+        if vol > 0.005 {
+            play_sound(snd, PlaySoundParams { looped: false, volume: vol });
+        }
+    }
+
+    pub fn play_voice(&self, speaker: &str) {
+        if self.muted {
+            return;
+        }
+        let idx = match speaker {
+            "Queen Crab" | "Tenebris" | "Tow-Tou" => 0,
+            "Jack" | "Jill" | "Guard 1" | "Guard 2" | "Grandparent" | "Mark" => 1,
+            "River" | "Nadia" | "Thaumiel" | "Magic Fire Genie" => 2,
+            "Kenny" | "Sophie" | "Market Lady" | "Gillbert" => 3,
+            _ => 4,
+        };
+        let vol = (0.14 * self.sfx_vol).clamp(0.0, 1.0);
+        if vol > 0.005 {
+            play_sound(&self.blips[idx], PlaySoundParams { looped: false, volume: vol });
+        }
+    }
+}
+
 async fn sfx(name: &str, fallback: &[f32]) -> Sound {
     let path = format!("assets/game/audio/{}.ogg", name);
     if let Ok(s) = load_sound(&path).await {
@@ -153,8 +239,17 @@ async fn sfx(name: &str, fallback: &[f32]) -> Sound {
         .unwrap_or_else(|e| panic!("audio subsystem rejected fallback for {}: {:?}", name, e))
 }
 
+async fn mus(name: &str, fallback: &[f32]) -> Sound {
+    let path = format!("assets/game/audio/{}.ogg", name);
+    if let Ok(s) = load_sound(&path).await {
+        return s;
+    }
+    load_sound_from_bytes(&write_wav(fallback))
+        .await
+        .unwrap_or_else(|e| panic!("audio subsystem rejected fallback for {}: {:?}", name, e))
+}
+
 pub async fn load() -> AudioSys {
-    // --- synthesized fallbacks (also the actual ambience beds) --------------
     let blip = tone(880.0, 0.05, 0.25, 40.0);
 
     let mut good = tone(660.0, 0.25, 0.3, 8.0);
@@ -203,15 +298,6 @@ pub async fn load() -> AudioSys {
 
     let click = tone(1200.0, 0.035, 0.22, 60.0);
 
-    // --- ambience beds: seamless, one per biome -----------------------------
-    // Frequencies are snapped to the loop rate inside `pad`, so these wrap
-    // without a click.
-    let house = pad(&[130.8, 164.8, 196.0], 0.4, 4.0, 0.25, 0.25, 3);
-    let candy = pad(&[261.6, 329.6, 392.0, 523.2], 0.7, 4.0, 0.55, 0.5, 17);
-    let aqua = pad(&[98.0, 130.8, 146.8], 0.25, 4.0, 1.0, 0.25, 29);
-    let cosma = pad(&[174.6, 220.0, 261.6, 349.2], 0.5, 4.0, 0.85, 0.75, 41);
-
-    // Footsteps: grass, sand, stone, wood, then two extras for variety.
     let step_names = [
         "step_grass_a", "step_grass_b", "step_sand_a", "step_sand_b",
         "step_stone_a", "step_stone_b", "step_wood_a", "step_wood_b",
@@ -221,6 +307,34 @@ pub async fn load() -> AudioSys {
     for n in step_names {
         steps.push(sfx(n, &click).await);
     }
+
+    let town_pad = pad(&[130.8, 164.8, 196.0], 0.4, 4.0, 0.25, 0.25, 3);
+    let kelp_pad = pad(&[196.0, 246.9, 293.7, 392.0], 0.5, 4.0, 0.55, 0.4, 17);
+    let coral_pad = pad(&[98.0, 130.8, 164.8], 0.25, 4.0, 0.85, 0.3, 29);
+    let slums_pad = pad(&[110.0, 146.8, 174.6, 220.0], 0.4, 4.0, 0.90, 0.65, 41);
+
+    let town = mus("mus_town", &town_pad).await;
+    let kelp = mus("mus_kelp", &kelp_pad).await;
+    let coral = mus("mus_coral", &coral_pad).await;
+    let cave = mus("mus_cave", &coral_pad).await;
+    let slums = mus("mus_slums", &slums_pad).await;
+    let rainbow = mus("mus_rainbow", &kelp_pad).await;
+    let battle = mus("mus_battle", &slums_pad).await;
+
+    let amb = Ambience {
+        house: town.clone(),
+        candy: kelp.clone(),
+        aqua: coral.clone(),
+        cosma: slums.clone(),
+    };
+
+    let blips = [
+        load_sound_from_bytes(&write_wav(&tone(210.0, 0.048, 0.22, 38.0))).await.unwrap(),
+        load_sound_from_bytes(&write_wav(&tone(320.0, 0.045, 0.20, 42.0))).await.unwrap(),
+        load_sound_from_bytes(&write_wav(&tone(440.0, 0.042, 0.19, 44.0))).await.unwrap(),
+        load_sound_from_bytes(&write_wav(&tone(540.0, 0.040, 0.19, 46.0))).await.unwrap(),
+        load_sound_from_bytes(&write_wav(&tone(660.0, 0.038, 0.18, 48.0))).await.unwrap(),
+    ];
 
     AudioSys {
         sfx: Sfx {
@@ -236,11 +350,12 @@ pub async fn load() -> AudioSys {
             coin: sfx("coin", &good).await,
             steps,
         },
-        amb: Ambience {
-            house: load_sound_from_bytes(&write_wav(&house)).await.unwrap(),
-            candy: load_sound_from_bytes(&write_wav(&candy)).await.unwrap(),
-            aqua: load_sound_from_bytes(&write_wav(&aqua)).await.unwrap(),
-            cosma: load_sound_from_bytes(&write_wav(&cosma)).await.unwrap(),
-        },
+        mus: MusicTracks { town, kelp, coral, cave, slums, rainbow, battle },
+        amb,
+        blips,
+        active: None,
+        muted: false,
+        music_vol: 0.26,
+        sfx_vol: 0.55,
     }
 }
