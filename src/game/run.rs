@@ -10,8 +10,8 @@ use crate::game::{
     script::{self, Biome, Line},
     set_swift_swim,
     ui::{
-        draw_btn, draw_dlg_shadow, draw_field_notes, draw_nine_slice, draw_option_row_skinned,
-        draw_panel, draw_pause_overlay, draw_storybook, draw_tag_shadow, draw_wrapped_col,
+        draw_btn, draw_btn_icon, draw_dlg_shadow, draw_field_notes, draw_nine_slice,
+        draw_option_row_skinned, draw_panel, draw_pause_overlay, draw_tag_shadow, draw_wrapped_col,
         draw_wrapped_rich, dlg_width, quiz_header_skinned, tag_width, wrapped_line_count,
         DialogueBox, PauseAction, Skin,
     },
@@ -273,7 +273,7 @@ impl Game {
     pub fn demo_dialog(&mut self) {
         self.enter_biome(Biome::Kelp, false);
         self.world.player.0 = 500.0;
-        self.queue_lines(&[Line::expr("Kenny", "happy", "Look friend—*questions* and sharpest reading settle every duel down here!")], AfterDialogue::None);
+        self.queue_lines(&[Line::expr("Kenny", "happy", "Look friend, *questions* and sharp reading settle every duel down here!")], AfterDialogue::None);
     }
 
     /// Boot any scene cleanly by name for native CLI or headless WebGL QA.
@@ -865,7 +865,7 @@ impl Game {
                         }
                     }
                     if hp == 0 {
-                        feedback = Some((false, "Ouch—shelled out!", 0.9));
+                        feedback = Some((false, "Ouch, shelled out!", 0.9));
                     } else if timer <= 0.0 {
                         round_dodge = false;
                         q_idx += 1;
@@ -970,7 +970,7 @@ impl Game {
                         feedback = Some(("Clean rhyme!! Keep flowing!", 0.8));
                     } else {
                         self.audio.play_sfx(&self.audio.sfx.bad, 0.45);
-                        feedback = Some(("Off-rhythm bar—match the end rhyme!", 0.9));
+                        feedback = Some(("Off-rhythm bar! Match the end rhyme!", 0.9));
                     }
                     let _ = cur;
                 }
@@ -1038,7 +1038,7 @@ impl Game {
                             feedback = Some((true, tr.infuse_note, 1.3));
                         } else {
                             self.audio.play_sfx(&self.audio.sfx.bad, 0.5);
-                            feedback = Some((false, "Imbalance in the crystal lattice—check the figure & device!", 1.1));
+                            feedback = Some((false, "Crystal mismatch! Check the figure and poetic device!", 1.1));
                         }
                     }
                 }
@@ -1247,7 +1247,7 @@ impl Game {
                         self.dlg.ask_expr(
                             "Kenny",
                             "normal",
-                            "In this world, our King prohibited weapons—so every fight settles by...",
+                            "In this world, our King prohibited weapons, so every fight settles by...",
                             &[("Risk?", "r"), ("Riddles?", "d"), ("Questions?", "q")],
                             &self.tex,
                         );
@@ -1354,7 +1354,7 @@ impl Game {
                             "Kenny",
                             "normal",
                             "Catch your breath! What did you just try asking?",
-                            &[("Where am I?", "w1"), ("Where are we?", "w2"), ("No—stay back!", "w3")],
+                            &[("Where am I?", "w1"), ("Where are we?", "w2"), ("No, stay back!", "w3")],
                             &self.tex,
                         );
                         self.phase = Phase::KennyTree { step: 1 };
@@ -1430,7 +1430,7 @@ impl Game {
             }
             "jack_jill" => {
                 if self.prog.all_coral_items() {
-                    self.queue_lines(&[Line::expr("Jack", "normal", "Superb!! All 3 reef ingredients gathered—head east for Tow-Tou's Scrapyard!")], AfterDialogue::None);
+                    self.queue_lines(&[Line::expr("Jack", "normal", "Superb!! All 3 reef ingredients gathered! Head east for Tow-Tou's Scrapyard!")], AfterDialogue::None);
                 } else {
                     self.queue_lines(&[Line::expr("Jill", "normal", "Bring a Blue Seashroom, Tentacle Anemone & True Seaberry! Check [Tab] Field Notes for clues.")], AfterDialogue::None);
                 }
@@ -1482,7 +1482,7 @@ impl Game {
             }
             "anglers" => {
                 if self.anglers_cleared {
-                    self.world.say_hint("The Angler Trio already respects your flow—head east into the Cave Maze!");
+                    self.world.say_hint("The Angler Trio already respects your flow. Head east into the Cave Maze!");
                 } else {
                     self.queue_lines(script::ANGLERS_AMBUSH, AfterDialogue::StartRapBattle);
                 }
@@ -1493,7 +1493,7 @@ impl Game {
                 } else if self.prog.coral_riddles_seen == 0 {
                     self.world.say_hint("Attempt at least one Coral Riddle Tablet before braving the Grave Cave Maze!");
                 } else {
-                    self.queue_lines(&[Line::new("Tow-Tou", "Careful inside the Grave Cave Maze of Craze—wrong answers push you back silently without a sound!")], AfterDialogue::StartMaze);
+                    self.queue_lines(&[Line::new("Tow-Tou", "Careful inside the Grave Cave Maze of Craze! Wrong answers push you back silently without a sound!")], AfterDialogue::StartMaze);
                 }
             }
             "thaumiel" | "tenebris" => {
@@ -1609,7 +1609,7 @@ impl Game {
             }
         }
 
-        // Fixed crisp UI layer (free of camera punch/lift) — every interactive widget sits here
+        // Fixed crisp UI layer, free of camera shake, holding every interactive widget
         self.fx.begin_ui();
 
         match &self.phase {
@@ -1714,6 +1714,20 @@ impl Game {
         let t = get_time() as f32;
         crate::art::draw_biome_bg(Biome::Coral, t * 0.8, t * 22.0, &self.fx, &self.tex);
 
+        // Passing Ansimuz reef fish silhouettes in the lagoon behind the title
+        let f_frame = ((t * 5.0) as usize) % 4;
+        for i in 0..3 {
+            let fx_pos = (w + 100.0) - ((t * 42.0 + i as f32 * 390.0).rem_euclid(w + 200.0));
+            let fy = 228.0 + i as f32 * 36.0 + (t * 1.4 + i as f32).sin() * 10.0;
+            let fspr = if i % 2 == 0 { &self.tex.aqua.anim_fish } else { &self.tex.aqua.anim_fish_big };
+            let fw = fspr.width() / 4.0;
+            draw_texture_ex(fspr, fx_pos, fy, c(210, 245, 255, 210), DrawTextureParams {
+                source: Some(Rect::new(f_frame as f32 * fw, 0.0, fw, fspr.height())),
+                dest_size: Some(vec2(fw * 2.0, fspr.height() * 2.0)),
+                ..Default::default()
+            });
+        }
+
         // Rich sandy seabed floor so lower 160px of title screen integrates seamlessly
         let tp = &self.tex.tiles;
         let step = 48.0;
@@ -1735,18 +1749,57 @@ impl Game {
         draw_texture_ex(&self.tex.aqua.sea_bush, 864.0, 492.0, WHITE, DrawTextureParams { dest_size: Some(vec2(68.0, 72.0)), ..Default::default() });
 
         let title_skin = Skin::for_biome(Biome::Coral);
-        draw_nine_slice(&self.tex, (w - 720.0) * 0.5, 48.0, 720.0, 154.0, title_skin.bg, title_skin.accent);
+        draw_nine_slice(&self.tex, (w - 720.0) * 0.5, 44.0, 720.0, 150.0, title_skin.bg, title_skin.accent);
         let t1 = "GIFT OF EDUCATION";
         let t2 = "A SUNKEN REALM LITERACY RPG";
-        draw_tag_shadow(t1, (w - tag_width(t1, 28)) * 0.5, 114.0, 28, title_skin.accent);
-        draw_tag_shadow(t2, (w - tag_width(t2, 13)) * 0.5, 162.0, 13, title_skin.chip_ink);
+        draw_tag_shadow(t1, (w - tag_width(t1, 28)) * 0.5, 108.0, 28, title_skin.accent);
+        draw_tag_shadow(t2, (w - tag_width(t2, 13)) * 0.5, 154.0, 13, title_skin.chip_ink);
 
-        let glow = 0.5 + 0.5 * (t * 2.2).sin();
-        draw_storybook(w * 0.5, 415.0 + (t * 2.0).sin() * 6.0, 4.0, glow);
+        // Glowing floating Elixir Tome sprite + sparkles
+        let tome_y = 266.0 + (t * 2.2).sin() * 8.0;
+        self.fx.glow_rect(w * 0.5, tome_y + 66.0, 220.0, 220.0, c(104, 240, 255, 58));
+        draw_texture_ex(&self.tex.props.tome, w * 0.5 - 54.0, tome_y, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(108.0, 132.0)),
+            ..Default::default()
+        });
 
-        // Cast preview lining the reef floor
-        draw_texture_ex(&self.tex.river, w * 0.5 - 240.0, 315.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 108.0)), ..Default::default() });
-        draw_texture_ex(&self.tex.kenny, w * 0.5 + 135.0, 315.0, WHITE, DrawTextureParams { dest_size: Some(vec2(108.0, 108.0)), flip_x: true, ..Default::default() });
+        // Grounded animated River (idle blink) & claw-snapping Kenny flanking the Tome on sand
+        let feet_y = 562.0;
+        if let Some(sh) = self.tex.shadow_of("river") {
+            let sw = sh.width() * 3.0;
+            draw_texture_ex(sh, w * 0.5 - 230.0 - sw * 0.5, feet_y - sh.height() * 1.5, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(sw, sh.height() * 3.0)),
+                ..Default::default()
+            });
+        }
+        let r_spr = if (t % 3.6) > 3.42 { self.tex.idle_of("river").unwrap_or(&self.tex.river) } else { &self.tex.river };
+        let rw = r_spr.width() * 3.0;
+        let rh = r_spr.height() * 3.0;
+        draw_texture_ex(r_spr, w * 0.5 - 230.0 - rw * 0.5, feet_y - rh, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(rw, rh)),
+            ..Default::default()
+        });
+
+        if let Some(sh) = self.tex.shadow_of("kenny") {
+            let sw = sh.width() * 3.0;
+            draw_texture_ex(sh, w * 0.5 + 230.0 - sw * 0.5, feet_y - sh.height() * 1.5, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(sw, sh.height() * 3.0)),
+                ..Default::default()
+            });
+        }
+        let k_spr = match ((t * 3.4) as usize) % 5 {
+            0 | 1 => &self.tex.kenny,
+            2 => &self.tex.walks["kenny"][0],
+            3 => &self.tex.walks["kenny"][1],
+            _ => self.tex.idle_of("kenny").unwrap_or(&self.tex.kenny),
+        };
+        let kw = k_spr.width() * 3.0;
+        let kh = k_spr.height() * 3.0;
+        draw_texture_ex(k_spr, w * 0.5 + 230.0 - kw * 0.5, feet_y - kh, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(kw, kh)),
+            flip_x: true,
+            ..Default::default()
+        });
     }
 
     fn draw_title_buttons(&mut self, skin: &Skin) {
@@ -1766,8 +1819,9 @@ impl Game {
                 return;
             }
         }
+        let s_ico = if self.audio.muted { &self.tex.ui.sound_off } else { &self.tex.ui.sound_on };
         let m_lbl = if self.audio.muted { "SOUND: OFF [M]" } else { "SOUND: ON [M]" };
-        if draw_btn(&self.tex, bx, if self.has_save { 594.0 } else { 536.0 }, bw, 46.0, m_lbl, &title_skin, false) {
+        if draw_btn_icon(&self.tex, bx, if self.has_save { 594.0 } else { 536.0 }, bw, 46.0, s_ico, m_lbl, &title_skin, false) {
             self.audio.toggle_mute();
         }
         let _ = skin;
@@ -1777,32 +1831,29 @@ impl Game {
 
     fn draw_hud(&mut self, skin: &Skin) {
         let w = screen_width();
-        draw_nine_slice(&self.tex, 12.0, 12.0, 442.0, 44.0, skin.bg, skin.border);
+        draw_nine_slice(&self.tex, 12.0, 12.0, 420.0, 44.0, skin.bg, skin.border);
         draw_tag_shadow(script::biome_title(self.biome), 26.0, 40.0, 10, skin.accent);
 
-        // Elixir vial badge
+        // Elixir vial & Riddle scroll badge
         let vial = match self.prog.elixir {
             0 => &self.tex.ui.vial_empty,
             1 => &self.tex.ui.vial_red,
             2 => &self.tex.ui.vial_green,
             _ => &self.tex.ui.vial_blue,
         };
-        draw_nine_slice(&self.tex, 462.0, 12.0, 264.0, 44.0, skin.bg, skin.border);
-        draw_texture_ex(vial, 474.0, 18.0, WHITE, DrawTextureParams { dest_size: Some(vec2(30.0, 30.0)), ..Default::default() });
-        draw_dlg_shadow(
-            &format!("Elixir {}/3   Riddles {}", self.prog.elixir, self.prog.total_riddles_right()),
-            512.0,
-            40.0,
-            22,
-            skin.ink,
-        );
+        draw_nine_slice(&self.tex, 440.0, 12.0, 286.0, 44.0, skin.bg, skin.border);
+        draw_texture_ex(vial, 450.0, 21.0, WHITE, DrawTextureParams { dest_size: Some(vec2(26.0, 26.0)), ..Default::default() });
+        draw_dlg_shadow(&format!("Elixir {}/3", self.prog.elixir), 482.0, 40.0, 22, skin.ink);
+        draw_texture_ex(&self.tex.ui.scroll, 588.0, 22.0, WHITE, DrawTextureParams { dest_size: Some(vec2(24.0, 24.0)), ..Default::default() });
+        draw_dlg_shadow(&format!("Riddles {}", self.prog.total_riddles_right()), 618.0, 40.0, 22, skin.ink);
 
-        if draw_btn(&self.tex, w - 290.0, 12.0, 136.0, 44.0, "NOTES [Tab]", skin, self.show_notes) {
+        if draw_btn_icon(&self.tex, w - 290.0, 12.0, 144.0, 44.0, &self.tex.ui.book, "NOTES [Tab]", skin, self.show_notes) {
             self.show_notes = !self.show_notes;
             self.audio.play_sfx(&self.audio.sfx.page, 0.55);
         }
+        let s_ico = if self.audio.muted { &self.tex.ui.sound_off } else { &self.tex.ui.sound_on };
         let m_lbl = if self.audio.muted { "MUTE [M]" } else { "PAUSE [Esc]" };
-        if draw_btn(&self.tex, w - 146.0, 12.0, 134.0, 44.0, m_lbl, skin, false) {
+        if draw_btn_icon(&self.tex, w - 138.0, 12.0, 126.0, 44.0, s_ico, m_lbl, skin, false) {
             self.paused = true;
         }
     }
@@ -1815,10 +1866,10 @@ impl Game {
         let chase_gap = (1.0 - prog) * 320.0;
         let rx = 680.0;
         let kx = rx - 140.0 - chase_gap;
-        let swim = &self.tex.river_swim[((get_time() * 9.0) as usize) % 2];
-        draw_texture_ex(swim, rx, 456.0, WHITE, DrawTextureParams { dest_size: Some(vec2(108.0, 96.0)), ..Default::default() });
+        let swim = &self.tex.river_swim[((get_time() * 10.0) as usize) % 4];
+        draw_texture_ex(swim, rx, 456.0 + (get_time() as f32 * 8.0).sin() * 4.0, WHITE, DrawTextureParams { dest_size: Some(vec2(114.0, 96.0)), ..Default::default() });
         let ken = &self.tex.walks["kenny"][((get_time() * 10.0) as usize) % 2];
-        draw_texture_ex(ken, kx, 448.0, WHITE, DrawTextureParams { dest_size: Some(vec2(108.0, 108.0)), ..Default::default() });
+        draw_texture_ex(ken, kx, 448.0, WHITE, DrawTextureParams { dest_size: Some(vec2(114.0, 108.0)), ..Default::default() });
 
         draw_panel(&self.tex, (w - 640.0) * 0.5, 58.0, 640.0, 160.0, skin);
         let head = "SWIM FAST!! OUTRUN THE KELP CRAB!";
@@ -1927,7 +1978,7 @@ impl Game {
 
         if let Some(p) = picked {
             let ok = p == r.correct;
-            let foot = if ok { "WELL REASONED! " } else { "LOCKED — NOTE THE EXPLANATION: " };
+            let foot = if ok { "Nice work! " } else { "LOCKED. Note the explanation: " };
             draw_wrapped_rich(&format!("{}{}", foot, r.explain), px + 32.0, opt_y0 + 266.0, pw - 64.0, 22, 24.0, skin.accent, skin.ink);
             draw_tag_shadow("Press [Enter] or Click to return", px + pw - 330.0, py + ph - 26.0, 10, skin.muted);
         } else {
@@ -2017,7 +2068,7 @@ impl Game {
 
         if let Some((right, msg)) = feedback {
             draw_dlg_shadow(
-                &format!("Score: {}/14 — {}", right, msg),
+                &format!("Score: {}/14: {}", right, msg),
                 px + 28.0,
                 py + ph - 26.0,
                 22,
@@ -2043,17 +2094,26 @@ impl Game {
     ) -> Option<usize> {
         let w = screen_width();
         let mut hit = None;
+        let pulse = ((beat_t * 4.0) as usize) % 2;
 
-        // Stage characters
-        draw_texture_ex(&self.tex.towtou, 84.0, 210.0, WHITE, DrawTextureParams { dest_size: Some(vec2(144.0, 120.0)), ..Default::default() });
-        draw_texture_ex(&self.tex.river, 240.0, 220.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 108.0)), ..Default::default() });
-        draw_texture_ex(&self.tex.angler_a, 690.0, 220.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 108.0)), flip_x: true, ..Default::default() });
-        draw_texture_ex(&self.tex.angler_b, 770.0, 224.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 108.0)), flip_x: true, ..Default::default() });
-        draw_texture_ex(&self.tex.angler_c, 850.0, 220.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 108.0)), flip_x: true, ..Default::default() });
+        // Animated stage characters grooving on the beat
+        let tow = if pulse == 0 { &self.tex.towtou } else { &self.tex.walks["towtou"][0] };
+        let riv = &self.tex.river_walks[((beat_t * 5.0) as usize) % 4];
+        let aa = &self.tex.walks["angler_a"][pulse];
+        let ab = &self.tex.walks["angler_b"][(pulse + 1) % 2];
+        let ac = &self.tex.walks["angler_c"][pulse];
+        let bob = (beat_t * 6.0).sin() * 4.0;
+
+        draw_texture_ex(tow, 84.0, 210.0, WHITE, DrawTextureParams { dest_size: Some(vec2(144.0, 120.0)), ..Default::default() });
+        draw_texture_ex(riv, 240.0, 220.0 + bob * 0.5, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 114.0)), ..Default::default() });
+        draw_texture_ex(aa, 690.0, 220.0 - bob, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 114.0)), flip_x: true, ..Default::default() });
+        draw_texture_ex(ab, 770.0, 224.0 + bob, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 114.0)), flip_x: true, ..Default::default() });
+        draw_texture_ex(ac, 850.0, 220.0 - bob, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 114.0)), flip_x: true, ..Default::default() });
 
         draw_panel(&self.tex, 60.0, 24.0, w - 120.0, 86.0, skin);
-        draw_tag_shadow(&format!("SEA ANGLERS CYPHER — BAR {}/{}", bar + 1, cosma::RAP_BARS.len()), 86.0, 60.0, 15, skin.accent);
-        draw_tag_shadow(&format!("FLOW SCORE: {}", score), w - 280.0, 60.0, 14, skin.ink);
+        draw_texture_ex(&self.tex.ui.note, 82.0, 42.0, WHITE, DrawTextureParams { dest_size: Some(vec2(26.0, 26.0)), ..Default::default() });
+        draw_tag_shadow(&format!("SEA ANGLERS CYPHER: BAR {}/{}", bar + 1, cosma::RAP_BARS.len()), 118.0, 62.0, 15, skin.accent);
+        draw_tag_shadow(&format!("FLOW SCORE: {}", score), w - 280.0, 62.0, 14, skin.ink);
 
         // Beat lanes (left)
         draw_panel(&self.tex, 60.0, 350.0, 320.0, 320.0, skin);
@@ -2068,7 +2128,7 @@ impl Game {
             let dy = (*nt - beat_t) * 180.0;
             if dy > -30.0 && dy < 260.0 {
                 let lx = 84.0 + *nl as f32 * 68.0;
-                draw_texture_ex(&self.tex.ui.gem, lx + 12.0, 608.0 - dy, WHITE, DrawTextureParams { dest_size: Some(vec2(32.0, 32.0)), ..Default::default() });
+                draw_texture_ex(&self.tex.ui.note, lx + 12.0, 608.0 - dy, WHITE, DrawTextureParams { dest_size: Some(vec2(32.0, 32.0)), ..Default::default() });
             }
         }
 
@@ -2107,7 +2167,7 @@ impl Game {
                 hit = Some(i);
             }
         }
-        draw_tag_shadow("Keys [1-4] / [Enter] or Click — tread wisely!", 132.0, 622.0, 11, skin.muted);
+        draw_tag_shadow("Keys [1-4], [Enter], or Click carefully!", 132.0, 622.0, 11, skin.muted);
         hit
     }
 
@@ -2116,15 +2176,17 @@ impl Game {
         let tr = &cosma::ALGAE_TRIALS[stage];
         let mut hit = None;
         draw_panel(&self.tex, 60.0, 52.0, w - 120.0, 606.0, skin);
-        quiz_header_skinned(&self.tex, &format!("FIGURATE ALGAE TEMPLE — {}", tr.chamber), 90.0, 78.0, w - 180.0, skin);
+        quiz_header_skinned(&self.tex, &format!("FIGURATE ALGAE TEMPLE: {}", tr.chamber), 90.0, 78.0, w - 180.0, skin);
 
         draw_nine_slice(&self.tex, 90.0, 142.0, 250.0, 286.0, skin.chip, skin.border);
         let rows = stage + 2;
+        let pulse = (get_time() as f32 * 3.0).sin() * 2.0;
         for r in 0..rows {
             for c_i in 0..=r {
                 let gx = 215.0 + (c_i as f32 - r as f32 * 0.5) * 34.0;
-                let gy = 185.0 + r as f32 * 38.0;
-                draw_texture_ex(&self.tex.ui.gem, gx - 12.0, gy - 12.0, WHITE, DrawTextureParams { dest_size: Some(vec2(26.0, 26.0)), ..Default::default() });
+                let gy = 185.0 + r as f32 * 38.0 + pulse * 0.5;
+                let ico = if r == 0 { &self.tex.ui.pearl } else { &self.tex.ui.gem };
+                draw_texture_ex(ico, gx - 13.0, gy - 13.0, WHITE, DrawTextureParams { dest_size: Some(vec2(26.0, 26.0)), ..Default::default() });
             }
         }
         draw_wrapped_col(tr.sequence_hint, 108.0, 356.0, 214.0, 20, 22.0, skin.muted);
@@ -2143,15 +2205,22 @@ impl Game {
 
     fn draw_stars(&self, caught: u32, lives: u8, basket_x: f32, stars: &[(f32, f32, f32, bool)], skin: &Skin) {
         let w = screen_width();
-        crate::art::draw_biome_bg(Biome::Slums, get_time() as f32, 0.0, &self.fx, &self.tex);
+        let t = get_time() as f32;
+        crate::art::draw_biome_bg(Biome::Slums, t, 0.0, &self.fx, &self.tex);
 
         for (sx, sy, _, dying) in stars {
-            let t = if *dying { &self.tex.ui.dying_star } else { &self.tex.ui.star };
-            draw_texture_ex(t, sx - 16.0, sy - 16.0, WHITE, DrawTextureParams { dest_size: Some(vec2(32.0, 32.0)), ..Default::default() });
+            let spr = if *dying { &self.tex.ui.dying_star } else { &self.tex.ui.star };
+            draw_texture_ex(spr, sx - 16.0, sy - 16.0, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(32.0, 32.0)),
+                rotation: t * if *dying { -2.2 } else { 1.6 },
+                pivot: Some(vec2(*sx, *sy)),
+                ..Default::default()
+            });
         }
 
         draw_nine_slice(&self.tex, basket_x - 56.0, 610.0, 112.0, 36.0, skin.sel, skin.accent);
-        draw_texture_ex(&self.tex.river, basket_x - 24.0, 558.0, WHITE, DrawTextureParams { dest_size: Some(vec2(48.0, 54.0)), ..Default::default() });
+        let r_spr = &self.tex.river_walks[((t * 8.0) as usize) % 4];
+        draw_texture_ex(r_spr, basket_x - 24.0, 554.0, WHITE, DrawTextureParams { dest_size: Some(vec2(48.0, 57.0)), ..Default::default() });
 
         draw_panel(&self.tex, 60.0, 22.0, w - 120.0, 74.0, skin);
         draw_tag_shadow(&format!("RAINBOW ROAD: CATCH STARS  {}/{}", caught, cosma::STAR_TARGET), 84.0, 62.0, 14, skin.accent);
@@ -2159,18 +2228,19 @@ impl Game {
             let ht = if (i as u8) < lives { &self.tex.ui.heart_full } else { &self.tex.ui.heart_empty };
             draw_texture_ex(ht, w - 200.0 + i as f32 * 36.0, 42.0, WHITE, DrawTextureParams { dest_size: Some(vec2(30.0, 30.0)), ..Default::default() });
         }
-        draw_dlg_shadow("Arrows / Mouse to Catch Gold Stars — Dodge Dying Stars!", 84.0, 86.0, 21, skin.muted);
+        draw_dlg_shadow("Arrows / Mouse to Catch Gold Stars (Dodge Dying Stars!)", 84.0, 86.0, 21, skin.muted);
     }
 
     fn draw_torches(&self, lit: [bool; 3], skin: &Skin) -> Option<usize> {
         let w = screen_width();
         let mut hit = None;
+        let flick = 1 + ((get_time() * 8.0) as usize % 2);
         draw_panel(&self.tex, (w - 640.0) * 0.5, 160.0, 640.0, 256.0, skin);
         let head = "CARVE & PLACE THE 3 POEM SLABS";
         draw_tag_shadow(head, (w - tag_width(head, 15)) * 0.5, 210.0, 15, skin.accent);
         for i in 0..3 {
             let tx = (w - 380.0) * 0.5 + i as f32 * 140.0;
-            let spr = if lit[i] { &self.tex.props.torch[1] } else { &self.tex.props.torch[0] };
+            let spr = if lit[i] { &self.tex.props.torch[flick] } else { &self.tex.props.torch[0] };
             draw_texture_ex(spr, tx + 16.0, 232.0, WHITE, DrawTextureParams { dest_size: Some(vec2(64.0, 108.0)), ..Default::default() });
             if draw_btn(&self.tex, tx, 344.0, 96.0, 38.0, if lit[i] { "LIT" } else { "LIGHT" }, skin, lit[i]) {
                 hit = Some(i);
@@ -2182,6 +2252,7 @@ impl Game {
 
     fn draw_genie(&self, poem_idx: usize, q_idx: usize, sel: usize, feedback: Option<(bool, &'static str)>, skin: &Skin) -> Option<usize> {
         let w = screen_width();
+        let t = get_time() as f32;
         let poem = &cosma::POEMS[poem_idx];
         let q = &poem.questions[q_idx];
         let mut hit = None;
@@ -2198,7 +2269,12 @@ impl Game {
         }
 
         draw_panel(&self.tex, 504.0, 48.0, w - 540.0, 620.0, skin);
-        draw_texture_ex(&self.tex.genie, 528.0, 74.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 108.0)), ..Default::default() });
+        let g_spr = match ((t * 7.0) as usize) % 3 {
+            0 => &self.tex.genie,
+            1 => &self.tex.walks["genie"][0],
+            _ => &self.tex.walks["genie"][1],
+        };
+        draw_texture_ex(g_spr, 528.0, 74.0 + (t * 3.0).sin() * 4.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 108.0)), ..Default::default() });
         draw_tag_shadow("MAGIC FIRE GENIE", 640.0, 110.0, 15, skin.accent);
         draw_wrapped_rich(q.prompt, 528.0, 210.0, w - 588.0, 24, 26.0, skin.ink, skin.accent);
         for (i, ch) in q.choices.iter().enumerate() {
@@ -2223,13 +2299,13 @@ impl Game {
                         boss_hp = boss_hp.saturating_sub(1);
                         self.audio.play_sfx(&self.audio.sfx.good, 0.6);
                         self.fx.accent(true);
-                        Some((true, "Direct literacy strike!!", 0.9))
+                        Some((true, "Clean strike!!", 0.9))
                     } else {
                         hp = hp.saturating_sub(1);
                         flawless = false;
                         self.audio.play_sfx(&self.audio.sfx.bad, 0.55);
                         self.fx.accent(false);
-                        Some((false, "Misread that strike! Guard up!", 0.9))
+                        Some((false, "Missed that! Guard up!", 0.9))
                     };
                     self.phase = Phase::KennyBattle { q_idx, round_dodge, timer, hp, boss_hp, fewer, flawless, heart, bullets, hit_cd, sel: pick, feedback: new_fb };
                     return;
@@ -2256,7 +2332,7 @@ impl Game {
                     self.phase = Phase::RapBattle { bar, beat_t, score, notes, sel: 0, feedback: Some(("Clean rhyme!! Keep flowing!", 0.8)) };
                 } else {
                     self.audio.play_sfx(&self.audio.sfx.bad, 0.45);
-                    self.phase = Phase::RapBattle { bar, beat_t, score, notes, sel: pick, feedback: Some(("Off-rhythm bar—match the end rhyme!", 0.9)) };
+                    self.phase = Phase::RapBattle { bar, beat_t, score, notes, sel: pick, feedback: Some(("Off-rhythm bar! Match the end rhyme!", 0.9)) };
                 }
             }
             Phase::Maze { mut depth, mut q_idx, mut pool_pos, order, .. } => {
@@ -2285,7 +2361,7 @@ impl Game {
                     Some((true, tr.infuse_note, 1.3))
                 } else {
                     self.audio.play_sfx(&self.audio.sfx.bad, 0.5);
-                    Some((false, "Imbalance in the crystal lattice—check the figure & device!", 1.1))
+                    Some((false, "Crystal mismatch! Check the figure and poetic device!", 1.1))
                 };
                 self.phase = Phase::AlgaeTemple { stage, sel: pick, feedback: fb };
             }
@@ -2321,19 +2397,30 @@ impl Game {
 
     fn draw_crumble(&self, dist: f32, py: f32, lives: u8, shards: &[(f32, f32, f32, bool)], skin: &Skin) {
         let w = screen_width();
-        crate::art::draw_biome_bg(Biome::Slums, get_time() as f32, dist * 1600.0, &self.fx, &self.tex);
-        self.world.draw_ground(&self.tex, dist * 1800.0, 556.0, get_time() as f32);
+        let t = get_time() as f32;
+        crate::art::draw_biome_bg(Biome::Slums, t, dist * 1600.0, &self.fx, &self.tex);
+        self.world.draw_ground(&self.tex, dist * 1800.0, 556.0, t);
 
-        // Portal at destination
+        // Spinning Portal at destination
         let portal_x = (w - 140.0) * (1.05 - dist).max(0.75) + 40.0;
-        draw_texture_ex(&self.tex.props.portal_ring, portal_x, 380.0, WHITE, DrawTextureParams { dest_size: Some(vec2(130.0, 170.0)), ..Default::default() });
+        draw_texture_ex(&self.tex.props.portal_ring, portal_x, 380.0, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(140.0, 140.0)),
+            rotation: t * 1.4,
+            pivot: Some(vec2(portal_x + 70.0, 450.0)),
+            ..Default::default()
+        });
 
-        // Running River + Falling Shards
-        let r_spr = &self.tex.walks["river"][((get_time() * 10.0) as usize) % 2];
-        draw_texture_ex(r_spr, 192.0, py - 108.0 + 56.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 108.0)), ..Default::default() });
+        // 4-frame Sprinting River & jagged Purple Void Shards
+        let r_spr = &self.tex.river_walks[((t * 11.0) as usize) % 4];
+        draw_texture_ex(r_spr, 192.0, py - 114.0 + 56.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 114.0)), ..Default::default() });
 
         for (sx, sy, _, _) in shards {
-            draw_texture_ex(&self.tex.ui.dying_star, sx - 20.0, sy - 20.0, WHITE, DrawTextureParams { dest_size: Some(vec2(40.0, 40.0)), ..Default::default() });
+            draw_texture_ex(&self.tex.ui.shard, sx - 20.0, sy - 20.0, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(40.0, 40.0)),
+                rotation: t * 3.0,
+                pivot: Some(vec2(*sx, *sy)),
+                ..Default::default()
+            });
         }
 
         draw_panel(&self.tex, 60.0, 24.0, w - 120.0, 86.0, skin);
@@ -2355,7 +2442,8 @@ impl Game {
             draw_texture_ex(np, 198.0, 128.0, WHITE, DrawTextureParams { dest_size: Some(vec2(136.0, 136.0)), ..Default::default() });
         }
 
-        draw_tag_shadow("CHRONICLE COMPLETE!", 370.0, 148.0, 20, skin.accent);
+        draw_texture_ex(&self.tex.ui.crown, 370.0, 124.0, WHITE, DrawTextureParams { dest_size: Some(vec2(32.0, 32.0)), ..Default::default() });
+        draw_tag_shadow("CHRONICLE COMPLETE!", 412.0, 150.0, 20, skin.accent);
         draw_wrapped_rich(
             "Nadia drank the *Elixir* *of* *Literacy* and read every single line aloud without a smudge!",
             370.0,

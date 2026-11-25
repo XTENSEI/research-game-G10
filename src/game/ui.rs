@@ -215,6 +215,36 @@ pub fn draw_btn(tex: &Textures, x: f32, y: f32, w: f32, h: f32, label: &str, ski
     hov && is_mouse_button_pressed(MouseButton::Left)
 }
 
+/// Interactive pill/panel button featuring a 20x20 pixel icon beside its label.
+pub fn draw_btn_icon(
+    tex: &Textures,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    ico: &Texture2D,
+    label: &str,
+    skin: &Skin,
+    active: bool,
+) -> bool {
+    let (mx, my) = mouse_position();
+    let hov = mx >= x && mx <= x + w && my >= y && my <= y + h;
+    let fill = if active || hov { skin.sel } else { skin.chip };
+    let border = if active || hov { skin.accent } else { skin.border };
+    draw_nine_slice(tex, x, y, w, h, fill, border);
+    let size = 10;
+    let tw = tag_width(label, size);
+    let total = 20.0 + 7.0 + tw;
+    let x0 = x + (w - total) * 0.5;
+    draw_texture_ex(ico, x0, y + (h - 20.0) * 0.5, WHITE, DrawTextureParams {
+        dest_size: Some(vec2(20.0, 20.0)),
+        ..Default::default()
+    });
+    let col = if active || hov { skin.accent } else { skin.ink };
+    draw_tag_shadow(label, x0 + 27.0, y + h * 0.5 + 4.0, size, col);
+    hov && is_mouse_button_pressed(MouseButton::Left)
+}
+
 // --- DialogueBox (Undertale/Stardew style bust portrait + rich text) -------
 
 pub struct DialogueBox {
@@ -416,9 +446,14 @@ impl DialogueBox {
                 }
             } else {
                 let bob = (get_time() as f32 * 4.5).sin() * 2.5;
-                let prompt = "Enter / Click v";
+                let prompt = "Enter / Click";
                 let pw = tag_width(prompt, 10);
-                draw_tag_shadow(prompt, bx + bw - pw - 24.0, by + bh - 18.0 + bob, 10, skin.accent);
+                let qx = bx + bw - pw - 48.0;
+                draw_texture_ex(&tex.ui.quill, qx, by + bh - 31.0 + bob, WHITE, DrawTextureParams {
+                    dest_size: Some(vec2(18.0, 18.0)),
+                    ..Default::default()
+                });
+                draw_tag_shadow(prompt, qx + 24.0, by + bh - 18.0 + bob, 10, skin.accent);
             }
         }
     }
@@ -533,7 +568,11 @@ pub fn draw_field_notes(tex: &Textures, prog: &Progress, biome: Biome, skin: &Sk
     let py = (h - ph) * 0.5;
     draw_panel(tex, px, py, pw, ph, skin);
 
-    draw_tag_shadow("FIELD NOTES & JOURNAL", px + 28.0, py + 42.0, 16, skin.accent);
+    draw_texture_ex(&tex.ui.book, px + 26.0, py + 24.0, WHITE, DrawTextureParams {
+        dest_size: Some(vec2(26.0, 26.0)),
+        ..Default::default()
+    });
+    draw_tag_shadow("FIELD NOTES & JOURNAL", px + 60.0, py + 43.0, 16, skin.accent);
     draw_tag_shadow("[Tab] Close", px + pw - 160.0, py + 42.0, 11, skin.muted);
 
     // Objective summary
@@ -568,15 +607,20 @@ pub fn draw_field_notes(tex: &Textures, prog: &Progress, biome: Biome, skin: &Sk
     // Aquarius clues & ingredients
     draw_tag_shadow("AQUARIUS CLUES & REAGENTS:", px + 28.0, py + 280.0, 11, skin.chip_ink);
     let items = [
-        ("Blue Seashroom", prog.items[0]),
-        ("Tentacle Anemone", prog.items[1]),
-        ("True Seaberry", prog.items[2]),
+        (&tex.props.item_seashroom, "Blue Seashroom", prog.items[0]),
+        (&tex.props.item_anemone, "Tentacle Anemone", prog.items[1]),
+        (&tex.props.item_seaberry, "True Seaberry", prog.items[2]),
     ];
-    for (i, (name, got)) in items.iter().enumerate() {
-        let mark = if *got { "[OK]" } else { "[  ]" };
+    for (i, (ico, name, got)) in items.iter().enumerate() {
+        let ix = px + 28.0 + i as f32 * 230.0;
+        let tint = if *got { WHITE } else { Color::new(0.45, 0.48, 0.58, 0.7) };
+        draw_texture_ex(*ico, ix, py + 290.0, tint, DrawTextureParams {
+            dest_size: Some(vec2(24.0, 24.0)),
+            ..Default::default()
+        });
         draw_dlg_shadow(
-            &format!("{} {}", mark, name),
-            px + 28.0 + i as f32 * 230.0,
+            name,
+            ix + 30.0,
             py + 308.0,
             22,
             if *got { skin.accent } else { skin.muted },
@@ -660,51 +704,4 @@ pub fn draw_pause_overlay(tex: &Textures, muted: bool, vol: f32, skin: &Skin) ->
         action = PauseAction::QuitTitle;
     }
     action
-}
-
-// --- Heirloom Storybook Hero Art --------------------------------------------
-
-pub fn draw_storybook(cx: f32, bottom: f32, k: f32, glow: f32) {
-    let left = cx - 16.0 * k;
-    let top = bottom - 40.0 * k;
-    let r = |x: f32, y: f32, w: f32, h: f32, c: Color| {
-        draw_rectangle(left + x * k, top + y * k, w * k, h * k, c);
-    };
-    let gold = Color::from_rgba(238, 193, 100, 255);
-    let gold_lo = Color::from_rgba(170, 124, 48, 255);
-    let leather = Color::from_rgba(82, 40, 116, 255);
-    let leather_hi = Color::from_rgba(112, 60, 154, 255);
-    let leather_lo = Color::from_rgba(52, 22, 78, 255);
-    let page = Color::from_rgba(251, 240, 214, 255);
-    let page_lo = Color::from_rgba(212, 190, 152, 255);
-
-    draw_circle(cx + 2.0 * k, bottom - 20.0 * k, 24.0 * k,
-        Color::new(1.0, 0.84, 0.48, 0.06 + glow * 0.10));
-
-    r(9.0, 5.0, 20.0, 32.0, page);
-    r(9.0, 5.0, 20.0, 1.0, page_lo);
-    for i in 0..5 {
-        r(11.0, 9.0 + i as f32 * 5.5, 16.0, 0.8, page_lo);
-    }
-    r(28.0, 5.0, 1.0, 32.0, page_lo);
-
-    r(4.0, 2.0, 23.0, 36.0, leather_lo);
-    r(4.0, 4.0, 20.0, 33.0, leather);
-    r(6.0, 4.0, 4.0, 33.0, leather_hi);
-    r(6.0, 4.0, 1.0, 33.0, Color::from_rgba(140, 84, 184, 255));
-    r(6.0, 6.0, 4.0, 2.0, gold_lo);
-    r(6.0, 32.0, 4.0, 2.0, gold_lo);
-
-    r(13.0, 8.0, 1.0, 25.0, gold_lo);
-    r(25.0, 8.0, 1.0, 25.0, gold_lo);
-    r(13.0, 8.0, 13.0, 1.0, gold_lo);
-    r(13.0, 32.0, 13.0, 1.0, gold_lo);
-    draw_poly(cx + 4.0 * k, top + 19.0 * k, 4, 5.0 * k, 0.78, gold);
-    draw_poly(cx + 4.0 * k, top + 19.0 * k, 4, 2.4 * k, 0.78, leather);
-    draw_circle(cx + 4.0 * k, top + 19.0 * k, 0.9 * k, gold);
-
-    r(26.0, 17.0, 4.0, 6.0, gold);
-    r(26.0, 19.0, 4.0, 2.0, gold_lo);
-    r(19.0, 36.0, 3.0, 4.0, Color::from_rgba(214, 74, 132, 255));
-    r(19.0, 36.0, 3.0, 1.0, Color::from_rgba(246, 130, 176, 255));
 }

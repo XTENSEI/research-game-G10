@@ -352,6 +352,42 @@ impl World {
                 self.step_t = 0.0;
                 self.step_hit = true;
             }
+            let swimming = self.biome == Biome::Kelp || self.biome == Biome::Coral;
+            if swimming && self.particles.len() < 90 {
+                self.amb_acc[7] += dt * if swift { 16.0 } else { 9.0 };
+                while self.amb_acc[7] >= 1.0 {
+                    self.amb_acc[7] -= 1.0;
+                    self.particles.push(Particle {
+                        x: self.player.0 - self.facing * 26.0,
+                        y: self.player.1 - 36.0 + ((get_time() * 43.0).sin() as f32) * 8.0,
+                        vx: -self.facing * 24.0,
+                        vy: -38.0,
+                        life: 1.1,
+                        max_life: 1.1,
+                        kind: 1,
+                        size: 9.0,
+                        rot: 0.0,
+                        spin: 0.8,
+                        grav: -10.0,
+                        drag: 0.97,
+                    });
+                }
+            } else if self.step_hit && self.particles.len() < 90 {
+                self.particles.push(Particle {
+                    x: self.player.0 - self.facing * 10.0,
+                    y: self.player.1 - 4.0,
+                    vx: -self.facing * 18.0,
+                    vy: -12.0,
+                    life: 0.45,
+                    max_life: 0.45,
+                    kind: 5,
+                    size: 11.0,
+                    rot: 0.0,
+                    spin: 1.5,
+                    grav: 8.0,
+                    drag: 0.92,
+                });
+            }
         } else {
             self.bob_t = 0.0;
             self.step_t = 0.20;
@@ -701,7 +737,7 @@ impl World {
         let sw = screen_width();
         match self.biome {
             Biome::Kelp => {
-                // Swaying dense kelp stalks & Ansimuz reef foliage along the background strip
+                // Swaying dense kelp stalks pivoted from root & Ansimuz reef foliage along the background strip
                 for i in 0..22 {
                     let wx = 120.0 + i as f32 * 155.0 + ((i * 53) % 40) as f32;
                     let sx = wx - cam;
@@ -709,9 +745,11 @@ impl World {
                         continue;
                     }
                     let stalk = &tex.props.kelp[i % 3];
-                    let sway = (t * 1.4 + i as f32 * 0.8).sin() * 5.0;
-                    draw_texture_ex(stalk, sx - 36.0 + sway, ground_y - 210.0, WHITE, DrawTextureParams {
+                    let sway = (t * 1.45 + i as f32 * 0.85).sin() * 0.055;
+                    draw_texture_ex(stalk, sx - 36.0, ground_y - 210.0, WHITE, DrawTextureParams {
                         dest_size: Some(vec2(72.0, 216.0)),
+                        rotation: sway,
+                        pivot: Some(vec2(sx, ground_y + 4.0)),
                         ..Default::default()
                     });
                     if i % 3 == 0 {
@@ -720,6 +758,24 @@ impl World {
                             ..Default::default()
                         });
                     }
+                }
+                // Passing Ansimuz reef fish swimming gently through upper kelp canopy
+                let frame = ((t * 5.0) as usize) % 4;
+                for i in 0..4 {
+                    let bx = (260.0 + i as f32 * 880.0 - t * 34.0).rem_euclid(self.length);
+                    let sx = bx - cam;
+                    if sx < -80.0 || sx > sw + 80.0 {
+                        continue;
+                    }
+                    let fy = 170.0 + (i % 2) as f32 * 58.0 + (t * 1.4 + i as f32).sin() * 12.0;
+                    let spr = if i % 2 == 0 { &tex.aqua.anim_fish } else { &tex.aqua.anim_fish_dart };
+                    let fw = spr.width() / 4.0;
+                    let fh = spr.height();
+                    draw_texture_ex(spr, sx, fy, c(198, 240, 232, 225), DrawTextureParams {
+                        source: Some(Rect::new(frame as f32 * fw, 0.0, fw, fh)),
+                        dest_size: Some(vec2(fw * 2.0, fh * 2.0)),
+                        ..Default::default()
+                    });
                 }
             }
             Biome::Coral => {
@@ -845,24 +901,27 @@ impl World {
             }
             "item_0" => {
                 if !prog.items[0] {
-                    fx.glow_rect(sx, top + p.h * 0.5, 104.0, 104.0, c(90, 200, 255, 65));
-                    draw_texture_ex(&tex.aqua.sea_bush, sx - p.w * 0.5, top, c(120, 215, 255, 255), DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
+                    let hover = (t * 3.0).sin() * 5.0;
+                    fx.glow_rect(sx, top + p.h * 0.5 + hover, 108.0, 108.0, c(90, 210, 255, 72));
+                    draw_texture_ex(&tex.props.item_seashroom, sx - p.w * 0.5, top + hover, WHITE, DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
                 }
             }
             "item_1" => {
                 if !prog.items[1] {
-                    fx.glow_rect(sx, top + p.h * 0.5, 104.0, 104.0, c(255, 130, 210, 65));
-                    draw_texture_ex(&tex.aqua.coral_red, sx - p.w * 0.5, top, c(255, 170, 230, 255), DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
+                    let hover = (t * 3.0 + 1.2).sin() * 5.0;
+                    fx.glow_rect(sx, top + p.h * 0.5 + hover, 108.0, 108.0, c(255, 130, 220, 72));
+                    draw_texture_ex(&tex.props.item_anemone, sx - p.w * 0.5, top + hover, WHITE, DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
                 }
             }
             "item_2" => {
                 if !prog.items[2] {
-                    fx.glow_rect(sx, top + p.h * 0.5, 104.0, 104.0, c(255, 220, 96, 65));
-                    draw_texture_ex(&tex.aqua.sea_bush, sx - p.w * 0.5, top, WHITE, DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
+                    let hover = (t * 3.2 + 2.4).sin() * 5.0;
+                    fx.glow_rect(sx, top + p.h * 0.5 + hover, 114.0, 114.0, c(96, 226, 255, 78));
+                    draw_texture_ex(&tex.props.item_seaberry, sx - p.w * 0.5, top + hover, WHITE, DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
                 }
             }
             "decoy" => {
-                draw_texture_ex(&tex.aqua.coral_red, sx - p.w * 0.5, top, c(255, 140, 140, 255), DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
+                draw_texture_ex(&tex.props.item_decoy, sx - p.w * 0.5, top, WHITE, DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
             }
             "torch" => {
                 let idx = if self.torches_lit > 0 { 1 + ((t * 6.0) as usize % 2) } else { 0 };
@@ -876,18 +935,78 @@ impl World {
     }
 
     fn draw_actor(&self, tex: &Textures, a: &Actor, sx: f32, t: f32) {
-        let moving_npc = a.patrol.is_some();
-        let spr = if !a.anim.is_empty() && moving_npc {
-            if let Some([w1, w2]) = tex.walk_of(a.anim) {
-                if (t * 4.5) as i32 % 2 == 0 { w1 } else { w2 }
+        let phase_t = t + a.x * 0.017;
+        let walks = tex.walk_of(a.anim);
+        let idle = tex.idle_of(a.anim);
+
+        // Alive personality idle/action cycles per cast member
+        let spr = if a.patrol.is_some() {
+            if let Some([w1, w2]) = walks {
+                match ((phase_t * 5.5) as usize) % 4 {
+                    0 => &a.tex,
+                    1 => w1,
+                    2 => &a.tex,
+                    _ => w2,
+                }
             } else {
                 &a.tex
+            }
+        } else if let Some([w1, w2]) = walks {
+            match a.anim {
+                "genie" => match ((phase_t * 7.5) as usize) % 3 {
+                    0 => &a.tex,
+                    1 => w1,
+                    _ => w2,
+                },
+                "kenny" | "queen_crab" => match ((phase_t * 3.4) as usize) % 5 {
+                    0 | 1 => &a.tex,
+                    2 => w1,
+                    3 => w2,
+                    _ => idle.unwrap_or(&a.tex),
+                },
+                "angler_a" | "angler_b" | "angler_c" | "thaumiel" | "sophie" => {
+                    match ((phase_t * 4.2) as usize) % 4 {
+                        0 => &a.tex,
+                        1 => w1,
+                        2 => &a.tex,
+                        _ => w2,
+                    }
+                }
+                "guard_a" | "guard_b" | "towtou" => {
+                    if ((phase_t * 2.4) as usize) % 2 == 0 { &a.tex } else { w1 }
+                }
+                _ => {
+                    // Calm cast periodically blinks using their idle frame
+                    if (phase_t % 3.6) > 3.42 {
+                        idle.unwrap_or(&a.tex)
+                    } else {
+                        &a.tex
+                    }
+                }
             }
         } else {
             &a.tex
         };
+
+        let hover_y = match a.anim {
+            "guard_a" | "guard_b" => (phase_t * 2.8).sin() * 4.5,
+            "genie" => -6.0 + (phase_t * 3.2).sin() * 5.5,
+            _ => 0.0,
+        };
+        let breath = if a.patrol.is_none() {
+            1.0 + (phase_t * 2.6).sin() * 0.015
+        } else {
+            1.0
+        };
+
         let dw = spr.width() * a.scale;
-        let dh = spr.height() * a.scale;
+        let dh = spr.height() * a.scale * breath;
+        let face = if a.patrol.is_none() && (self.player.0 - a.x).abs() < 230.0 {
+            if self.player.0 >= a.x { 1.0 } else { -1.0 }
+        } else {
+            a.face
+        };
+
         if let Some(sh) = (!a.anim.is_empty()).then(|| tex.shadow_of(a.anim)).flatten() {
             let sw = sh.width() * a.scale;
             let shh = sh.height() * a.scale;
@@ -896,9 +1015,9 @@ impl World {
                 ..Default::default()
             });
         }
-        draw_texture_ex(spr, sx - dw * 0.5, a.y - dh, WHITE, DrawTextureParams {
+        draw_texture_ex(spr, sx - dw * 0.5, a.y - dh + hover_y, WHITE, DrawTextureParams {
             dest_size: Some(vec2(dw, dh)),
-            flip_x: a.face < 0.0,
+            flip_x: face < 0.0,
             ..Default::default()
         });
     }
@@ -908,21 +1027,26 @@ impl World {
         let feet_y = self.player.1;
         let swimming = self.biome == Biome::Kelp || self.biome == Biome::Coral;
         let spr = if swimming && self.moving {
-            let idx = (t * 6.0) as usize % 2;
+            let idx = (self.bob_t * 0.65) as usize % 4;
             &tex.river_swim[idx]
         } else if self.moving {
-            if let Some([w1, w2]) = tex.walk_of("river") {
-                if (self.bob_t * 0.5) as i32 % 2 == 0 { w1 } else { w2 }
-            } else {
-                &tex.river
-            }
+            let idx = (self.bob_t * 0.65) as usize % 4;
+            &tex.river_walks[idx]
+        } else if (t % 3.8) > 3.62 {
+            tex.idle_of("river").unwrap_or(&tex.river)
         } else {
             &tex.river
         };
 
         let dw = spr.width() * 3.0;
         let dh = spr.height() * 3.0;
-        let float_off = if swimming && self.moving { -10.0 + (t * 5.0).sin() * 4.0 } else { 0.0 };
+        let float_off = if swimming && self.moving {
+            -12.0 + (t * 5.5).sin() * 4.5
+        } else if swimming {
+            -4.0 + (t * 2.4).sin() * 3.0
+        } else {
+            0.0
+        };
 
         if let Some(sh) = tex.shadow_of("river") {
             let sw = sh.width() * 3.0;
