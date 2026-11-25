@@ -394,6 +394,64 @@ def make_star_sprite(dying):
 make_star_sprite(False).save(os.path.join(OUT_UI, "star.png"))
 make_star_sprite(True).save(os.path.join(OUT_UI, "dying_star.png"))
 
+# Roguelike CC0 sheet 16x16 UI icons (scroll, open book, ink quill)
+RL_SHEET = Image.open(os.path.join(VENDOR, "kenney/roguelike/Spritesheet/roguelikeSheet_transparent.png")).convert("RGBA")
+for icon_name, (rc, rr) in (("scroll", (44, 15)), ("book", (50, 15)), ("quill", (45, 15))):
+    RL_SHEET.crop((rc * 17, rr * 17, rc * 17 + 16, rr * 17 + 16)).save(os.path.join(OUT_UI, f"{icon_name}.png"))
+
+
+def make_custom_ui_icons():
+    from PIL import ImageDraw
+
+    # Luminous Pearl icon (16x16)
+    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.ellipse((2, 2, 13, 13), fill=(68, 178, 224, 255), outline=(14, 26, 48, 255))
+    d.ellipse((3, 3, 11, 11), fill=(154, 240, 255, 255))
+    d.rectangle((5, 5, 7, 7), fill=(255, 255, 255, 255))
+    im.save(os.path.join(OUT_UI, "pearl.png"))
+
+    # Glowing Eighth-Note music icon for Anglers Cypher (16x16)
+    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.ellipse((2, 9, 8, 14), fill=(96, 232, 255, 255), outline=(14, 24, 44, 255))
+    d.rectangle((6, 2, 8, 12), fill=(96, 232, 255, 255), outline=(14, 24, 44, 255))
+    d.polygon([(7, 2), (14, 5), (14, 8), (7, 5)], fill=(255, 120, 210, 255))
+    d.rectangle((4, 10, 5, 11), fill=(255, 255, 255, 255))
+    im.save(os.path.join(OUT_UI, "note.png"))
+
+    # Jagged Void Crystal Shard for Dimension Crumble (16x16)
+    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.polygon([(8, 1), (13, 6), (11, 14), (5, 14), (3, 6)], fill=(186, 56, 128, 255), outline=(24, 12, 36, 255))
+    d.polygon([(8, 2), (11, 6), (9, 13), (7, 13)], fill=(255, 130, 196, 255))
+    im.save(os.path.join(OUT_UI, "shard.png"))
+
+    # Golden Crown for Chronicle Complete / Queen Crab (16x16)
+    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.polygon([(2, 12), (2, 5), (5, 8), (8, 3), (11, 8), (14, 5), (14, 12)], fill=(244, 198, 72, 255), outline=(58, 32, 18, 255))
+    d.rectangle((2, 12, 13, 13), fill=(196, 142, 42, 255))
+    d.rectangle((7, 8, 8, 9), fill=(255, 70, 140, 255))
+    im.save(os.path.join(OUT_UI, "crown.png"))
+
+    # Speaker ON / OFF icons (16x16)
+    for muted_flag, name in ((False, "sound_on"), (True, "sound_off")):
+        im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        col = (242, 120, 138, 255) if muted_flag else (126, 232, 240, 255)
+        d.polygon([(2, 6), (5, 6), (9, 2), (9, 13), (5, 9), (2, 9)], fill=col, outline=(14, 24, 44, 255))
+        if muted_flag:
+            d.line((11, 5, 14, 10), fill=col, width=2)
+            d.line((14, 5, 11, 10), fill=col, width=2)
+        else:
+            d.arc((10, 4, 14, 11), 290, 70, fill=col, width=1)
+            d.arc((11, 2, 15, 13), 290, 70, fill=col, width=1)
+        im.save(os.path.join(OUT_UI, f"{name}.png"))
+
+
+make_custom_ui_icons()
+
 # ---------------------------------------------------------------------------
 # 6. FX Particles (Kenney Particle Pack, CC0)
 # ---------------------------------------------------------------------------

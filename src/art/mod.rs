@@ -39,6 +39,15 @@ pub struct UiPack {
     pub gem: Texture2D,
     pub star: Texture2D,
     pub dying_star: Texture2D,
+    pub scroll: Texture2D,
+    pub book: Texture2D,
+    pub quill: Texture2D,
+    pub pearl: Texture2D,
+    pub note: Texture2D,
+    pub shard: Texture2D,
+    pub crown: Texture2D,
+    pub sound_on: Texture2D,
+    pub sound_off: Texture2D,
 }
 
 pub struct PropPack {
@@ -61,6 +70,11 @@ pub struct PropPack {
     pub torch: [Texture2D; 3],
     pub towtou_garage: Texture2D,
     pub whale_skeleton: Texture2D,
+    pub tome: Texture2D,
+    pub item_seashroom: Texture2D,
+    pub item_anemone: Texture2D,
+    pub item_seaberry: Texture2D,
+    pub item_decoy: Texture2D,
 }
 
 pub struct Aqua {
@@ -87,7 +101,8 @@ pub struct Cosma {
 
 pub struct Textures {
     pub river: Texture2D,
-    pub river_swim: [Texture2D; 2],
+    pub river_walks: [Texture2D; 4],
+    pub river_swim: [Texture2D; 4],
     pub nadia: Texture2D,
     pub grandparent: Texture2D,
     pub mark: Texture2D,
@@ -112,6 +127,7 @@ pub struct Textures {
     pub genie: Texture2D,
     pub intro: [Texture2D; 4],
     pub portraits: HashMap<String, Texture2D>,
+    pub idles: HashMap<&'static str, Texture2D>,
     pub walks: HashMap<&'static str, [Texture2D; 2]>,
     pub shadows: HashMap<&'static str, Texture2D>,
     pub tiles: TilePack,
@@ -218,6 +234,8 @@ async fn load_ui() -> UiPack {
         "panel_fill", "panel_border", "divider", "vial_empty",
         "vial_green", "vial_red", "vial_blue", "heart_full",
         "heart_empty", "gem", "star", "dying_star",
+        "scroll", "book", "quill", "pearl",
+        "note", "shard", "crown", "sound_on", "sound_off",
     ];
     let mut it = crate::game::join_all(names.iter().map(|n| ui_tex(n)).collect()).await.into_iter();
     UiPack {
@@ -233,6 +251,15 @@ async fn load_ui() -> UiPack {
         gem: it.next().unwrap(),
         star: it.next().unwrap(),
         dying_star: it.next().unwrap(),
+        scroll: it.next().unwrap(),
+        book: it.next().unwrap(),
+        quill: it.next().unwrap(),
+        pearl: it.next().unwrap(),
+        note: it.next().unwrap(),
+        shard: it.next().unwrap(),
+        crown: it.next().unwrap(),
+        sound_on: it.next().unwrap(),
+        sound_off: it.next().unwrap(),
     }
 }
 
@@ -244,6 +271,7 @@ async fn load_props() -> PropPack {
         "market_stall", "portal_ring", "riddle_stone", "shipwreck",
         "slum_shack", "throne_gate", "torch_0", "torch_1",
         "torch_2", "towtou_garage", "whale_skeleton",
+        "tome", "item_seashroom", "item_anemone", "item_seaberry", "item_decoy",
     ];
     let mut it = crate::game::join_all(names.iter().map(|n| prop_tex(n)).collect()).await.into_iter();
     PropPack {
@@ -266,6 +294,11 @@ async fn load_props() -> PropPack {
         torch: [it.next().unwrap(), it.next().unwrap(), it.next().unwrap()],
         towtou_garage: it.next().unwrap(),
         whale_skeleton: it.next().unwrap(),
+        tome: it.next().unwrap(),
+        item_seashroom: it.next().unwrap(),
+        item_anemone: it.next().unwrap(),
+        item_seaberry: it.next().unwrap(),
+        item_decoy: it.next().unwrap(),
     }
 }
 
@@ -308,12 +341,14 @@ async fn load_cosma() -> Cosma {
 impl Textures {
     pub async fn load() -> Self {
         let mut walks = HashMap::new();
+        let mut idles = HashMap::new();
         let mut shadows = HashMap::new();
         let mut base_sprites = HashMap::new();
 
-        let mut char_names = Vec::with_capacity(CAST_IDS.len() * 4);
+        let mut char_names = Vec::with_capacity(CAST_IDS.len() * 5);
         for &id in CAST_IDS {
             char_names.push(id.to_string());
+            char_names.push(format!("{}_idle", id));
             char_names.push(format!("{}_w1", id));
             char_names.push(format!("{}_w2", id));
             char_names.push(format!("{}_shadow", id));
@@ -321,9 +356,15 @@ impl Textures {
         let mut cit = crate::game::join_all(char_names.iter().map(|n| char_tex(n)).collect()).await.into_iter();
         for &id in CAST_IDS {
             base_sprites.insert(id, cit.next().unwrap());
+            idles.insert(id, cit.next().unwrap());
             walks.insert(id, [cit.next().unwrap(), cit.next().unwrap()]);
             shadows.insert(id, cit.next().unwrap());
         }
+
+        let rw = walks["river"].clone();
+        let river_w34 = crate::game::join_all(vec![char_tex("river_w3"), char_tex("river_w4")]).await;
+        let mut rw34 = river_w34.into_iter();
+        let river_walks = [rw[0].clone(), rw[1].clone(), rw34.next().unwrap(), rw34.next().unwrap()];
 
         let mut portraits = HashMap::new();
         let ppaths: Vec<_> = PORTRAIT_KEYS
@@ -335,7 +376,9 @@ impl Textures {
             portraits.insert(pk.to_string(), t);
         }
 
-        let swim_tex = crate::game::join_all(vec![char_tex("river_swim1"), char_tex("river_swim2")]).await;
+        let swim_tex = crate::game::join_all(vec![
+            char_tex("river_swim1"), char_tex("river_swim2"), char_tex("river_swim3"), char_tex("river_swim4"),
+        ]).await;
         let mut sw = swim_tex.into_iter();
         let intro_tex = crate::game::join_all(vec![
             load_crisp("assets/game/intro/plate_0.png"),
@@ -348,7 +391,8 @@ impl Textures {
 
         Self {
             river: base_sprites.remove("river").unwrap(),
-            river_swim: [sw.next().unwrap(), sw.next().unwrap()],
+            river_walks,
+            river_swim: [sw.next().unwrap(), sw.next().unwrap(), sw.next().unwrap(), sw.next().unwrap()],
             nadia: base_sprites.remove("nadia").unwrap(),
             grandparent: base_sprites.remove("grandparent").unwrap(),
             mark: base_sprites.remove("mark").unwrap(),
@@ -373,6 +417,7 @@ impl Textures {
             genie: base_sprites.remove("genie").unwrap(),
             intro,
             portraits,
+            idles,
             walks,
             shadows,
             tiles: load_tiles().await,
@@ -381,6 +426,10 @@ impl Textures {
             aqua: load_aqua().await,
             cosma: load_cosma().await,
         }
+    }
+
+    pub fn idle_of(&self, id: &str) -> Option<&Texture2D> {
+        self.idles.get(id)
     }
 
     pub fn shadow_of(&self, id: &str) -> Option<&Texture2D> {
