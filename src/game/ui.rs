@@ -1,68 +1,46 @@
-//! Dialogue UI. Undertale-style panel restyled to the cream/plum/pink tokens:
-//! VT323 for spoken text, Press Start 2P for speaker chips, cream panel with a
-//! plum border. Public API and geometry are unchanged for the run loop.
+//! Rich pixel-art RPG UI: Kenney Fantasy 9-slice borders, 48x48 animated bust
+//! portraits, pixel drop-shadow text helpers, Field Notes modal, and Pause UI.
 
-use macroquad::prelude::*;
-use crate::art::Textures;
-use std::collections::HashMap;
 use std::sync::OnceLock;
+use macroquad::prelude::*;
 
-const BOX_H: f32 = 190.0;
-const BOX_MARGIN: f32 = 20.0;
+use crate::art::Textures;
+use crate::game::script::Biome;
+use crate::game::Progress;
 
-const CREAM: Color = Color::new(1.0, 0.96, 0.91, 0.99);
-const CREAM_DIM: Color = Color::new(0.94, 0.84, 0.75, 1.0);
-const PLUM: Color = Color::from_rgba(74, 42, 99, 255);
-const INK: Color = Color::from_rgba(46, 26, 71, 255);
-const INK_SOFT: Color = Color::from_rgba(96, 74, 120, 255);
-const PINK: Color = Color::from_rgba(226, 106, 156, 255);
-const PINK_PALE: Color = Color::from_rgba(255, 214, 230, 255);
-
-/// Leak the portrait textures so DialogueBox can hold 'static refs.
-static PORTRAITS: OnceLock<HashMap<String, Texture2D>> = OnceLock::new();
-
-fn portraits(tex: &Textures) -> &'static HashMap<String, Texture2D> {
-    PORTRAITS.get_or_init(|| {
-        let mut m = HashMap::new();
-        m.insert("River".to_string(), tex.river.clone());
-        m.insert("Jin".to_string(), tex.jin.clone());
-        m.insert("Kandy Kween".to_string(), tex.kandy.clone());
-        m.insert("Matt".to_string(), tex.matt.clone());
-        m.insert("Magic Fire Genie".to_string(), tex.genie.clone());
-        m.insert("Guard 1".to_string(), tex.guard_a.clone());
-        m.insert("Guard 2".to_string(), tex.guard_b.clone());
-        m.insert("Nadia".to_string(), tex.nadia.clone());
-        m.insert("Grandparent".to_string(), tex.grandparent.clone());
-        m.insert("Gillbert".to_string(), tex.gill.clone());
-        m.insert("Scalleon".to_string(), tex.scal.clone());
-        m.insert("Market Lady".to_string(), tex.lady.clone());
-        m
-    })
-}
+const BOX_H: f32 = 192.0;
+const BOX_MARGIN: f32 = 22.0;
 
 // --- pixel fonts -----------------------------------------------------------
 
 static F_DIALOG: OnceLock<Font> = OnceLock::new();
 static F_TAG: OnceLock<Font> = OnceLock::new();
 
-/// Load the pixel fonts through macroquad's file loader (works natively and on
-/// wasm, where std::fs does not exist). Must be awaited once before drawing.
 pub async fn ensure_fonts() {
     if F_DIALOG.get().is_some() && F_TAG.get().is_some() {
         return;
     }
     if let Ok(bytes) = macroquad::file::load_file("assets/fonts/VT323-Regular.ttf").await {
-        if let Ok(f) = load_ttf_font_from_bytes(&bytes) {
+        if let Ok(mut f) = load_ttf_font_from_bytes(&bytes) {
+            prewarm_font(&mut f, &[20, 22, 24, 26, 28]);
             let _ = F_DIALOG.set(f);
         }
     }
     if let Ok(bytes) = macroquad::file::load_file("assets/fonts/PressStart2P-Regular.ttf").await {
-        if let Ok(f) = load_ttf_font_from_bytes(&bytes) {
+        if let Ok(mut f) = load_ttf_font_from_bytes(&bytes) {
+            prewarm_font(&mut f, &[10, 11, 12, 13, 14, 15, 16, 18, 20, 28]);
             let _ = F_TAG.set(f);
         }
     }
     assert!(F_DIALOG.get().is_some(), "VT323 font failed to load");
     assert!(F_TAG.get().is_some(), "Press Start 2P font failed to load");
+}
+
+fn prewarm_font(font: &mut Font, sizes: &[u16]) {
+    let chars: Vec<char> = (' '..='~').chain("—…“”’•".chars()).collect();
+    for &sz in sizes {
+        font.populate_font_cache(&chars, sz);
+    }
 }
 
 fn dialog_font() -> &'static Font {
@@ -77,21 +55,26 @@ fn ttext_w(text: &str, font: &Font, size: u16) -> f32 {
 }
 
 fn ttext(text: &str, x: f32, y: f32, font: &Font, size: u16, color: Color) {
-    draw_text_ex(text, x, y, TextParams {
-        font: Some(font),
-        font_size: size,
-        color,
-        ..Default::default()
-    });
+    draw_text_ex(
+        text,
+        x.round(),
+        y.round(),
+        TextParams {
+            font: Some(font),
+            font_size: size,
+            color,
+            ..Default::default()
+        },
+    );
 }
 
-/// Press Start 2P text (chips, titles, HUD).
-pub fn draw_tag(text: &str, x: f32, y: f32, size: u16, color: Color) {
+pub fn draw_tag_shadow(text: &str, x: f32, y: f32, size: u16, color: Color) {
+    ttext(text, x + 2.0, y + 2.0, tag_font(), size, Color::new(0.03, 0.02, 0.07, color.a * 0.85));
     ttext(text, x, y, tag_font(), size, color);
 }
 
-/// VT323 text (narrative, labels).
-pub fn draw_dlg_text(text: &str, x: f32, y: f32, size: u16, color: Color) {
+pub fn draw_dlg_shadow(text: &str, x: f32, y: f32, size: u16, color: Color) {
+    ttext(text, x + 2.0, y + 2.0, dialog_font(), size, Color::new(0.03, 0.02, 0.07, color.a * 0.85));
     ttext(text, x, y, dialog_font(), size, color);
 }
 
@@ -103,18 +86,147 @@ pub fn tag_width(text: &str, size: u16) -> f32 {
     ttext_w(text, tag_font(), size)
 }
 
+// --- Biome UI Palettes & 9-slice Fantasy UI Borders -------------------------
+
+#[derive(Clone, Copy)]
+pub struct Skin {
+    pub bg: Color,
+    pub fill: Color,
+    pub border: Color,
+    pub ink: Color,
+    pub muted: Color,
+    pub accent: Color,
+    pub sel: Color,
+    pub chip: Color,
+    pub chip_ink: Color,
+}
+
+impl Skin {
+    pub fn for_biome(b: Biome) -> Self {
+        match b {
+            Biome::Kelp => Self {
+                bg: Color::from_rgba(12, 34, 42, 238),
+                fill: Color::from_rgba(18, 48, 56, 240),
+                border: Color::from_rgba(104, 232, 184, 255),
+                ink: Color::from_rgba(238, 250, 244, 255),
+                muted: Color::from_rgba(154, 206, 192, 255),
+                accent: Color::from_rgba(255, 218, 102, 255),
+                sel: Color::from_rgba(32, 82, 86, 245),
+                chip: Color::from_rgba(28, 76, 82, 255),
+                chip_ink: Color::from_rgba(146, 246, 206, 255),
+            },
+            Biome::Coral => Self {
+                bg: Color::from_rgba(12, 28, 64, 238),
+                fill: Color::from_rgba(16, 40, 84, 240),
+                border: Color::from_rgba(106, 224, 252, 255),
+                ink: Color::from_rgba(240, 248, 255, 255),
+                muted: Color::from_rgba(156, 198, 236, 255),
+                accent: Color::from_rgba(255, 190, 96, 255),
+                sel: Color::from_rgba(32, 72, 134, 245),
+                chip: Color::from_rgba(24, 62, 114, 255),
+                chip_ink: Color::from_rgba(136, 236, 255, 255),
+            },
+            Biome::Slums => Self {
+                bg: Color::from_rgba(16, 12, 36, 242),
+                fill: Color::from_rgba(22, 18, 48, 244),
+                border: Color::from_rgba(156, 124, 246, 255),
+                ink: Color::from_rgba(240, 236, 255, 255),
+                muted: Color::from_rgba(162, 152, 210, 255),
+                accent: Color::from_rgba(110, 244, 240, 255),
+                sel: Color::from_rgba(46, 34, 88, 245),
+                chip: Color::from_rgba(36, 26, 70, 255),
+                chip_ink: Color::from_rgba(122, 246, 242, 255),
+            },
+            Biome::Home => Self {
+                bg: Color::from_rgba(34, 20, 40, 238),
+                fill: Color::from_rgba(46, 28, 52, 242),
+                border: Color::from_rgba(240, 190, 110, 255),
+                ink: Color::from_rgba(252, 244, 232, 255),
+                muted: Color::from_rgba(208, 178, 156, 255),
+                accent: Color::from_rgba(255, 212, 112, 255),
+                sel: Color::from_rgba(78, 46, 80, 245),
+                chip: Color::from_rgba(64, 38, 66, 255),
+                chip_ink: Color::from_rgba(255, 224, 152, 255),
+            },
+        }
+    }
+}
+
+/// Draw crisp 9-slice panel using Kenney Fantasy UI Borders (`48x48` 16px grid).
+pub fn draw_nine_slice(tex: &Textures, x: f32, y: f32, w: f32, h: f32, fill_tint: Color, border_tint: Color) {
+    let x = x.round();
+    let y = y.round();
+    let w = w.round().max(28.0);
+    let h = h.round().max(28.0);
+    let c = 14.0f32.min(w * 0.35).min(h * 0.35);
+    let s = 16.0;
+
+    let draw_cell = |t: &Texture2D, sx: f32, sy: f32, dx: f32, dy: f32, dw: f32, dh: f32, col: Color| {
+        if dw <= 0.0 || dh <= 0.0 {
+            return;
+        }
+        draw_texture_ex(t, dx, dy, col, DrawTextureParams {
+            source: Some(Rect::new(sx, sy, s, s)),
+            dest_size: Some(vec2(dw, dh)),
+            ..Default::default()
+        });
+    };
+
+    // Subtle ground drop shadow
+    draw_rectangle(x + 4.0, y + 6.0, w, h, Color::new(0.01, 0.01, 0.03, 0.45));
+
+    // Inner fill quad
+    draw_rectangle(x + 6.0, y + 6.0, w - 12.0, h - 12.0, fill_tint);
+    draw_texture_ex(&tex.ui.panel_fill, x + 8.0, y + 8.0, Color::new(fill_tint.r * 1.15, fill_tint.g * 1.15, fill_tint.b * 1.15, 0.25), DrawTextureParams {
+        dest_size: Some(vec2(w - 16.0, h - 16.0)),
+        ..Default::default()
+    });
+
+    // 9-slice border frame
+    let b = &tex.ui.panel_border;
+    let mw = (w - c * 2.0).max(0.0);
+    let mh = (h - c * 2.0).max(0.0);
+    // Corners
+    draw_cell(b, 0.0, 0.0, x, y, c, c, border_tint);
+    draw_cell(b, 32.0, 0.0, x + w - c, y, c, c, border_tint);
+    draw_cell(b, 0.0, 32.0, x, y + h - c, c, c, border_tint);
+    draw_cell(b, 32.0, 32.0, x + w - c, y + h - c, c, c, border_tint);
+    // Edges
+    draw_cell(b, 16.0, 0.0, x + c, y, mw, c, border_tint);
+    draw_cell(b, 16.0, 32.0, x + c, y + h - c, mw, c, border_tint);
+    draw_cell(b, 0.0, 16.0, x, y + c, c, mh, border_tint);
+    draw_cell(b, 32.0, 16.0, x + w - c, y + c, c, mh, border_tint);
+}
+
+pub fn draw_panel(tex: &Textures, x: f32, y: f32, w: f32, h: f32, skin: &Skin) {
+    draw_nine_slice(tex, x, y, w, h, skin.bg, skin.border);
+}
+
+/// Interactive pill/panel button with hover highlight. Returns true if clicked this frame.
+pub fn draw_btn(tex: &Textures, x: f32, y: f32, w: f32, h: f32, label: &str, skin: &Skin, active: bool) -> bool {
+    let (mx, my) = mouse_position();
+    let hov = mx >= x && mx <= x + w && my >= y && my <= y + h;
+    let fill = if active || hov { skin.sel } else { skin.chip };
+    let border = if active || hov { skin.accent } else { skin.border };
+    draw_nine_slice(tex, x, y, w, h, fill, border);
+    let tw = tag_width(label, 12);
+    let col = if active || hov { skin.accent } else { skin.ink };
+    draw_tag_shadow(label, x + (w - tw) * 0.5, y + h * 0.5 + 5.0, 12, col);
+    hov && is_mouse_button_pressed(MouseButton::Left)
+}
+
+// --- DialogueBox (Undertale/Stardew style bust portrait + rich text) -------
+
 pub struct DialogueBox {
     pub open: bool,
     speaker: String,
+    expr: String,
     text: String,
     shown: usize,
     timer: f32,
-    portrait: Option<&'static Texture2D>,
+    portrait: Option<Texture2D>,
     choices: Vec<(String, String)>,
     choice_sel: usize,
-    pub resolved: Option<String>,
-    /// Set by the autoplay harness: treat this frame as if the advance key was
-    /// pressed. Cleared as soon as it is read.
     pub force_advance: bool,
 }
 
@@ -123,30 +235,38 @@ impl DialogueBox {
         Self {
             open: false,
             speaker: String::new(),
+            expr: "normal".to_string(),
             text: String::new(),
             shown: 0,
             timer: 0.0,
             portrait: None,
             choices: Vec::new(),
             choice_sel: 0,
-            resolved: None,
             force_advance: false,
         }
     }
 
     pub fn say(&mut self, who: &str, text: &str, tex: &Textures) {
+        self.say_expr(who, "normal", text, tex);
+    }
+
+    pub fn say_expr(&mut self, who: &str, expr: &str, text: &str, tex: &Textures) {
         self.open = true;
         self.speaker = who.to_string();
+        self.expr = expr.to_string();
         self.text = text.to_string();
         self.shown = 0;
         self.timer = 0.0;
-        self.portrait = portraits(tex).get(who);
+        self.portrait = tex.portrait_expr(who, expr).cloned();
         self.choices.clear();
-        self.resolved = None;
     }
 
     pub fn ask(&mut self, who: &str, text: &str, choices: &[(&str, &str)], tex: &Textures) {
-        self.say(who, text, tex);
+        self.ask_expr(who, "normal", text, choices, tex);
+    }
+
+    pub fn ask_expr(&mut self, who: &str, expr: &str, text: &str, choices: &[(&str, &str)], tex: &Textures) {
+        self.say_expr(who, expr, text, tex);
         self.choices = choices.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
         self.choice_sel = 0;
     }
@@ -160,409 +280,390 @@ impl DialogueBox {
         &self.speaker
     }
 
-    /// How many characters of the line are currently revealed. The game watches
-    /// this to fire typewriter blips, so every screen that shows dialogue gets
-    /// the sound without each call site having to opt in.
     pub fn chars_shown(&self) -> usize {
         if self.open { self.shown } else { 0 }
     }
 
-    /// Returns Some(payload) when the player finishes the line, or picks a choice payload.
+    pub fn is_finished(&self) -> bool {
+        self.open && self.shown >= self.text.len()
+    }
+
     pub fn update(&mut self, dt: f32) -> Option<String> {
         if !self.open {
             return None;
         }
-
         if self.shown < self.text.len() {
             self.timer += dt;
-            let want = (self.timer * 46.0) as usize;
+            let want = (self.timer * 52.0) as usize;
             if want > self.shown {
                 self.shown = want.min(self.text.len());
             }
         }
-
         let done = self.shown >= self.text.len();
-        let advance = self.force_advance || is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Enter)
+        let forced = self.force_advance;
+        let advance = forced
+            || is_key_pressed(KeyCode::Z)
+            || is_key_pressed(KeyCode::Enter)
+            || is_key_pressed(KeyCode::Space)
             || is_mouse_button_pressed(MouseButton::Left);
         self.force_advance = false;
 
         if !self.choices.is_empty() && done {
-            if is_key_pressed(KeyCode::Up) { self.choice_sel = self.choice_sel.saturating_sub(1); }
-            if is_key_pressed(KeyCode::Down) {
+            if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
+                self.choice_sel = self.choice_sel.saturating_sub(1);
+            }
+            if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
                 self.choice_sel = (self.choice_sel + 1).min(self.choices.len() - 1);
             }
-            if is_key_pressed(KeyCode::Key1) { self.choice_sel = 0; }
-            if is_key_pressed(KeyCode::Key2) && self.choices.len() > 1 { self.choice_sel = 1; }
-            if is_key_pressed(KeyCode::Key3) && self.choices.len() > 2 { self.choice_sel = 2; }
-            if is_key_pressed(KeyCode::Key4) && self.choices.len() > 3 { self.choice_sel = 3; }
-
+            for (k, key) in [KeyCode::Key1, KeyCode::Key2, KeyCode::Key3, KeyCode::Key4].iter().enumerate() {
+                if is_key_pressed(*key) && k < self.choices.len() {
+                    self.choice_sel = k;
+                }
+            }
             let (mx, my) = mouse_position();
-            for (i, _) in self.choices.iter().enumerate() {
-                let r = self.choice_rect(i);
-                if r.contains(Vec2::new(mx, my)) {
+            let (bx, by, bw, _) = self.panel_rect();
+            let list_x = bx + 186.0;
+            let list_w = bw - 216.0;
+            let base_y = by + BOX_H - 18.0 - self.choices.len() as f32 * 26.0;
+            for i in 0..self.choices.len() {
+                let cy = base_y + i as f32 * 26.0;
+                if mx >= list_x && mx <= list_x + list_w && my >= cy && my <= cy + 24.0 {
                     self.choice_sel = i;
                     if is_mouse_button_pressed(MouseButton::Left) {
-                        let payload = self.choices[i].1.clone();
-                        self.close();
-                        return Some(payload);
+                        let out = self.choices[i].1.clone();
+                        self.open = false;
+                        return Some(out);
                     }
                 }
             }
-
-            // `advance` already folds in the harness flag, the same as the
-            // non-choice path, so an automated run can actually pick an option
-            if advance {
-                let payload = self.choices[self.choice_sel].1.clone();
-                self.close();
-                return Some(payload);
+            if forced || is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Space) {
+                let out = self.choices[self.choice_sel].1.clone();
+                self.open = false;
+                return Some(out);
             }
             return None;
         }
 
-        if done && advance {
-            self.close();
-            return Some(String::new());
-        }
-        if !done && advance {
-            self.shown = self.text.len();
+        if advance {
+            if !done {
+                self.shown = self.text.len();
+            } else {
+                self.open = false;
+                return Some(String::new());
+            }
         }
         None
     }
 
-    fn choice_rect(&self, i: usize) -> Rect {
+    fn panel_rect(&self) -> (f32, f32, f32, f32) {
         let w = screen_width();
-        let x = w * 0.5 - 260.0 + 30.0;
-        let y = screen_height() - BOX_H - BOX_MARGIN + 64.0 + i as f32 * 32.0;
-        Rect::new(x, y, 460.0, 28.0)
+        let h = screen_height();
+        let bw = (w - BOX_MARGIN * 2.0).min(960.0);
+        let bx = (w - bw) * 0.5;
+        let by = h - BOX_H - BOX_MARGIN;
+        (bx, by, bw, BOX_H)
     }
 
-    pub fn draw(&self) {
+    pub fn draw(&self, tex: &Textures, skin: &Skin) {
         if !self.open {
             return;
         }
-        let w = screen_width();
-        let h = screen_height();
-        let box_y = h - BOX_H - BOX_MARGIN;
-        let box_w = w - BOX_MARGIN * 2.0;
-        let f = dialog_font();
+        let (bx, by, bw, bh) = self.panel_rect();
+        draw_panel(tex, bx, by, bw, bh, skin);
 
-        // soft drop shadow, cream panel, plum border
-        draw_rectangle(BOX_MARGIN - 5.0, box_y - 3.0, box_w + 10.0, BOX_H + 10.0, Color::from_rgba(46, 26, 71, 70));
-        let pulse = 0.75 + 0.25 * (get_time() as f32 * 2.4).sin();
-        draw_rectangle(BOX_MARGIN - 4.0, box_y - 4.0, box_w + 8.0, BOX_H + 8.0,
-            Color::new(PLUM.r, PLUM.g, PLUM.b, pulse));
-        draw_rectangle(BOX_MARGIN, box_y, box_w, BOX_H, CREAM);
-        draw_rectangle(BOX_MARGIN + 4.0, box_y + 4.0, box_w - 8.0, 2.0, PINK_PALE);
-
-        // Portrait (keeps its 2:3 aspect, no stretching).
-        let mut text_x = BOX_MARGIN + 28.0;
-        if let Some(p) = self.portrait {
-            let ph = 150.0;
-            let pw = ph * 2.0 / 3.0;
-            draw_texture_ex(p, BOX_MARGIN + 26.0, box_y + 22.0, WHITE,
-                DrawTextureParams { dest_size: Some(Vec2::new(pw, ph)), ..Default::default() });
-            // soft accent panel behind the portrait
-            draw_rectangle_lines(BOX_MARGIN + 22.0, box_y + 18.0, pw + 8.0, ph + 8.0, 2.0, CREAM_DIM);
-            text_x += pw + 34.0;
+        // Portrait well on left (48x48 crisp pixel art rendered at 3x = 144x144)
+        let px = bx + 20.0;
+        let py = by + 24.0;
+        let psize = 144.0;
+        draw_nine_slice(tex, px - 4.0, py - 4.0, psize + 8.0, psize + 8.0, skin.chip, skin.border);
+        if let Some(p) = &self.portrait {
+            let talking = self.shown < self.text.len();
+            let bob = if talking { (self.timer * 18.0).sin().abs() * -3.0 } else { 0.0 };
+            draw_texture_ex(p, px, py + bob, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(psize, psize)),
+                ..Default::default()
+            });
         }
 
-        // Speaker chip (Press Start 2P).
-        if !self.speaker.is_empty() && self.speaker != "(Narration)" {
-            let tag = self.speaker.as_str();
-            let tf = tag_font();
-            let size: u16 = 15;
-            let tw = ttext_w(tag, tf, size);
-            let chip_w = tw + 30.0;
-            let chip_y = box_y - 18.0;
-            draw_rectangle(BOX_MARGIN + 8.0, chip_y, chip_w, 30.0, PINK);
-            draw_rectangle_lines(BOX_MARGIN + 8.0, chip_y, chip_w, 30.0, 2.0, PLUM);
-            ttext(tag, BOX_MARGIN + 23.0, chip_y + 22.0, tf, size, CREAM);
+        // Speaker name badge perched cleanly on top edge
+        if !self.speaker.is_empty() {
+            let nw = tag_width(&self.speaker, 12) + 28.0;
+            draw_nine_slice(tex, bx + 24.0, by - 16.0, nw.max(120.0), 32.0, skin.chip, skin.accent);
+            draw_tag_shadow(&self.speaker, bx + 38.0, by + 5.0, 12, skin.accent);
         }
 
-        // Body text (VT323), typewriter + wrap in plum ink.
-        let visible = &self.text[..self.shown.min(self.text.len())];
-        draw_wrapped_col(visible, text_x, box_y + 40.0, w - text_x - 56.0, 34.0, 32, INK);
-
-        // Choices
-        for (i, (label, _)) in self.choices.iter().enumerate() {
-            let r = self.choice_rect(i);
-            let sel = i == self.choice_sel;
-            if sel {
-                draw_rectangle(r.x - 12.0, r.y - 4.0, r.w + 24.0, 34.0, PINK_PALE);
-                ttext(">", r.x - 28.0, r.y + 30.0, f, 32, PINK);
-            }
-            ttext(label, r.x, r.y + 30.0, f, 32,
-                if sel { INK } else { INK_SOFT });
+        // Spoken text revealed char-by-char (respecting UTF-8 boundaries safely)
+        let mut end = self.shown.min(self.text.len());
+        while end > 0 && !self.text.is_char_boundary(end) {
+            end -= 1;
         }
+        let sub = &self.text[..end];
+        let tx = bx + 186.0;
+        let max_w = bw - 216.0;
+        draw_wrapped_rich(sub, tx, by + 48.0, max_w, 28, 30.0, skin.ink, skin.accent);
 
-        // Advance hint
-        let done = self.shown >= self.text.len();
-        if done && self.choices.is_empty() {
-            let blink = (get_time() * 2.0) as i32 % 2 == 0;
-            if blink {
-                ttext("z / click", w - 150.0, box_y + BOX_H - 14.0, f, 26, INK_SOFT);
-            }
-        }
-    }
-}
-
-/// Line count a text will occupy after greedy wrap (mirrors draw_wrapped_col).
-pub fn wrapped_line_count(text: &str, max_w: f32, size: u16) -> usize {
-    let f = dialog_font();
-    let mut count = 0usize;
-    for para in text.split('\n') {
-        let mut line = String::new();
-        count += 1;
-        for word in para.split(' ') {
-            let candidate = if line.is_empty() { word.to_string() } else { format!("{} {}", line, word) };
-            if ttext_w(&candidate, f, size) > max_w && !line.is_empty() {
-                count += 1;
-                line = word.to_string();
+        if self.shown >= self.text.len() {
+            if !self.choices.is_empty() {
+                let base_y = by + bh - 18.0 - self.choices.len() as f32 * 26.0;
+                for (i, (label, _)) in self.choices.iter().enumerate() {
+                    let cy = base_y + i as f32 * 26.0;
+                    let sel = i == self.choice_sel;
+                    if sel {
+                        draw_rectangle(tx - 6.0, cy - 2.0, max_w, 24.0, skin.sel);
+                    }
+                    let txt = if sel { format!("> {}", label) } else { format!("  {}", label) };
+                    draw_dlg_shadow(&txt, tx + 4.0, cy + 17.0, 22, if sel { skin.accent } else { skin.ink });
+                }
             } else {
-                line = candidate;
+                let bob = (get_time() as f32 * 4.5).sin() * 2.5;
+                let prompt = "Enter / Click v";
+                let pw = tag_width(prompt, 10);
+                draw_tag_shadow(prompt, bx + bw - pw - 24.0, by + bh - 18.0 + bob, 10, skin.accent);
             }
         }
     }
-    count
 }
 
-/// Greedy word wrap in the dialogue font, colored.
-pub fn draw_wrapped_col(text: &str, x: f32, mut y: f32, max_w: f32, line_h: f32, size: u16, color: Color) {
-    let f = dialog_font();
-    for para in text.split('\n') {
-        let mut line = String::new();
-        for word in para.split(' ') {
-            let candidate = if line.is_empty() { word.to_string() } else { format!("{} {}", line, word) };
-            if ttext_w(&candidate, f, size) > max_w && !line.is_empty() {
-                ttext(&line, x, y, f, size, color);
-                y += line_h;
-                line = word.to_string();
-            } else {
-                line = candidate;
-            }
-        }
-        ttext(&line, x, y, f, size, color);
-        y += line_h;
-    }
+// --- Rich Text Wrapping & Option Cards -------------------------------------
+
+pub fn draw_wrapped_rich(text: &str, x: f32, y: f32, max_w: f32, size: u16, line_h: f32, base: Color, accent: Color) {
+    draw_wrapped_inner(text, x, y, max_w, size, line_h, base, accent);
 }
 
-/// Diegetic quiz skins. Every quiz screen shares the dialogue tokens (VT323
-/// body, Press Start 2P title chip, framed stage) but wears its biome's
-/// materials: Candy keeps the plum veil, Aquarius dresses as pearl-and-sand,
-/// Cosma sits on a neon circuit slab.
-#[derive(Clone, Copy, PartialEq)]
-pub enum Skin {
-    Plum,
-    PearlSand,
-    NeonSlab,
+pub fn draw_wrapped_col(text: &str, x: f32, y: f32, max_w: f32, size: u16, line_h: f32, color: Color) {
+    draw_wrapped_inner(text, x, y, max_w, size, line_h, color, color);
 }
 
-impl Skin {
-    fn veil(self) -> Color {
-        match self {
-            Skin::Plum => Color::from_rgba(36, 18, 56, 210),
-            Skin::PearlSand => Color::from_rgba(7, 22, 36, 218),
-            Skin::NeonSlab => Color::from_rgba(10, 6, 22, 228),
-        }
-    }
-    /// (outer frame, inner frame)
-    fn frame(self) -> (Color, Color) {
-        match self {
-            Skin::Plum => (Color::from_rgba(255, 214, 230, 110), Color::from_rgba(226, 106, 156, 70)),
-            Skin::PearlSand => (Color::from_rgba(226, 240, 246, 150), Color::from_rgba(130, 214, 226, 80)),
-            Skin::NeonSlab => (Color::from_rgba(150, 110, 255, 170), Color::from_rgba(110, 230, 255, 90)),
-        }
-    }
-    /// title chip (fill, border, text)
-    fn chip(self) -> (Color, Color, Color) {
-        match self {
-            Skin::Plum => (PINK, PLUM, CREAM),
-            Skin::PearlSand => (
-                Color::from_rgba(235, 242, 246, 255),
-                Color::from_rgba(58, 118, 138, 255),
-                Color::from_rgba(14, 48, 66, 255),
-            ),
-            Skin::NeonSlab => (
-                Color::from_rgba(24, 16, 44, 255),
-                Color::from_rgba(110, 230, 255, 255),
-                Color::from_rgba(238, 246, 255, 255),
-            ),
-        }
-    }
-    /// selection band behind the chosen row
-    fn hi(self) -> Color {
-        match self {
-            Skin::Plum => Color::from_rgba(226, 106, 156, 70),
-            Skin::PearlSand => Color::from_rgba(190, 230, 240, 55),
-            Skin::NeonSlab => Color::from_rgba(150, 110, 255, 60),
-        }
-    }
-    fn caret(self) -> Color {
-        match self {
-            Skin::Plum => PINK,
-            Skin::PearlSand => Color::from_rgba(140, 225, 235, 255),
-            Skin::NeonSlab => Color::from_rgba(110, 230, 255, 255),
-        }
-    }
-    /// (selected text, unselected text, disabled text, subtitle text)
-    fn text(self) -> (Color, Color, Color, Color) {
-        match self {
-            Skin::Plum => (WHITE, Color::from_rgba(200, 200, 210, 255), Color::from_rgba(130, 130, 140, 255), Color::from_rgba(255, 236, 244, 255)),
-            Skin::PearlSand => (
-                Color::from_rgba(242, 250, 253, 255),
-                Color::from_rgba(168, 198, 212, 255),
-                Color::from_rgba(96, 118, 132, 255),
-                Color::from_rgba(214, 238, 244, 255),
-            ),
-            Skin::NeonSlab => (
-                Color::from_rgba(238, 246, 255, 255),
-                Color::from_rgba(170, 182, 222, 255),
-                Color::from_rgba(100, 108, 140, 255),
-                Color::from_rgba(218, 230, 255, 255),
-            ),
-        }
-    }
-    pub fn edge(self) -> Color {
-        self.frame().0
-    }
-    fn rule(self) -> Color {
-        match self {
-            Skin::Plum => Color::from_rgba(226, 106, 156, 150),
-            Skin::PearlSand => Color::from_rgba(140, 225, 235, 140),
-            Skin::NeonSlab => Color::from_rgba(110, 230, 255, 160),
-        }
-    }
-}
-
-/// Centered quiz option row (riddles + battles), in the given biome skin.
-/// Long options auto-shrink so they never overflow the frame edge.
-pub fn draw_option_row_skinned(i: usize, label: &str, y: f32, selected: bool, disabled: Option<bool>, skin: Skin) {
-    let w = screen_width();
-    let x = w * 0.5 - 300.0;
-    let f = dialog_font();
-    let (sel_c, dim_c, off_c, _) = skin.text();
-    let color = match disabled {
-        Some(true) => off_c,
-        _ => if selected { sel_c } else { dim_c },
-    };
-    let tag = format!("{}. {}", i + 1, label);
-    let mut size: u16 = 34;
-    let tw0 = ttext_w(&tag, f, size);
-    if tw0 > 640.0 {
-        size = ((size as f32 * 640.0 / tw0) as u16).max(20);
-    }
-    if selected {
-        draw_rectangle(x - 12.0, y - 24.0, 620.0, 34.0, skin.hi());
-        ttext(">", x - 30.0, y + 2.0, f, 34, skin.caret());
-    }
-    ttext(&tag, x, y + 2.0, f, size, color);
-}
-
-/// Centered quiz option row, default plum skin.
-pub fn draw_option_row(i: usize, label: &str, y: f32, selected: bool, disabled: Option<bool>) {
-    draw_option_row_skinned(i, label, y, selected, disabled, Skin::Plum);
-}
-
-pub fn quiz_header(title: &str, sub: &str) {
-    quiz_header_skinned(title, sub, Skin::Plum);
-}
-
-pub fn quiz_header_skinned(title: &str, sub: &str, skin: Skin) {
-    let w = screen_width();
-    let h = screen_height();
-    let (f_out, f_in) = skin.frame();
-    let (c_fill, c_border, c_text) = skin.chip();
-    let (_, _, _, sub_c) = skin.text();
-    // biome veil + hairline frame: every quiz screen sits on its biome's stage.
-    // The frame starts below the subtitle so text never sits on the rule.
-    draw_rectangle(0.0, 0.0, w, h, skin.veil());
-    let fx = 24.0;
-    let fy = 152.0;
-    let fw = w - 48.0;
-    let fh = h - 282.0;
-    draw_rectangle_lines(fx, fy, fw, fh, 2.0, f_out);
-    draw_rectangle_lines(fx + 6.0, fy + 6.0, fw - 12.0, fh - 12.0, 1.0, f_in);
-    // signature details, one per skin, kept quiet:
-    if skin == Skin::PearlSand {
-        // a string of sea-pearls threaded along the top rule
-        let ry = 153.0;
-        for k in 0..9 {
-            let px = w * 0.5 - 144.0 + k as f32 * 36.0;
-            let gl = 0.8 + 0.2 * (get_time() as f32 * 1.4 + k as f32).sin();
-            draw_circle(px, ry, 2.4, Color::new(0.94, 0.97, 0.99, gl));
-            draw_circle(px - 0.8, ry - 0.8, 0.9, Color::from_rgba(255, 255, 255, 230));
-        }
-    } else if skin == Skin::NeonSlab {
-        // circuit corner ticks, like the Neon Node panels inlaid in the walkway
-        let c = Color::from_rgba(110, 230, 255, 220);
-        let tick = 14.0;
-        for (cx, cy, dx, dy) in [
-            (fx, fy, 1.0, 1.0),
-            (fx + fw, fy, -1.0, 1.0),
-            (fx, fy + fh, 1.0, -1.0),
-            (fx + fw, fy + fh, -1.0, -1.0),
-        ] {
-            let hx = if dx > 0.0 { cx } else { cx - tick };
-            let hy = if dy > 0.0 { cy } else { cy - tick };
-            draw_rectangle(hx, cy - 1.5, tick, 3.0, c);
-            draw_rectangle(cx - 1.5, hy, 3.0, tick, c);
-        }
-    }
-    // title: Press Start 2P chip when it fits, otherwise cream VT323
-    let ts = tag_width(title, 18);
-    let f = dialog_font();
-    if ts < w - 240.0 {
-        let cw = ts + 52.0;
-        let cy = 34.0;
-        let cx = w * 0.5 - cw / 2.0;
-        draw_rectangle(cx, cy, cw, 38.0, c_fill);
-        draw_rectangle_lines(cx - 2.0, cy - 2.0, cw + 4.0, 42.0, 2.0, c_border);
-        draw_tag(title, w * 0.5 - ts / 2.0, cy + 27.0, 18, c_text);
+fn strip_emph(w: &str) -> (&str, bool) {
+    if w.len() >= 2 && w.starts_with('*') && w.ends_with('*') {
+        (&w[1..w.len() - 1], true)
+    } else if w.starts_with('*') && w.len() > 1 {
+        (&w[1..], true)
     } else {
-        ttext(title, w * 0.5 - ttext_w(title, f, 40) * 0.5, 60.0, f, 40, CREAM);
-    }
-    // rule + subtitle in the skin's tones
-    draw_rectangle(w * 0.5 - 150.0, 96.0, 300.0, 2.0, skin.rule());
-    if !sub.is_empty() {
-        let sl = wrapped_line_count(sub, 760.0, 25) as f32;
-        draw_wrapped_col(sub, w * 0.5 - 380.0, 124.0, 760.0, 25.0, 25, sub_c);
-        let _ = sl;
+        (w, false)
     }
 }
 
-/// Like `draw_wrapped_col` but treats `*word*` as emphasis (accent colour) and
-/// prints the word without its asterisks. The maze questions carry the
-/// script's own emphasis markers, which used to show up literally.
-pub fn draw_wrapped_rich(text: &str, x0: f32, mut y: f32, max_w: f32, line_h: f32, size: u16, base: Color, accent: Color) {
+fn draw_wrapped_inner(text: &str, x0: f32, mut y: f32, max_w: f32, size: u16, line_h: f32, base: Color, accent: Color) {
     let f = dialog_font();
-    let max_x = x0 + max_w;
     let space = ttext_w(" ", f, size);
     for para in text.split('\n') {
+        if para.is_empty() {
+            y += line_h * 0.65;
+            continue;
+        }
         let mut x = x0;
-        for word in para.split(' ') {
-            // emphasis can wrap punctuation (`*west*,`), so strip the markers
-            // wherever they sit instead of only on a bare *word*
-            let emph = word.contains('*');
-            let clean: String = word.chars().filter(|ch| *ch != '*').collect();
-            let ww = ttext_w(&clean, f, size);
-            if x + ww > max_x && x > x0 {
+        for raw_word in para.split_whitespace() {
+            let (clean, emph) = strip_emph(raw_word);
+            let ww = ttext_w(clean, f, size);
+            if x > x0 && x + ww > x0 + max_w {
                 x = x0;
                 y += line_h;
             }
-            ttext(&clean, x, y, f, size, if emph { accent } else { base });
+            let col = if emph { accent } else { base };
+            ttext(clean, x + 2.0, y + 2.0, f, size, Color::new(0.02, 0.02, 0.05, col.a * 0.85));
+            ttext(clean, x, y, f, size, col);
             x += ww + space;
         }
         y += line_h;
     }
 }
 
-// --- item art --------------------------------------------------------------
-// Everything here is drawn on a small integer grid (a "pixel" is `k` screen
-// pixels) so it keeps the hard edges of the pixel fonts at any size instead of
-// turning into a flat vector rectangle. The old gift was a red draw_rectangle.
+pub fn wrapped_line_count(text: &str, max_w: f32, size: u16) -> usize {
+    let f = dialog_font();
+    let space = ttext_w(" ", f, size);
+    let mut lines = 0usize;
+    for para in text.split('\n') {
+        lines += 1;
+        let mut x = 0.0f32;
+        for raw in para.split_whitespace() {
+            let (clean, _) = strip_emph(raw);
+            let ww = ttext_w(clean, f, size);
+            if x > 0.0 && x + ww > max_w {
+                lines += 1;
+                x = ww + space;
+            } else {
+                x += ww + space;
+            }
+        }
+    }
+    lines.max(1)
+}
 
-/// The Family Heirloom storybook. `bottom` is the base of the book.
-/// The grid is 32 wide by 40 tall.
+pub fn quiz_header_skinned(tex: &Textures, title: &str, x: f32, y: f32, w: f32, skin: &Skin) {
+    let chip_w = (tag_width(title, 11) + 32.0).min(w);
+    draw_nine_slice(tex, x, y - 4.0, chip_w.max(200.0), 36.0, skin.chip, skin.border);
+    draw_tag_shadow(title, x + 16.0, y + 20.0, 11, skin.chip_ink);
+    draw_texture_ex(&tex.ui.divider, x, y + 40.0, skin.border, DrawTextureParams {
+        dest_size: Some(vec2(w, 4.0)),
+        ..Default::default()
+    });
+}
+
+pub fn draw_option_row_skinned(
+    tex: &Textures,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    label: &str,
+    selected: bool,
+    skin: &Skin,
+) -> bool {
+    let (mx, my) = mouse_position();
+    let hov = mx >= x && mx <= x + w && my >= y && my <= y + h;
+    let fill = if selected || hov { skin.sel } else { skin.chip };
+    let border = if selected || hov { skin.accent } else { skin.border };
+    draw_nine_slice(tex, x, y, w, h, fill, border);
+    let txt_col = if selected || hov { skin.accent } else { skin.ink };
+    draw_wrapped_rich(label, x + 18.0, y + 28.0, w - 36.0, 24, 24.0, txt_col, skin.accent);
+    hov && is_mouse_button_pressed(MouseButton::Left)
+}
+
+// --- Field Notes & Pause Modals ---------------------------------------------
+
+pub fn draw_field_notes(tex: &Textures, prog: &Progress, biome: Biome, skin: &Skin) -> bool {
+    let w = screen_width();
+    let h = screen_height();
+    draw_rectangle(0.0, 0.0, w, h, Color::new(0.01, 0.01, 0.04, 0.72));
+
+    let pw = 760.0f32.min(w - 48.0);
+    let ph = 520.0f32.min(h - 48.0);
+    let px = (w - pw) * 0.5;
+    let py = (h - ph) * 0.5;
+    draw_panel(tex, px, py, pw, ph, skin);
+
+    draw_tag_shadow("FIELD NOTES & JOURNAL", px + 28.0, py + 42.0, 16, skin.accent);
+    draw_tag_shadow("[Tab] Close", px + pw - 160.0, py + 42.0, 11, skin.muted);
+
+    // Objective summary
+    let goal = match biome {
+        Biome::Kelp => "Solve at least 1 Kelp Riddle, mend The Lone Stone Throne Story Gate, and confront Queen Crab.",
+        Biome::Coral => "Gather Blue Seashroom, Tentacle Anemone & True Seaberry (use NPC N/E/W clues!), solve a Coral Riddle, ride Tow-Tou through the Cave Maze.",
+        Biome::Slums => "Answer Tenebris's Somber Riddles, conquer the Temple of Figurate Algae, catch stars & light the Rainbow Road.",
+        Biome::Home => "Deliver the Elixir of Literacy to heal Nadia!",
+    };
+    draw_tag_shadow("CURRENT OBJECTIVE:", px + 28.0, py + 82.0, 11, skin.chip_ink);
+    draw_wrapped_col(goal, px + 28.0, py + 108.0, pw - 56.0, 22, 24.0, skin.ink);
+
+    // Elixir vial status row
+    draw_tag_shadow("ELIXIR VIALS:", px + 28.0, py + 178.0, 11, skin.chip_ink);
+    let vials = [
+        (&tex.ui.vial_red, "Pearl of Clarity", prog.elixir >= 1),
+        (&tex.ui.vial_green, "Algae Synthesis", prog.elixir >= 2),
+        (&tex.ui.vial_blue, "Elixir of Literacy", prog.elixir >= 3),
+    ];
+    for (i, (ico, lbl, got)) in vials.iter().enumerate() {
+        let vx = px + 28.0 + i as f32 * 230.0;
+        let vy = py + 190.0;
+        draw_nine_slice(tex, vx, vy, 218.0, 56.0, skin.chip, if *got { skin.accent } else { skin.border });
+        let img = if *got { *ico } else { &tex.ui.vial_empty };
+        draw_texture_ex(img, vx + 10.0, vy + 12.0, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(32.0, 32.0)),
+            ..Default::default()
+        });
+        draw_dlg_shadow(lbl, vx + 48.0, vy + 36.0, 21, if *got { skin.accent } else { skin.muted });
+    }
+
+    // Aquarius clues & ingredients
+    draw_tag_shadow("AQUARIUS CLUES & REAGENTS:", px + 28.0, py + 280.0, 11, skin.chip_ink);
+    let items = [
+        ("Blue Seashroom", prog.items[0]),
+        ("Tentacle Anemone", prog.items[1]),
+        ("True Seaberry", prog.items[2]),
+    ];
+    for (i, (name, got)) in items.iter().enumerate() {
+        let mark = if *got { "[OK]" } else { "[  ]" };
+        draw_dlg_shadow(
+            &format!("{} {}", mark, name),
+            px + 28.0 + i as f32 * 230.0,
+            py + 308.0,
+            22,
+            if *got { skin.accent } else { skin.muted },
+        );
+    }
+
+    let mut cy = py + 344.0;
+    if prog.clues.is_empty() {
+        draw_dlg_shadow("Talk to Gillbert, Scalleon, Market Lady, and examine the Neptune Statue.", px + 28.0, cy, 22, skin.muted);
+    } else {
+        for c in &prog.clues {
+            draw_dlg_shadow(&format!("* {}", c), px + 28.0, cy, 22, skin.ink);
+            cy += 26.0;
+        }
+    }
+
+    // Riddle summary footer
+    draw_tag_shadow(
+        &format!("Riddles Mastered: {} / {}    Puzzles Cleared: {}/4",
+            prog.total_riddles_right(),
+            prog.total_riddles_seen(),
+            prog.gate_solved as u8 + prog.maze_solved as u8 + prog.algae_solved as u8 + prog.rainbow_solved as u8,
+        ),
+        px + 28.0,
+        py + ph - 48.0,
+        11,
+        skin.accent,
+    );
+
+    draw_btn(tex, px + pw - 150.0, py + ph - 62.0, 126.0, 38.0, "CLOSE", skin, false)
+        || is_key_pressed(KeyCode::Tab)
+        || is_key_pressed(KeyCode::Escape)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PauseAction {
+    None,
+    Resume,
+    ToggleMute,
+    VolDown,
+    VolUp,
+    RestartBiome,
+    QuitTitle,
+}
+
+pub fn draw_pause_overlay(tex: &Textures, muted: bool, vol: f32, skin: &Skin) -> PauseAction {
+    let w = screen_width();
+    let h = screen_height();
+    draw_rectangle(0.0, 0.0, w, h, Color::new(0.01, 0.01, 0.04, 0.72));
+
+    let pw = 440.0;
+    let ph = 398.0;
+    let px = (w - pw) * 0.5;
+    let py = (h - ph) * 0.5;
+    draw_panel(tex, px, py, pw, ph, skin);
+
+    let title = "PAUSED";
+    draw_tag_shadow(title, (w - tag_width(title, 18)) * 0.5, py + 48.0, 18, skin.accent);
+
+    let mut action = PauseAction::None;
+    let bx = px + 50.0;
+    let bw = pw - 100.0;
+    if draw_btn(tex, bx, py + 76.0, bw, 46.0, "RESUME GAME", skin, true) || is_key_pressed(KeyCode::Escape) {
+        action = PauseAction::Resume;
+    }
+    let m_lbl = if muted { "AUDIO: MUTED [M]" } else { "AUDIO: ON [M]" };
+    if draw_btn(tex, bx, py + 134.0, bw, 46.0, m_lbl, skin, false) {
+        action = PauseAction::ToggleMute;
+    }
+    if draw_btn(tex, bx, py + 192.0, 72.0, 42.0, "VOL -", skin, false) {
+        action = PauseAction::VolDown;
+    }
+    draw_dlg_shadow(&format!("Music {:>3}%", (vol * 100.0).round() as i32), bx + 110.0, py + 220.0, 24, skin.ink);
+    if draw_btn(tex, bx + bw - 72.0, py + 192.0, 72.0, 42.0, "VOL +", skin, false) {
+        action = PauseAction::VolUp;
+    }
+    if draw_btn(tex, bx, py + 248.0, bw, 46.0, "RESTART BIOME", skin, false) {
+        action = PauseAction::RestartBiome;
+    }
+    if draw_btn(tex, bx, py + 306.0, bw, 46.0, "RETURN TO TITLE", skin, false) {
+        action = PauseAction::QuitTitle;
+    }
+    action
+}
+
+// --- Heirloom Storybook Hero Art --------------------------------------------
+
 pub fn draw_storybook(cx: f32, bottom: f32, k: f32, glow: f32) {
     let left = cx - 16.0 * k;
     let top = bottom - 40.0 * k;
@@ -577,11 +678,9 @@ pub fn draw_storybook(cx: f32, bottom: f32, k: f32, glow: f32) {
     let page = Color::from_rgba(251, 240, 214, 255);
     let page_lo = Color::from_rgba(212, 190, 152, 255);
 
-    // warm halo so the book reads as the hero object, not a UI sprite
     draw_circle(cx + 2.0 * k, bottom - 20.0 * k, 24.0 * k,
-        Color::new(1.0, 0.84, 0.48, 0.05 + glow * 0.09));
+        Color::new(1.0, 0.84, 0.48, 0.06 + glow * 0.10));
 
-    // page block sits proud of the cover on the right, with page edges
     r(9.0, 5.0, 20.0, 32.0, page);
     r(9.0, 5.0, 20.0, 1.0, page_lo);
     for i in 0..5 {
@@ -589,16 +688,13 @@ pub fn draw_storybook(cx: f32, bottom: f32, k: f32, glow: f32) {
     }
     r(28.0, 5.0, 1.0, 32.0, page_lo);
 
-    // covers
     r(4.0, 2.0, 23.0, 36.0, leather_lo);
     r(4.0, 4.0, 20.0, 33.0, leather);
-    // spine with raised bands
     r(6.0, 4.0, 4.0, 33.0, leather_hi);
     r(6.0, 4.0, 1.0, 33.0, Color::from_rgba(140, 84, 184, 255));
     r(6.0, 6.0, 4.0, 2.0, gold_lo);
     r(6.0, 32.0, 4.0, 2.0, gold_lo);
 
-    // gilt frame and emblem
     r(13.0, 8.0, 1.0, 25.0, gold_lo);
     r(25.0, 8.0, 1.0, 25.0, gold_lo);
     r(13.0, 8.0, 13.0, 1.0, gold_lo);
@@ -607,46 +703,8 @@ pub fn draw_storybook(cx: f32, bottom: f32, k: f32, glow: f32) {
     draw_poly(cx + 4.0 * k, top + 19.0 * k, 4, 2.4 * k, 0.78, leather);
     draw_circle(cx + 4.0 * k, top + 19.0 * k, 0.9 * k, gold);
 
-    // clasp and ribbon bookmark
     r(26.0, 17.0, 4.0, 6.0, gold);
     r(26.0, 19.0, 4.0, 2.0, gold_lo);
     r(19.0, 36.0, 3.0, 4.0, Color::from_rgba(214, 74, 132, 255));
     r(19.0, 36.0, 3.0, 1.0, Color::from_rgba(246, 130, 176, 255));
-}
-
-/// One of the three elixir vials in the HUD. `filled` is 0..1.
-/// The grid is 10 wide by 20 tall.
-pub fn draw_vial(cx: f32, bottom: f32, h: f32, filled: f32) {
-    let k = h / 20.0;
-    let top = bottom - h;
-    let left = cx - 5.0 * k;
-    let glass = Color::from_rgba(240, 246, 252, 225);
-    let glass_lo = Color::from_rgba(150, 128, 176, 200);
-    let f = filled.clamp(0.0, 1.0);
-
-    // cork
-    draw_rectangle(left + 3.0 * k, top, 4.0 * k, 3.0 * k, Color::from_rgba(158, 108, 66, 255));
-    draw_rectangle(left + 3.0 * k, top, 4.0 * k, 1.0 * k, Color::from_rgba(196, 142, 92, 255));
-    // neck + body silhouette
-    draw_rectangle(left + 2.0 * k, top + 3.0 * k, 6.0 * k, 3.0 * k, glass);
-    draw_rectangle(left + 1.0 * k, top + 6.0 * k, 8.0 * k, 11.0 * k, glass);
-    draw_rectangle(left + 2.0 * k, top + 17.0 * k, 6.0 * k, 1.0 * k, glass);
-    draw_rectangle(left + 3.0 * k, top + 18.0 * k, 4.0 * k, 1.0 * k, glass_lo);
-    draw_rectangle(left, top + 6.0 * k, 1.0 * k, 11.0 * k, glass_lo);
-    draw_rectangle(left + 9.0 * k, top + 6.0 * k, 1.0 * k, 11.0 * k, glass_lo);
-
-    // glowing contents, filled from the base up
-    if f > 0.01 {
-        let body_top = top + 6.0 * k;
-        let body_h = 13.0 * k * f;
-        let y = top + 19.0 * k - body_h;
-        draw_rectangle(left + 1.0 * k, y, 8.0 * k, body_h, Color::from_rgba(255, 150, 200, 235));
-        draw_rectangle(left + 1.0 * k, y, 8.0 * k, 1.0 * k, Color::from_rgba(255, 214, 236, 255));
-        draw_rectangle(left + 1.0 * k, y, 2.0 * k, body_h, Color::from_rgba(255, 196, 226, 235));
-        // a spark near the surface
-        draw_circle(left + 6.0 * k, y + 2.0 * k, 0.8 * k, Color::from_rgba(255, 246, 252, 220));
-        let _ = body_top;
-    }
-    // specular stripe down the glass
-    draw_rectangle(left + 2.5 * k, top + 7.0 * k, 1.0 * k, 8.0 * k, Color::from_rgba(255, 255, 255, 190));
 }
