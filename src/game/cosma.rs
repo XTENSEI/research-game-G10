@@ -28,7 +28,7 @@ pub const RAP_BARS: &[RapBar] = &[
         decoys: ["glow", "luck"],
     },
     RapBar {
-        prompt: "River: \"Got the pearl, got the berries, kept my diction super bright,\nStand aside, Angler Trio—watch me claim the mountain ___!\"",
+        prompt: "River: \"Got the pearl, got the berries, kept my diction super bright.\nStand aside, Angler Trio! Watch me claim the mountain ___!\"",
         rhyming_word: "height",
         decoys: ["deep", "foam"],
     },
@@ -50,7 +50,7 @@ pub struct AlgaeTrial {
 
 pub const ALGAE_TRIALS: &[AlgaeTrial] = &[
     AlgaeTrial {
-        chamber: "Chamber I — Triangular Spore Lattice",
+        chamber: "Chamber I: Triangular Spore Lattice",
         riddle_text: "\"Like a lighthouse beacon cutting velvet night...\"\nIdentify the device AND next triangular algae count: 1, 3, 6, 10, ?",
         sequence_hint: "Add +2, +3, +4, +5 to each glowing frond.",
         choices: [
@@ -60,10 +60,10 @@ pub const ALGAE_TRIALS: &[AlgaeTrial] = &[
             "Oxymoron + 16",
         ],
         correct: 0,
-        infuse_note: "Queen Crab's *Pearl of Clarity* dissolves cleanly into emerald algae!",
+        infuse_note: "Queen Crab's *Pearl of Clarity* dissolves into emerald algae!",
     },
     AlgaeTrial {
-        chamber: "Chamber II — Square Coral Bloom",
+        chamber: "Chamber II: Square Coral Bloom",
         riddle_text: "\"The silent trench whispered old secrets to our oars.\"\nIdentify the device AND next square crystal count: 1, 4, 9, 16, ?",
         sequence_hint: "Square numbers: 1^2, 2^2, 3^2, 4^2, 5^2.",
         choices: [
@@ -73,10 +73,10 @@ pub const ALGAE_TRIALS: &[AlgaeTrial] = &[
             "Allusion + 21",
         ],
         correct: 1,
-        infuse_note: "The *Blue Seashroom & Tentacle Anemone* ignite in silver luminescence!",
+        infuse_note: "The *Blue Seashroom & Tentacle Anemone* gleam silver-bright!",
     },
     AlgaeTrial {
-        chamber: "Chamber III — Seal of The Elixir",
+        chamber: "Chamber III: Seal of The Elixir",
         riddle_text: "\"Words are lanterns carried across uncharted seas.\"\nIdentify the device AND closing pentagonal stone count: 1, 5, 12, 22, ?",
         sequence_hint: "Pentagonal differences grow by +3 each step: +4, +7, +10, +13.",
         choices: [
@@ -86,12 +86,12 @@ pub const ALGAE_TRIALS: &[AlgaeTrial] = &[
             "Euphemism + 28",
         ],
         correct: 2,
-        infuse_note: "True Seaberry fuses the potion whole—the *Elixir of Literacy* is complete!!",
+        infuse_note: "True Seaberry completes the brew: the *Elixir of Literacy* is whole!!",
     },
 ];
 
 // ---------------------------------------------------------------------------
-// The Rainbow Road — Falling Stars + Torch Slabs + Magic Fire Genie Poems
+// The Rainbow Road: Falling Stars + Torch Slabs + Magic Fire Genie Poems
 // ---------------------------------------------------------------------------
 
 pub const STAR_TARGET: u32 = 14;
@@ -120,27 +120,27 @@ pub const POEMS: &[Poem] = &[
         title: "Because I could not stop for Death",
         author: "Emily Dickinson (1890)",
         lines: &[
-            "Because I could not stop for Death –",
-            "He kindly stopped for me –",
-            "The Carriage held but just Ourselves –",
+            "Because I could not stop for Death -",
+            "He kindly stopped for me -",
+            "The Carriage held but just Ourselves -",
             "And Immortality.",
             "",
-            "We slowly drove – He knew no haste",
+            "We slowly drove - He knew no haste",
             "And I had put away",
             "My labor and my leisure too,",
-            "For His Civility –",
+            "For His Civility -",
             "",
             "We passed the School, where Children strove",
-            "At Recess – in the Ring –",
-            "We passed the Fields of Gazing Grain –",
-            "We passed the Setting Sun –",
+            "At Recess - in the Ring -",
+            "We passed the Fields of Gazing Grain -",
+            "We passed the Setting Sun -",
             "",
-            "Or rather – He passed Us –",
-            "The Dews drew quivering and Chill –",
-            "Since then – 'tis Centuries – and yet",
+            "Or rather - He passed Us -",
+            "The Dews drew quivering and Chill -",
+            "Since then - 'tis Centuries - and yet",
             "Feels shorter than the Day",
             "I first surmised the Horses' Heads",
-            "Were toward Eternity –",
+            "Were toward Eternity -",
         ],
         questions: &[
             PoemQ {
@@ -152,7 +152,7 @@ pub const POEMS: &[Poem] = &[
                     "Carriage travel across countryside ruins takes years",
                 ],
                 correct: 0,
-                feedback: "Exactly right—mortality arrives politely on its own schedule, beyond human choosing.",
+                feedback: "Spot on! Mortality arrives on its own schedule, outside our control.",
             },
             PoemQ {
                 prompt: "How does the poem depict this journey?",
@@ -163,7 +163,7 @@ pub const POEMS: &[Poem] = &[
                     "A ghost haunting an abandoned schoolhouse",
                 ],
                 correct: 1,
-                feedback: "Brilliant reading! School (youth), Grain (maturity), and Setting Sun (old age) trace life smoothly into Eternity.",
+                feedback: "Nice reading! School (youth), Grain (maturity), and Setting Sun (old age) trace life into Eternity.",
             },
         ],
     },
@@ -171,20 +171,20 @@ pub const POEMS: &[Poem] = &[
         title: "\"Hope\" is the thing with feathers",
         author: "Emily Dickinson (1891)",
         lines: &[
-            "\"Hope\" is the thing with feathers –",
-            "That perches in the soul –",
-            "And sings the tune without the words –",
-            "And never stops – at all –",
+            "\"Hope\" is the thing with feathers -",
+            "That perches in the soul -",
+            "And sings the tune without the words -",
+            "And never stops - at all -",
             "",
-            "And sweetest – in the Gale – is heard –",
-            "And sore must be the storm –",
+            "And sweetest - in the Gale - is heard -",
+            "And sore must be the storm -",
             "That could abash the little Bird",
-            "That kept so many warm –",
+            "That kept so many warm -",
             "",
-            "I've heard it in the chillest land –",
-            "And on the strangest Sea –",
-            "Yet – never – in Extremity,",
-            "It asked a crumb – of me.",
+            "I've heard it in the chillest land -",
+            "And on the strangest Sea -",
+            "Yet - never - in Extremity,",
+            "It asked a crumb - of me.",
         ],
         questions: &[
             PoemQ {
@@ -196,10 +196,10 @@ pub const POEMS: &[Poem] = &[
                     "A satirical dialogue with an emperor",
                 ],
                 correct: 0,
-                feedback: "Yes! Hope dwells quietly within the spirit, enduring storms without asking payment.",
+                feedback: "Yes! Hope stays in the spirit through fierce storms and never quits.",
             },
             PoemQ {
-                prompt: "What do the closing lines (\"never – in Extremity, / It asked a crumb – of me\") emphasize?",
+                prompt: "What do the closing lines (\"never - in Extremity, / It asked a crumb - of me\") emphasize?",
                 choices: [
                     "True hope sustains us selflessly even in our darkest hardship",
                     "The speaker forgot to bring bread on a voyage",
@@ -207,7 +207,7 @@ pub const POEMS: &[Poem] = &[
                     "Songs are harder to sing in winter weather",
                 ],
                 correct: 0,
-                feedback: "Precisely—hope asks nothing in return even in crisis.",
+                feedback: "Exactly! Hope asks for nothing in return even in crisis.",
             },
         ],
     },

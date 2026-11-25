@@ -35,7 +35,7 @@ pub const SLOTS: &[GateSlot] = &[
     GateSlot {
         before: "There was once an ancient city",
         answer: "—",
-        hint: "Slot 1 sets off a dramatic modifier after 'city' — try an em-dash.",
+        hint: "Slot 1 sets off a dramatic modifier after 'city'. Try an em-dash.",
     },
     GateSlot {
         before: "prospering and standing",

@@ -11,7 +11,7 @@ pub struct KennyQ {
 /// Full 3-question round for first duel; retries trim to first 2 questions per p. 2.
 pub const KENNY_QUESTIONS: &[KennyQ] = &[
     KennyQ {
-        prompt: "Kenny snaps: \"Alright land-kid, quick strike—which word completes this sentence in clean PAST TENSE?\"\n\"Earlier today, River ___ beside the glowing book.\"",
+        prompt: "Kenny snaps: \"Alright land-kid, quick strike! Which word completes this sentence in PAST TENSE?\"\n\"Earlier today, River ___ beside the glowing book.\"",
         choices: [
             "a) sleep",
             "b) slept",
