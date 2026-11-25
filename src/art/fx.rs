@@ -51,8 +51,8 @@ void main() {
     acc += texture2D(Texture, uv + vec2( u_texel.x,  u_texel.y)).rgb;
     acc *= 0.25;
     float lum = dot(acc, vec3(0.299, 0.587, 0.114));
-    float w = smoothstep(0.60, 0.94, lum);
-    gl_FragColor = vec4(acc * w * 1.15, 1.0);
+    float w = smoothstep(0.84, 0.99, lum);
+    gl_FragColor = vec4(acc * w * 0.85, 1.0);
 }
 "#;
 
@@ -93,8 +93,8 @@ void main() {
     vec3 b1 = texture2D(Bloom1, uv).rgb;
     vec3 b2 = texture2D(Bloom2, uv).rgb;
 
-    // Soft additive highlight bloom (never lifts dark backgrounds)
-    vec3 col = base + b1 * 0.26 + b2 * 0.22;
+    // Soft additive highlight bloom (never lifts cream sheets or dark backgrounds)
+    vec3 col = base + b1 * 0.16 + b2 * 0.14;
 
     // Per-biome subtle color grade
     col = mix(col, u_grade.rgb, u_grade.a);
@@ -270,59 +270,44 @@ async fn fx_tex(name: &str) -> Texture2D {
     t
 }
 
-macro_rules! fx_arr {
-    ($prefix:expr, $n:literal) => {{
-        let mut v = Vec::with_capacity($n);
-        for i in 1..=$n {
-            v.push(fx_tex(&format!("{}_{}", $prefix, i)).await);
-        }
-        let mut it = v.into_iter();
-        [(); $n].map(|_| it.next().unwrap())
-    }};
-}
-
 /// The CC0 particle sprite kit (Kenney Particle Pack).
 pub struct FxSprites {
     pub smoke: [Texture2D; 3],
-    pub spark: [Texture2D; 3],
     pub star: [Texture2D; 4],
     pub magic: [Texture2D; 3],
     pub fire: [Texture2D; 2],
-    pub flame: [Texture2D; 3],
     pub circle: [Texture2D; 3],
-    pub trace: [Texture2D; 3],
-    pub twirl: [Texture2D; 2],
     pub light: [Texture2D; 3],
-    pub dirt: [Texture2D; 2],
     pub flare: Texture2D,
 }
 
 impl FxSprites {
     pub async fn load() -> Self {
+        let mut names = Vec::with_capacity(20);
+        for i in 1..=3 { names.push(format!("smoke_{}", i)); }
+        for i in 1..=4 { names.push(format!("star_{}", i)); }
+        for i in 1..=3 { names.push(format!("magic_{}", i)); }
+        for i in 1..=2 { names.push(format!("fire_{}", i)); }
+        for i in 1..=3 { names.push(format!("circle_{}", i)); }
+        for i in 1..=3 { names.push(format!("light_{}", i)); }
+        names.push("flare".to_string());
+
+        let futs: Vec<_> = names.iter().map(|n| fx_tex(n)).collect();
+        let mut res = crate::game::join_all(futs).await.into_iter();
+        let mut take = || res.next().unwrap();
         Self {
-            smoke: fx_arr!("smoke", 3),
-            spark: fx_arr!("spark", 3),
-            star: fx_arr!("star", 4),
-            magic: fx_arr!("magic", 3),
-            fire: fx_arr!("fire", 2),
-            flame: fx_arr!("flame", 3),
-            circle: fx_arr!("circle", 3),
-            trace: fx_arr!("trace", 3),
-            twirl: fx_arr!("twirl", 2),
-            light: fx_arr!("light", 3),
-            dirt: fx_arr!("dirt", 2),
-            flare: fx_tex("flare").await,
+            smoke: [take(), take(), take()],
+            star: [take(), take(), take(), take()],
+            magic: [take(), take(), take()],
+            fire: [take(), take()],
+            circle: [take(), take(), take()],
+            light: [take(), take(), take()],
+            flare: take(),
         }
     }
 
     pub fn star_at(&self, k: usize) -> &Texture2D {
         &self.star[k % self.star.len()]
-    }
-    pub fn smoke_at(&self, k: usize) -> &Texture2D {
-        &self.smoke[k % self.smoke.len()]
-    }
-    pub fn spark_at(&self, k: usize) -> &Texture2D {
-        &self.spark[k % self.spark.len()]
     }
     pub fn light_at(&self, k: usize) -> &Texture2D {
         &self.light[k % self.light.len()]
@@ -583,9 +568,9 @@ impl Fx {
 
     pub fn sky(&self, biome: Biome) -> &Texture2D {
         match biome {
-            Biome::Candy => &self.sky_kelp,
-            Biome::Aquarius => &self.sky_aqua,
-            Biome::Cosma => &self.sky_slums,
+            Biome::Kelp => &self.sky_kelp,
+            Biome::Coral => &self.sky_aqua,
+            Biome::Slums => &self.sky_slums,
             Biome::Home => &self.sky_home,
         }
     }
@@ -748,15 +733,6 @@ impl Fx {
 
     pub fn light_pool(&self, x: f32, y: f32, radius: f32, col: Color) {
         draw_texture_ex(&self.glow, x - radius / 2.0, y - radius / 2.0, col,
-            DrawTextureParams {
-                dest_size: Some(vec2(radius, radius)),
-                ..Default::default()
-            });
-    }
-
-    pub fn light_sprite(&self, x: f32, y: f32, radius: f32, col: Color, k: usize) {
-        let t = self.sprites.light_at(k);
-        draw_texture_ex(t, x - radius / 2.0, y - radius / 2.0, col,
             DrawTextureParams {
                 dest_size: Some(vec2(radius, radius)),
                 ..Default::default()

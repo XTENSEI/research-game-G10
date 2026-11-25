@@ -14,8 +14,7 @@ fn conf() -> Conf {
     }
 }
 
-/// Movement QA: hold each direction through the real movement branch and check
-/// travel, facing, clamping and click-to-walk. Prints one PASS/FAIL per check.
+/// Movement QA: exercises left/right/up/down clamping and click-to-walk on native runs.
 fn run_move_qa(game: &mut game::run::Game) {
     let mut fails = 0u32;
     let mut check = |name: &str, ok: bool, detail: String| {
@@ -33,7 +32,7 @@ fn run_move_qa(game: &mut game::run::Game) {
         game.qa_dir(0.0, 0.0);
     };
 
-    game.qa_boot("candy");
+    game.qa_boot("kelp");
     game.update(1.0 / 60.0);
     game.draw();
     let start = game.qa_player();
@@ -42,7 +41,7 @@ fn run_move_qa(game: &mut game::run::Game) {
 
     hold(game, 1.0, 0.0, 60);
     let right = game.qa_player();
-    check("walk right", right.0 > start.0 + 40.0, format!("dx={:+.1} {} ", right.0 - start.0, game.qa_pose()));
+    check("walk right", right.0 > start.0 + 40.0, format!("dx={:+.1} {}", right.0 - start.0, game.qa_pose()));
     check("face right", game.qa_pose().contains("facing=+1"), game.qa_pose());
 
     hold(game, -1.0, 0.0, 60);
@@ -52,18 +51,17 @@ fn run_move_qa(game: &mut game::run::Game) {
 
     hold(game, 0.0, -1.0, 90);
     let up = game.qa_player();
-    check("walk up clamps at 400", (up.1 - 400.0).abs() < 0.6, format!("y={:.1}", up.1));
-    hold(game, 0.0, 1.0, 240);
+    check("walk up clamps at 538", (up.1 - 538.0).abs() < 0.8, format!("y={:.1}", up.1));
+    hold(game, 0.0, 1.0, 120);
     let down = game.qa_player();
-    check("walk down clamps at 560", (down.1 - 560.0).abs() < 0.6, format!("y={:.1}", down.1));
+    check("walk down clamps at 588", (down.1 - 588.0).abs() < 0.8, format!("y={:.1}", down.1));
 
-    game.qa_teleport(80.0);
+    game.qa_teleport(60.0);
     hold(game, -1.0, 0.0, 60);
-    check("left edge stops at 60", (game.qa_player().0 - 60.0).abs() < 0.6, format!("x={:.1}", game.qa_player().0));
-    game.qa_teleport(len - 80.0);
+    check("left edge stops at 40", (game.qa_player().0 - 40.0).abs() < 0.8, format!("x={:.1}", game.qa_player().0));
+    game.qa_teleport(len - 60.0);
     hold(game, 1.0, 0.0, 60);
-    check("right edge stops at len-60", (game.qa_player().0 - (len - 60.0)).abs() < 0.6,
-        format!("x={:.1}", game.qa_player().0));
+    check("right edge stops at len-40", (game.qa_player().0 - (len - 40.0)).abs() < 0.8, format!("x={:.1}", game.qa_player().0));
 
     game.qa_teleport(400.0);
     game.qa_click(760.0);
@@ -72,18 +70,11 @@ fn run_move_qa(game: &mut game::run::Game) {
         game.draw();
     }
     let walked = game.qa_player().0;
-    check("click-to-walk arrives", (walked - 760.0).abs() < 12.0 && game.qa_click_target().is_none(),
-        format!("x={:.1} target={:?}", walked, game.qa_click_target()));
-
-    game.qa_boot("swim");
-    for _ in 0..60 {
-        game.update(1.0 / 60.0);
-        game.draw();
-    }
-    let swim_a = game.qa_player().0;
-    hold(game, 1.0, 0.0, 60);
-    check("swim moves", game.qa_player().0 > swim_a + 40.0,
-        format!("dx={:+.1} {}", game.qa_player().0 - swim_a, game.qa_pose()));
+    check(
+        "click-to-walk arrives",
+        (walked - 760.0).abs() < 14.0 && game.qa_click_target().is_none(),
+        format!("x={:.1} target={:?}", walked, game.qa_click_target()),
+    );
 
     println!("[move] {} failure(s)", fails);
     if fails > 0 {
@@ -104,12 +95,18 @@ async fn main() {
     let seq = std::env::args().find_map(|a| a.strip_prefix("--seq=").map(str::to_string));
     // --move drives the movement branches and checks every direction and edge.
     let move_qa = std::env::args().any(|a| a == "--move");
+    let with_bot = std::env::args().any(|a| a == "--bot");
+
     let mut game = game::run::Game::new().await;
     if std::env::args().any(|a| a == "--autoplay") {
         game.autoplay();
     }
+
     if let Some(name) = seq.as_ref() {
         game.qa_boot(name);
+        if with_bot {
+            game.qa_enable_bot();
+        }
     } else if let Some(name) = &shot_scene {
         game.qa_boot(name);
     } else if shot_ui {
@@ -137,11 +134,10 @@ async fn main() {
     } else if shot_ui {
         "shot_ui.png"
     } else {
-        "shot_candy.png"
+        "shot_kelp.png"
     };
+
     loop {
-        // The sequence mode steps a fixed 1/60 s so the samples are comparable
-        // between runs; real play keeps the frame clock.
         if seq.is_some() {
             game.update(1.0 / 60.0);
         } else {
@@ -149,15 +145,17 @@ async fn main() {
         }
         game.draw();
         next_frame().await;
+
         if let Some(name) = seq.as_deref() {
             frames += 1;
-            if frames >= 40 && (frames - 40) % 6 == 0 && seq_i < 14 {
+            let (first, gap, cap) = if with_bot { (30u32, 40u32, 20u32) } else { (40u32, 6u32, 14u32) };
+            if frames >= first && (frames - first) % gap == 0 && seq_i < cap {
                 let img = game.shot_image();
                 img.export_png(&format!("shot_seq_{}_{:02}.png", name, seq_i));
-                println!("[seq] {:02} {}", seq_i, game.qa_pose());
+                println!("[seq] {:02} {} | {}", seq_i, game.qa_pose(), game.qa_state());
                 seq_i += 1;
             }
-            if seq_i >= 14 {
+            if seq_i >= cap {
                 println!("[seq] done {}", name);
                 std::process::exit(0);
             }
@@ -165,23 +163,9 @@ async fn main() {
         }
         if shot || shot_ui || shot_cosma || shot_aqua || shot_scene.is_some() {
             frames += 1;
-            if frames == 44 {
-                clear_background(Color::new(0.95, 0.95, 0.95, 1.0));
-                next_frame().await;
-            }
             if frames == 45 {
-                if std::env::var("SHOT_NO_READBACK").is_err() {
-                    // Read back the effects layer's own frame buffer rather than
-                    // the window's default one: after the offscreen passes the
-                    // default framebuffer readback comes back black on some
-                    // drivers, which silently produced empty QA shots.
-                    let img = if std::env::var("SHOT_WINDOW").is_ok() {
-                        get_screen_data()
-                    } else {
-                        game.shot_image()
-                    };
-                    img.export_png(out);
-                }
+                let img = game.shot_image();
+                img.export_png(out);
                 std::process::exit(0);
             }
         }

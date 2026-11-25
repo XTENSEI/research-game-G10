@@ -1,391 +1,434 @@
-//! Art loading and backdrop rendering.
+//! Pixel-art asset loader and layered parallax biome backdrops.
 //!
-//! Characters come from the Kenney Platformer Characters pack (CC0) recolored
-//! to the candy tokens by assets/tools/build.py: every cast member is emitted
-//! as a uniform 96x144 (2:3) canvas in three frames - stand, walk1, walk2 -
-//! so the whole game keeps drawing the same 2:3 boxes while River and friends
-//! now get real walk cycles. Tiles stay 16px Kenney roguelike remapped to the
-//! lemon/licorice palette and are sampled nearest-neighbour so the pixel art
-//! stays crisp at 3x. Biome skies are layered, camera-parallaxed and alive.
+//! All pixel-art cast sprites, portraits, intro plates, UI borders, props,
+//! tiles, and Ansimuz underwater crops use `FilterMode::Nearest` for crisp
+//! integer-grid pixel edges, while soft nebula/cloud effects keep linear filtering.
 
 pub mod fx;
 
+use std::collections::HashMap;
 use macroquad::prelude::*;
 use crate::game::script::Biome;
-use std::collections::HashMap;
 
 pub struct TilePack {
     pub ground: Texture2D,
     pub ground_alt: Texture2D,
     pub ground_speck: Texture2D,
     pub dirt: Texture2D,
-    pub flower_a: Texture2D,
-    pub flower_b: Texture2D,
-    pub flower_c: Texture2D,
-    /// Authored hedge clumps used for the Candy Land horizon.
-    pub hedges: Vec<Texture2D>,
+    pub coral_sand: Texture2D,
     pub stone: Texture2D,
     pub stone_alt: Texture2D,
-    // Home interior furniture (verified visually in the roguelike band probe)
-    pub bed_head: Texture2D,
-    pub bed_foot: Texture2D,
-    pub bed_wide: Texture2D,
-    pub table_a: Texture2D,
-    pub table_b: Texture2D,
-    pub door: Texture2D,
-    pub window: Texture2D,
-    pub rug: Texture2D,
-    pub fire_lit: Texture2D,
-    pub fire_dark: Texture2D,
-    pub shelf: Texture2D,
+    pub planks: Texture2D,
     pub wood_wall: Texture2D,
     pub wood_wall_alt: Texture2D,
-    pub planks: Texture2D,
+    pub window: Texture2D,
+    pub rug: Texture2D,
+    pub door: Texture2D,
 }
 
-/// Aquarius fauna and flora from the Kenney Fish Pack (tight-cropped).
+pub struct UiPack {
+    pub panel_fill: Texture2D,
+    pub panel_border: Texture2D,
+    pub divider: Texture2D,
+    pub vial_empty: Texture2D,
+    pub vial_green: Texture2D,
+    pub vial_red: Texture2D,
+    pub vial_blue: Texture2D,
+    pub heart_full: Texture2D,
+    pub heart_empty: Texture2D,
+    pub gem: Texture2D,
+    pub star: Texture2D,
+    pub dying_star: Texture2D,
+}
+
+pub struct PropPack {
+    pub algae_temple: Texture2D,
+    pub coral_house_0: Texture2D,
+    pub coral_house_1: Texture2D,
+    pub crab_castle: Texture2D,
+    pub home_bed: Texture2D,
+    pub home_hearth: Texture2D,
+    pub home_shelf: Texture2D,
+    pub home_table: Texture2D,
+    pub kelp: [Texture2D; 3],
+    pub kenny_house: Texture2D,
+    pub market_stall: Texture2D,
+    pub portal_ring: Texture2D,
+    pub riddle_stone: Texture2D,
+    pub shipwreck: Texture2D,
+    pub slum_shack: Texture2D,
+    pub throne_gate: Texture2D,
+    pub torch: [Texture2D; 3],
+    pub towtou_garage: Texture2D,
+    pub whale_skeleton: Texture2D,
+}
+
 pub struct Aqua {
-    pub fish: Vec<Texture2D>,
-    pub weed: Vec<Texture2D>,
-    pub rock: Vec<Texture2D>,
-    /// Background kelp / rock silhouettes drawn far behind the fish.
-    pub bg: Vec<Texture2D>,
+    pub ansimuz_bg: Texture2D,
+    pub ansimuz_mid: Texture2D,
+    pub seabed_ledge: Texture2D,
+    pub neptune_statue: Texture2D,
+    pub neptune_coral: Texture2D,
+    pub coral_arch: Texture2D,
+    pub ruin_hall: Texture2D,
+    pub sea_bush: Texture2D,
+    pub coral_red: Texture2D,
+    pub sea_kelp: Texture2D,
+    pub anim_fish: Texture2D,
+    pub anim_fish_big: Texture2D,
+    pub anim_fish_dart: Texture2D,
 }
 
-/// Cosma void set pieces + floor (Kenney Space Kit & Planets, CC0, recolored
-/// to the neon tokens by assets/tools/build.py).
 pub struct Cosma {
-    /// Distant drifting asteroids & void-stone boulders (far parallax).
-    pub boulders: Vec<Texture2D>,
-    /// Near floating neon crystals (teal / magenta / violet).
     pub crystals: Vec<Texture2D>,
-    /// Tiny rim sparkles that skim the walkway edge.
-    pub pebbles: Vec<Texture2D>,
-    /// Deep indigo castle-stone floor tiles (3 variants + lit rim + veins).
     pub floor: Vec<Texture2D>,
-    pub rim: Texture2D,
-    /// Neon line-art circuit panels (OGA Neon Node, CC0) inlaid in the
-    /// walkway and behind the quiz slab styling.
-    pub neon_nodes: Vec<Texture2D>,
     pub planets: Vec<Texture2D>,
 }
 
 pub struct Textures {
     pub river: Texture2D,
-    pub jin: Texture2D,
-    pub kandy: Texture2D,
-    pub matt: Texture2D,
-    pub genie: Texture2D,
-    pub guard_a: Texture2D,
-    pub guard_b: Texture2D,
+    pub river_swim: [Texture2D; 2],
     pub nadia: Texture2D,
     pub grandparent: Texture2D,
+    pub mark: Texture2D,
+    pub kenny: Texture2D,
+    pub guard_a: Texture2D,
+    pub guard_b: Texture2D,
+    pub queen_crab: Texture2D,
+    pub sophie: Texture2D,
+    pub jack: Texture2D,
+    pub jill: Texture2D,
+    pub angelfish: Texture2D,
+    pub stonefish: Texture2D,
     pub gill: Texture2D,
     pub scal: Texture2D,
     pub lady: Texture2D,
-    pub star: Texture2D,
-    pub dying_star: Texture2D,
+    pub towtou: Texture2D,
+    pub angler_a: Texture2D,
+    pub angler_b: Texture2D,
+    pub angler_c: Texture2D,
+    pub thaumiel: Texture2D,
+    pub tenebris: Texture2D,
+    pub genie: Texture2D,
+    pub intro: [Texture2D; 4],
+    pub portraits: HashMap<String, Texture2D>,
+    pub walks: HashMap<&'static str, [Texture2D; 2]>,
+    pub shadows: HashMap<&'static str, Texture2D>,
     pub tiles: TilePack,
+    pub ui: UiPack,
+    pub props: PropPack,
     pub aqua: Aqua,
     pub cosma: Cosma,
-    /// Walk cycles keyed by cast id (used by the overworld).
-    pub walks: HashMap<&'static str, [Texture2D; 2]>,
-    /// Baked contact shadows cut from each sprite's own alpha feet.
-    pub shadows: HashMap<&'static str, Texture2D>,
 }
 
-const COSMA_BOULDERS: [&str; 4] = ["boulder_a", "boulder_b", "meteor_a", "meteor_b"];
+const CAST_IDS: &[&str] = &[
+    "river", "nadia", "grandparent", "mark",
+    "kenny", "guard_a", "guard_b", "queen_crab", "sophie",
+    "jack", "jill", "angelfish", "stonefish", "gill", "scal", "lady", "towtou",
+    "angler_a", "angler_b", "angler_c", "thaumiel", "tenebris", "genie",
+];
+
+const PORTRAIT_KEYS: &[&str] = &[
+    "river_normal", "river_shocked",
+    "nadia_sick", "nadia_cured",
+    "grandparent_normal", "mark_normal",
+    "kenny_normal", "kenny_happy", "kenny_worried",
+    "guard_a_normal", "guard_b_normal",
+    "queen_crab_normal", "queen_crab_fuming",
+    "sophie_normal",
+    "jack_normal", "jill_normal", "jill_shocked",
+    "angelfish_normal", "stonefish_normal",
+    "gill_normal", "scal_normal", "lady_normal", "towtou_normal",
+    "angler_normal", "thaumiel_normal", "tenebris_normal", "genie_normal",
+];
+
 const COSMA_CRYSTALS: [&str; 3] = ["crystal_teal", "crystal_pink", "crystal_violet"];
-const COSMA_PEBBLES: [&str; 2] = ["pebble_cyan", "pebble_pink"];
 const COSMA_FLOOR: [&str; 3] = ["floor_a", "floor_b", "floor_c"];
 const COSMA_VEINS: [&str; 2] = ["vein_pink", "vein_cyan"];
-const COSMA_NEON_NODES: [&str; 5] =
-    ["neon_node_0", "neon_node_1", "neon_node_2", "neon_node_3", "neon_node_4"];
 const COSMA_PLANETS: [&str; 7] = [
     "planet00", "planet01", "planet02", "planet03", "planet07", "planet08", "planet09",
 ];
 
-async fn cosma_tex(name: &str) -> Texture2D {
-    let path = format!("assets/game/cosma/{}.png", name);
-    macroquad::texture::load_texture(&path)
-        .await
-        .unwrap_or_else(|e| panic!("missing art asset {}: {:?}", path, e))
-}
-
-async fn load_cosma() -> Cosma {
-    // Floor is 16px pixel art drawn at 3x -> nearest; the rest are larger
-    // soft-shaded pieces kept linear so upscaling stays smooth.
-    let mut floor = Vec::with_capacity(COSMA_FLOOR.len() + COSMA_VEINS.len());
-    for n in COSMA_FLOOR.iter().chain(COSMA_VEINS.iter()) {
-        let mut t = cosma_tex(n).await;
-        crisp(&mut t);
-        floor.push(t);
-    }
-    let mut rim = cosma_tex("floor_rim").await;
-    crisp(&mut rim);
-    let mut neon_nodes = Vec::with_capacity(COSMA_NEON_NODES.len());
-    for n in COSMA_NEON_NODES {
-        let mut t = cosma_tex(n).await;
-        crisp(&mut t);
-        neon_nodes.push(t);
-    }
-    let mut boulders = Vec::with_capacity(COSMA_BOULDERS.len());
-    for n in COSMA_BOULDERS {
-        boulders.push(cosma_tex(n).await);
-    }
-    let mut crystals = Vec::with_capacity(COSMA_CRYSTALS.len());
-    for n in COSMA_CRYSTALS {
-        crystals.push(cosma_tex(n).await);
-    }
-    let mut pebbles = Vec::with_capacity(COSMA_PEBBLES.len());
-    for n in COSMA_PEBBLES {
-        pebbles.push(cosma_tex(n).await);
-    }
-    let mut planets = Vec::with_capacity(COSMA_PLANETS.len());
-    for n in COSMA_PLANETS {
-        planets.push(cosma_tex(n).await);
-    }
-    Cosma {
-        boulders,
-        crystals,
-        pebbles,
-        floor,
-        rim,
-        neon_nodes,
-        planets,
-    }
-}
-
-const AQUA_FISH: [&str; 9] = [
-    "fish_blue", "fish_brown", "fish_green", "fish_grey_long_a", "fish_grey_long_b",
-    "fish_grey", "fish_orange", "fish_pink", "fish_red",
-];
-const AQUA_WEED: [&str; 6] = [
-    "seaweed_grass_a", "seaweed_grass_b", "seaweed_green_b", "seaweed_green_d",
-    "seaweed_pink_a", "seaweed_pink_c",
-];
-const AQUA_ROCK: [&str; 2] = ["rock_a", "rock_b"];
-const AQUA_BG: [&str; 3] = ["background_rock_a", "background_rock_b", "background_seaweed_b"];
-
-async fn aqua_tex(name: &str) -> Texture2D {
-    let path = format!("assets/game/aqua/{}.png", name);
-    macroquad::texture::load_texture(&path)
-        .await
-        .unwrap_or_else(|e| panic!("missing art asset {}: {:?}", path, e))
-}
-
-async fn load_aqua() -> Aqua {
-    let mut fish = Vec::with_capacity(AQUA_FISH.len());
-    for n in AQUA_FISH { fish.push(aqua_tex(n).await); }
-    let mut weed = Vec::with_capacity(AQUA_WEED.len());
-    for n in AQUA_WEED { weed.push(aqua_tex(n).await); }
-    let mut rock = Vec::with_capacity(AQUA_ROCK.len());
-    for n in AQUA_ROCK { rock.push(aqua_tex(n).await); }
-    let mut bg = Vec::with_capacity(AQUA_BG.len());
-    for n in AQUA_BG { bg.push(aqua_tex(n).await); }
-    Aqua { fish, weed, rock, bg }
-}
-
-const CAST_IDS: [&'static str; 11] = [
-    "river", "jin", "guard_a", "guard_b", "kandy", "matt", "nadia", "grandparent",
-    "gill", "scal", "lady",
-];
-
-async fn char_tex(name: &str) -> Texture2D {
-    let path = format!("assets/game/char/{}.png", name);
-    macroquad::texture::load_texture(&path)
-        .await
-        .unwrap_or_else(|e| panic!("missing art asset {}: {:?}", path, e))
-}
-
-/// Optional variant: missing files (e.g. baked shadows for procedural-only
-/// sprites) resolve to None instead of panicking.
-async fn char_tex_opt(name: &str) -> Option<Texture2D> {
-    let path = format!("assets/game/char/{}.png", name);
-    macroquad::texture::load_texture(&path).await.ok()
-}
-
-/// Walk frames are soft-rendered sprites downsampled at load; the default
-/// linear filter keeps them clean (nearest would alias at 0.5x).
-async fn frame_tex(name: &str, suffix: &str) -> Texture2D {
-    let path = format!("assets/game/char/{}_{}.png", name, suffix);
-    macroquad::texture::load_texture(&path)
-        .await
-        .unwrap_or_else(|e| panic!("missing art asset {}: {:?}", path, e))
-}
-
-/// 16px tiles are drawn at exactly 3x, so nearest sampling keeps them crisp.
-fn crisp(tex: &mut Texture2D) {
-    tex.set_filter(FilterMode::Nearest);
-}
-
-/// Larger painted pieces (hedges, props) keep the linear filter so their
-/// curved edges do not stair-step when scaled.
-async fn tile_tex_linear(name: &str) -> Texture2D {
-    let path = format!("assets/game/tiles/{}.png", name);
-    macroquad::texture::load_texture(&path)
-        .await
-        .unwrap_or_else(|e| panic!("missing art asset {}: {:?}", path, e))
-}
-
-async fn tile_tex(name: &str) -> Texture2D {
-    let path = format!("assets/game/tiles/{}.png", name);
-    let mut t = macroquad::texture::load_texture(&path)
+async fn load_crisp(path: &str) -> Texture2D {
+    let t = macroquad::texture::load_texture(path)
         .await
         .unwrap_or_else(|e| panic!("missing art asset {}: {:?}", path, e));
-    crisp(&mut t);
+    t.set_filter(FilterMode::Nearest);
     t
 }
 
+async fn load_linear(path: &str) -> Texture2D {
+    let t = macroquad::texture::load_texture(path)
+        .await
+        .unwrap_or_else(|e| panic!("missing art asset {}: {:?}", path, e));
+    t.set_filter(FilterMode::Linear);
+    t
+}
+
+async fn char_tex(name: &str) -> Texture2D {
+    load_crisp(&format!("assets/game/char/{}.png", name)).await
+}
+
+async fn tile_tex(name: &str) -> Texture2D {
+    load_crisp(&format!("assets/game/tiles/{}.png", name)).await
+}
+
+async fn ui_tex(name: &str) -> Texture2D {
+    load_crisp(&format!("assets/game/ui/{}.png", name)).await
+}
+
+async fn prop_tex(name: &str) -> Texture2D {
+    load_crisp(&format!("assets/game/props/{}.png", name)).await
+}
+
+async fn aqua_crisp(name: &str) -> Texture2D {
+    load_crisp(&format!("assets/game/aqua/{}.png", name)).await
+}
+
+async fn cosma_tex(name: &str) -> Texture2D {
+    load_linear(&format!("assets/game/cosma/{}.png", name)).await
+}
+
 async fn load_tiles() -> TilePack {
+    let names = [
+        "ground", "ground_alt", "ground_speck", "dirt", "coral_sand",
+        "stone", "stone_alt", "planks", "wood_wall", "wood_wall_alt",
+        "window", "rug", "door",
+    ];
+    let mut it = crate::game::join_all(names.iter().map(|n| tile_tex(n)).collect()).await.into_iter();
     TilePack {
-        ground: tile_tex("ground").await,
-        ground_alt: tile_tex("ground_alt").await,
-        ground_speck: tile_tex("ground_speck").await,
-        dirt: tile_tex("dirt").await,
-        flower_a: tile_tex("flower_a").await,
-        flower_b: tile_tex("flower_b").await,
-        flower_c: tile_tex("flower_c").await,
-        hedges: vec![
-            tile_tex_linear("bush_soft_a").await,
-            tile_tex_linear("bush_soft_b").await,
-            tile_tex_linear("bush_soft_c").await,
-        ],
-        stone: tile_tex("stone").await,
-        stone_alt: tile_tex("stone_alt").await,
-        bed_head: tile_tex("bed_head").await,
-        bed_foot: tile_tex("bed_foot").await,
-        bed_wide: tile_tex("bed_wide").await,
-        table_a: tile_tex("table_a").await,
-        table_b: tile_tex("table_b").await,
-        door: tile_tex("door").await,
-        window: tile_tex("window").await,
-        rug: tile_tex("rug").await,
-        fire_lit: tile_tex("fire_lit").await,
-        fire_dark: tile_tex("fire_dark").await,
-        shelf: tile_tex("shelf").await,
-        wood_wall: tile_tex("wood_wall").await,
-        wood_wall_alt: tile_tex("wood_wall_alt").await,
-        planks: tile_tex("planks").await,
+        ground: it.next().unwrap(),
+        ground_alt: it.next().unwrap(),
+        ground_speck: it.next().unwrap(),
+        dirt: it.next().unwrap(),
+        coral_sand: it.next().unwrap(),
+        stone: it.next().unwrap(),
+        stone_alt: it.next().unwrap(),
+        planks: it.next().unwrap(),
+        wood_wall: it.next().unwrap(),
+        wood_wall_alt: it.next().unwrap(),
+        window: it.next().unwrap(),
+        rug: it.next().unwrap(),
+        door: it.next().unwrap(),
     }
 }
 
-// --- procedural remnants (no sprite sheet exists for these) ----------------
-
-const T: Color = Color::new(0.0, 0.0, 0.0, 0.0);
-
-fn px(img: &mut Image, x: i32, y: i32, w: i32, h: i32, c: Color) {
-    for yy in y..y + h {
-        for xx in x..x + w {
-            if xx >= 0 && yy >= 0 {
-                img.set_pixel(xx as u32, yy as u32, c);
-            }
-        }
+async fn load_ui() -> UiPack {
+    let names = [
+        "panel_fill", "panel_border", "divider", "vial_empty",
+        "vial_green", "vial_red", "vial_blue", "heart_full",
+        "heart_empty", "gem", "star", "dying_star",
+    ];
+    let mut it = crate::game::join_all(names.iter().map(|n| ui_tex(n)).collect()).await.into_iter();
+    UiPack {
+        panel_fill: it.next().unwrap(),
+        panel_border: it.next().unwrap(),
+        divider: it.next().unwrap(),
+        vial_empty: it.next().unwrap(),
+        vial_green: it.next().unwrap(),
+        vial_red: it.next().unwrap(),
+        vial_blue: it.next().unwrap(),
+        heart_full: it.next().unwrap(),
+        heart_empty: it.next().unwrap(),
+        gem: it.next().unwrap(),
+        star: it.next().unwrap(),
+        dying_star: it.next().unwrap(),
     }
 }
 
-fn make_genie() -> Texture2D {
-    let mut img = Image::gen_image_color(16, 24, T);
-    let flame = Color::from_rgba(255, 120, 40, 255);
-    px(&mut img, 5, 4, 6, 12, flame);
-    px(&mut img, 4, 6, 8, 8, flame);
-    px(&mut img, 6, 2, 4, 2, Color::from_rgba(255, 220, 80, 255));
-    px(&mut img, 6, 4, 4, 3, Color::from_rgba(255, 220, 80, 255));
-    px(&mut img, 7, 5, 1, 1, Color::from_rgba(180, 40, 0, 255));
-    px(&mut img, 9, 5, 1, 1, Color::from_rgba(180, 40, 0, 255));
-    px(&mut img, 5, 8, 2, 4, Color::from_rgba(255, 180, 60, 255));
-    px(&mut img, 10, 8, 2, 4, Color::from_rgba(255, 180, 60, 255));
-    Texture2D::from_image(&img)
+async fn load_props() -> PropPack {
+    let names = [
+        "algae_temple", "coral_house_0", "coral_house_1", "crab_castle",
+        "home_bed", "home_hearth", "home_shelf", "home_table",
+        "kelp_0", "kelp_1", "kelp_2", "kenny_house",
+        "market_stall", "portal_ring", "riddle_stone", "shipwreck",
+        "slum_shack", "throne_gate", "torch_0", "torch_1",
+        "torch_2", "towtou_garage", "whale_skeleton",
+    ];
+    let mut it = crate::game::join_all(names.iter().map(|n| prop_tex(n)).collect()).await.into_iter();
+    PropPack {
+        algae_temple: it.next().unwrap(),
+        coral_house_0: it.next().unwrap(),
+        coral_house_1: it.next().unwrap(),
+        crab_castle: it.next().unwrap(),
+        home_bed: it.next().unwrap(),
+        home_hearth: it.next().unwrap(),
+        home_shelf: it.next().unwrap(),
+        home_table: it.next().unwrap(),
+        kelp: [it.next().unwrap(), it.next().unwrap(), it.next().unwrap()],
+        kenny_house: it.next().unwrap(),
+        market_stall: it.next().unwrap(),
+        portal_ring: it.next().unwrap(),
+        riddle_stone: it.next().unwrap(),
+        shipwreck: it.next().unwrap(),
+        slum_shack: it.next().unwrap(),
+        throne_gate: it.next().unwrap(),
+        torch: [it.next().unwrap(), it.next().unwrap(), it.next().unwrap()],
+        towtou_garage: it.next().unwrap(),
+        whale_skeleton: it.next().unwrap(),
+    }
 }
 
-fn make_star(dying: bool) -> Texture2D {
-    let mut img = Image::gen_image_color(8, 8, T);
-    let c = if dying {
-        Color::from_rgba(120, 60, 60, 255)
-    } else {
-        Color::from_rgba(255, 240, 150, 255)
-    };
-    px(&mut img, 3, 0, 2, 2, c);
-    px(&mut img, 3, 6, 2, 2, c);
-    px(&mut img, 0, 3, 2, 2, c);
-    px(&mut img, 6, 3, 2, 2, c);
-    px(&mut img, 2, 2, 4, 4, c);
-    let core = if dying {
-        Color::from_rgba(200, 90, 90, 255)
-    } else {
-        Color::from_rgba(255, 255, 220, 255)
-    };
-    px(&mut img, 3, 3, 2, 2, core);
-    Texture2D::from_image(&img)
+async fn load_aqua() -> Aqua {
+    let names = [
+        "ansimuz_bg", "ansimuz_mid", "seabed_ledge", "neptune_statue",
+        "neptune_coral", "coral_arch", "ruin_hall", "sea_bush",
+        "coral_red", "sea_kelp", "anim_fish", "anim_fish_big",
+        "anim_fish_dart",
+    ];
+    let mut it = crate::game::join_all(names.iter().map(|n| aqua_crisp(n)).collect()).await.into_iter();
+    Aqua {
+        ansimuz_bg: it.next().unwrap(),
+        ansimuz_mid: it.next().unwrap(),
+        seabed_ledge: it.next().unwrap(),
+        neptune_statue: it.next().unwrap(),
+        neptune_coral: it.next().unwrap(),
+        coral_arch: it.next().unwrap(),
+        ruin_hall: it.next().unwrap(),
+        sea_bush: it.next().unwrap(),
+        coral_red: it.next().unwrap(),
+        sea_kelp: it.next().unwrap(),
+        anim_fish: it.next().unwrap(),
+        anim_fish_big: it.next().unwrap(),
+        anim_fish_dart: it.next().unwrap(),
+    }
+}
+
+async fn load_cosma() -> Cosma {
+    let mut floor = Vec::with_capacity(COSMA_FLOOR.len() + COSMA_VEINS.len());
+    let fnames: Vec<_> = COSMA_FLOOR.iter().chain(COSMA_VEINS.iter()).map(|n| format!("assets/game/cosma/{}.png", n)).collect();
+    for t in crate::game::join_all(fnames.iter().map(|p| load_crisp(p)).collect()).await {
+        floor.push(t);
+    }
+    let crystals = crate::game::join_all(COSMA_CRYSTALS.iter().map(|n| cosma_tex(n)).collect()).await;
+    let planets = crate::game::join_all(COSMA_PLANETS.iter().map(|n| cosma_tex(n)).collect()).await;
+    Cosma { crystals, floor, planets }
 }
 
 impl Textures {
     pub async fn load() -> Self {
         let mut walks = HashMap::new();
         let mut shadows = HashMap::new();
-        for id in CAST_IDS {
-            let w1 = frame_tex(id, "w1").await;
-            let w2 = frame_tex(id, "w2").await;
-            walks.insert(id, [w1, w2]);
-            if let Some(sh) = char_tex_opt(&format!("{}_shadow", id)).await {
-                shadows.insert(id, sh);
-            }
+        let mut base_sprites = HashMap::new();
+
+        let mut char_names = Vec::with_capacity(CAST_IDS.len() * 4);
+        for &id in CAST_IDS {
+            char_names.push(id.to_string());
+            char_names.push(format!("{}_w1", id));
+            char_names.push(format!("{}_w2", id));
+            char_names.push(format!("{}_shadow", id));
         }
+        let mut cit = crate::game::join_all(char_names.iter().map(|n| char_tex(n)).collect()).await.into_iter();
+        for &id in CAST_IDS {
+            base_sprites.insert(id, cit.next().unwrap());
+            walks.insert(id, [cit.next().unwrap(), cit.next().unwrap()]);
+            shadows.insert(id, cit.next().unwrap());
+        }
+
+        let mut portraits = HashMap::new();
+        let ppaths: Vec<_> = PORTRAIT_KEYS
+            .iter()
+            .map(|pk| format!("assets/game/portraits/{}.png", pk))
+            .collect();
+        let ptex = crate::game::join_all(ppaths.iter().map(|p| load_crisp(p)).collect()).await;
+        for (&pk, t) in PORTRAIT_KEYS.iter().zip(ptex.into_iter()) {
+            portraits.insert(pk.to_string(), t);
+        }
+
+        let swim_tex = crate::game::join_all(vec![char_tex("river_swim1"), char_tex("river_swim2")]).await;
+        let mut sw = swim_tex.into_iter();
+        let intro_tex = crate::game::join_all(vec![
+            load_crisp("assets/game/intro/plate_0.png"),
+            load_crisp("assets/game/intro/plate_1.png"),
+            load_crisp("assets/game/intro/plate_2.png"),
+            load_crisp("assets/game/intro/plate_3.png"),
+        ]).await;
+        let mut ii = intro_tex.into_iter();
+        let intro = [ii.next().unwrap(), ii.next().unwrap(), ii.next().unwrap(), ii.next().unwrap()];
+
         Self {
-            river: char_tex("river").await,
-            jin: char_tex("jin").await,
-            kandy: char_tex("kandy").await,
-            matt: char_tex("matt").await,
-            genie: make_genie(),
-            guard_a: char_tex("guard_a").await,
-            guard_b: char_tex("guard_b").await,
-            nadia: char_tex("nadia").await,
-            grandparent: char_tex("grandparent").await,
-            gill: char_tex("gill").await,
-            scal: char_tex("scal").await,
-            lady: char_tex("lady").await,
-            star: make_star(false),
-            dying_star: make_star(true),
-            tiles: load_tiles().await,
-            aqua: load_aqua().await,
-            cosma: load_cosma().await,
+            river: base_sprites.remove("river").unwrap(),
+            river_swim: [sw.next().unwrap(), sw.next().unwrap()],
+            nadia: base_sprites.remove("nadia").unwrap(),
+            grandparent: base_sprites.remove("grandparent").unwrap(),
+            mark: base_sprites.remove("mark").unwrap(),
+            kenny: base_sprites.remove("kenny").unwrap(),
+            guard_a: base_sprites.remove("guard_a").unwrap(),
+            guard_b: base_sprites.remove("guard_b").unwrap(),
+            queen_crab: base_sprites.remove("queen_crab").unwrap(),
+            sophie: base_sprites.remove("sophie").unwrap(),
+            jack: base_sprites.remove("jack").unwrap(),
+            jill: base_sprites.remove("jill").unwrap(),
+            angelfish: base_sprites.remove("angelfish").unwrap(),
+            stonefish: base_sprites.remove("stonefish").unwrap(),
+            gill: base_sprites.remove("gill").unwrap(),
+            scal: base_sprites.remove("scal").unwrap(),
+            lady: base_sprites.remove("lady").unwrap(),
+            towtou: base_sprites.remove("towtou").unwrap(),
+            angler_a: base_sprites.remove("angler_a").unwrap(),
+            angler_b: base_sprites.remove("angler_b").unwrap(),
+            angler_c: base_sprites.remove("angler_c").unwrap(),
+            thaumiel: base_sprites.remove("thaumiel").unwrap(),
+            tenebris: base_sprites.remove("tenebris").unwrap(),
+            genie: base_sprites.remove("genie").unwrap(),
+            intro,
+            portraits,
             walks,
             shadows,
+            tiles: load_tiles().await,
+            ui: load_ui().await,
+            props: load_props().await,
+            aqua: load_aqua().await,
+            cosma: load_cosma().await,
         }
     }
 
-    /// Baked contact shadow for a cast id (None for procedural-only sprites).
     pub fn shadow_of(&self, id: &str) -> Option<&Texture2D> {
         self.shadows.get(id)
     }
 
-    /// Big dialogue portrait for a speaker name.
-    #[allow(dead_code)]
-    pub fn portrait(&self, who: &str) -> Option<&Texture2D> {
-        Some(match who {
-            "River" => &self.river,
-            "Jin" => &self.jin,
-            "Kandy Kween" => &self.kandy,
-            "Matt" => &self.matt,
-            "Magic Fire Genie" => &self.genie,
-            "Guard 1" => &self.guard_a,
-            "Guard 2" => &self.guard_b,
-            "Nadia" => &self.nadia,
-            "Grandparent" => &self.grandparent,
-            "Gillbert" => &self.gill,
-            "Scalleon" => &self.scal,
-            "Market Lady" => &self.lady,
-            _ => return None,
-        })
-    }
-
-    /// Walk cycle for a cast id, if one exists.
     pub fn walk_of(&self, id: &str) -> Option<&[Texture2D; 2]> {
         self.walks.get(id)
     }
+
+    pub fn portrait_expr(&self, speaker: &str, expr: &str) -> Option<&Texture2D> {
+        let base = match speaker {
+            "River" => "river",
+            "Nadia" => "nadia",
+            "Grandparent" => "grandparent",
+            "Mark" => "mark",
+            "Kenny" => "kenny",
+            "Guard 1" => "guard_a",
+            "Guard 2" => "guard_b",
+            "Queen Crab" => "queen_crab",
+            "Sophie" => "sophie",
+            "Jack" => "jack",
+            "Jill" => "jill",
+            "AngelFish" => "angelfish",
+            "StoneFish" => "stonefish",
+            "Gillbert" => "gill",
+            "Scalleon" => "scal",
+            "Market Lady" => "lady",
+            "Tow-Tou" => "towtou",
+            "Angler A" | "Angler B" | "Angler C" => "angler",
+            "Thaumiel" => "thaumiel",
+            "Tenebris" => "tenebris",
+            "Magic Fire Genie" => "genie",
+            _ => return None,
+        };
+        let key = format!("{}_{}", base, expr);
+        if let Some(t) = self.portraits.get(&key) {
+            return Some(t);
+        }
+        let fallback = if base == "nadia" {
+            "nadia_sick".to_string()
+        } else {
+            format!("{}_normal", base)
+        };
+        self.portraits.get(&fallback)
+    }
 }
 
-/// Draw a 16px tile texture scaled to `size` screen px at (x, y).
 pub fn draw_tile(tex: &Texture2D, x: f32, y: f32, size: f32) {
     draw_texture_ex(tex, x, y, WHITE, DrawTextureParams {
         dest_size: Some(Vec2::new(size, size)),
@@ -393,29 +436,15 @@ pub fn draw_tile(tex: &Texture2D, x: f32, y: f32, size: f32) {
     });
 }
 
-/// Tile draw with a tint (e.g. sea-stone / void-indigo riddle monoliths).
-pub fn draw_tile_tint(tex: &Texture2D, x: f32, y: f32, size: f32, tint: Color) {
-    draw_texture_ex(tex, x, y, tint, DrawTextureParams {
-        dest_size: Some(Vec2::new(size, size)),
-        ..Default::default()
-    });
-}
-
-// --- palette + small helpers ------------------------------------------------
-
 pub fn c(r: u8, g: u8, b: u8, a: u8) -> Color {
     Color::from_rgba(r, g, b, a)
 }
 
-/// Layered parallax loop: objects spaced `screen_span` apart on screen, shifted
-/// by `cam * factor` plus drift.
 fn layer_x(k: i32, cam: f32, factor: f32, drift: f32, span: f32) -> f32 {
     let base = (cam * factor + drift).rem_euclid(span);
     k as f32 * span - base
 }
 
-/// Sprite-based twinkle field. Same layout every frame (seeded, not random) so
-/// sparkles stay anchored to the world instead of crawling.
 fn sparkle_stars(fx: &crate::art::fx::Fx, t: f32, y0: f32, y1: f32, n: u32, hue: Color, alpha: f32, base_seed: u64) {
     let mut seed = base_seed;
     for idx in 0..n {
@@ -428,7 +457,7 @@ fn sparkle_stars(fx: &crate::art::fx::Fx, t: f32, y0: f32, y1: f32, n: u32, hue:
         if tw < 0.02 {
             continue;
         }
-        let s = 9.0 + ((seed >> 11) % 3) as f32 * 7.0;
+        let s = 8.0 + ((seed >> 11) % 3) as f32 * 6.0;
         let col = Color::new(hue.r, hue.g, hue.b, tw);
         let spr = fx.sprites.star_at(idx as usize);
         draw_texture_ex(spr, x - s / 2.0, y - s / 2.0, col, DrawTextureParams {
@@ -439,325 +468,230 @@ fn sparkle_stars(fx: &crate::art::fx::Fx, t: f32, y0: f32, y1: f32, n: u32, hue:
     }
 }
 
-/// Soft vertical haze: translucent bands fading from `a0` to `a1` alpha. Welds
-/// the sky into the ground line and gives distance a colour it can breathe in.
-fn haze_band(y0: f32, y1: f32, col: Color, a0: f32, a1: f32, steps: u8) {
-    let w = screen_width();
-    let n = steps.max(1) as f32;
-    let band = (y1 - y0) / n + 1.0;
-    for i in 0..steps {
-        let f = i as f32 / n;
-        let a = a0 + (a1 - a0) * f;
-        if a <= 0.002 {
-            continue;
-        }
-        draw_rectangle(0.0, y0 + (y1 - y0) * f, w, band, Color::new(col.r, col.g, col.b, a));
+fn draw_bubbles(fx: &crate::art::fx::Fx, t: f32, max_y: f32, count: usize, tint: Color) {
+    for i in 0..count {
+        let seed = (i as u64).wrapping_mul(6364136223846793005).wrapping_add(3);
+        let bx = ((seed >> 33) % 1024) as f32;
+        let cyc = (t * 0.24 + i as f32 * (1.0 / count as f32)) % 1.0;
+        let y = max_y - cyc * (max_y + 120.0);
+        let sway = (t * 0.85 + i as f32 * 1.3).sin() * 22.0;
+        let r = 8.0 + ((seed >> 20) % 20) as f32 + (1.0 - cyc) * 6.0;
+        let a = (0.16 + 0.28 * (1.0 - cyc)) * tint.a;
+        let spr = &fx.sprites.circle[i % 3];
+        draw_texture_ex(spr, bx + sway - r, y - r, Color::new(tint.r, tint.g, tint.b, a),
+            DrawTextureParams { dest_size: Some(Vec2::new(r * 2.0, r * 2.0)), ..Default::default() });
+        draw_circle(bx + sway - r * 0.30, y - r * 0.30, 1.6,
+            Color::new(0.95, 1.0, 1.0, (a * 1.4).min(1.0)));
     }
 }
 
-// --- biome skies -------------------------------------------------------------
-
-/// Vertical gradient backdrop per biome, drawn each frame. `cam` is the world
-/// camera x so every sky element parallaxes at its own depth, and `fx` supplies
-/// the baked ramps, cloud and light sprites that keep the sky from reading as
-/// stacked primitives.
-pub fn draw_biome_bg(biome: Biome, t: f32, cam: f32, fx: &crate::art::fx::Fx) {
+/// Layered biome backdrop with GPU gradient + Ansimuz pixel reefs + god rays.
+pub fn draw_biome_bg(biome: Biome, t: f32, cam: f32, fx: &crate::art::fx::Fx, tex: &Textures) {
     match biome {
-        Biome::Candy => candy_sky(fx, t, cam),
-        Biome::Aquarius => aqua_sky(fx, t, cam),
+        Biome::Kelp => kelp_sky(fx, tex, t, cam),
+        Biome::Coral => coral_sky(fx, tex, t, cam),
+        Biome::Slums => slums_sky(fx, tex, t, cam),
         Biome::Home => home_sky(fx, t, cam),
-        Biome::Cosma => cosma_sky(fx, t, cam),
     }
 }
 
-fn candy_sky(fx: &crate::art::fx::Fx, t: f32, cam: f32) {
+fn kelp_sky(fx: &crate::art::fx::Fx, tex: &Textures, t: f32, cam: f32) {
     let w = screen_width();
+    fx.sky_draw(Biome::Kelp, 0.0, 0.0, w, 560.0);
 
-    // 1. sky: one baked 512-row ramp stretched to the ground line. Linear
-    //    filtering across those rows is what finally kills the banding the old
-    //    stack of ~130 rectangles showed at this size.
-    fx.sky_draw(Biome::Candy, 0.0, 0.0, w, 560.0);
+    // Distant Ansimuz ocean silhouettes tiled smoothly across horizon
+    let bg = &tex.aqua.ansimuz_bg;
+    let bgh = 360.0;
+    let bgw = bg.width() * (bgh / bg.height().max(1.0));
+    let n = (w / bgw).ceil() as i32 + 2;
+    for k in -1..n {
+        let x = layer_x(k, cam, 0.08, 0.0, bgw);
+        draw_texture_ex(bg, x, 560.0 - bgh, c(120, 232, 200, 115), DrawTextureParams {
+            dest_size: Some(vec2(bgw + 1.0, bgh)),
+            ..Default::default()
+        });
+    }
 
-    // 2. sun: an authored stack of soft light pools plus an anamorphic streak,
-    //    so the halo has a falloff instead of visible concentric steps.
-    let sx = 212.0 + (t * 0.13).sin() * 9.0 - (cam * 0.02).rem_euclid(680.0);
-    let sy = 108.0 + (t * 0.26).sin() * 6.0;
-    let pulse = 0.5 + 0.5 * (t * 0.85).sin();
-    fx.glow_rect(sx, sy, 470.0, 470.0, c(255, 188, 100, (7.0 + pulse * 3.0) as u8));
-    fx.glow_rect(sx, sy, 250.0, 250.0, c(255, 204, 126, (13.0 + pulse * 5.0) as u8));
-    fx.glow_rect(sx, sy, 132.0, 132.0, c(255, 224, 164, (26.0 + pulse * 9.0) as u8));
-    fx.glow_rect(sx, sy, 520.0, 18.0, c(255, 228, 176, (10.0 + pulse * 4.0) as u8));
-    fx.glow_rect(sx, sy, 18.0, 220.0, c(255, 228, 176, 8));
-    for i in 0..12 {
-        let a = t * 0.09 + i as f32 * std::f32::consts::TAU / 12.0;
-        let l0 = 45.0;
-        let l1 = 64.0 + (t * 0.6 + i as f32 * 1.9).sin().abs() * 24.0;
-        let (dx, dy) = (a.cos(), a.sin());
-        draw_triangle(
-            Vec2::new(sx + dx * l0 - dy * 4.0, sy + dy * l0 + dx * 4.0),
-            Vec2::new(sx + dx * l0 + dy * 4.0, sy + dy * l0 - dx * 4.0),
-            Vec2::new(sx + dx * l1, sy + dy * l1),
-            c(255, 240, 198, 38),
+    // Underwater sunlight caustics + emerald god rays
+    for i in 0..6 {
+        let x = layer_x(i, cam, 0.04, 0.0, 780.0) + 40.0;
+        let lean = (t * 0.25 + i as f32 * 1.7).sin() * 0.12;
+        let flick = 0.5 + 0.5 * (t * 0.55 + i as f32 * 2.1).sin();
+        fx.beam_strip(
+            x, -40.0, 130.0 + i as f32 * 22.0, 600.0,
+            c(166, 255, 224, ((0.05 + flick * 0.065) * 255.0) as u8), lean,
         );
     }
-    draw_circle(sx, sy, 33.0, c(255, 196, 106, 255));
-    draw_circle(sx, sy, 25.0, c(255, 230, 164, 255));
-    draw_circle(sx, sy, 18.0, c(255, 250, 226, 255));
 
-    // 3. clouds: metaball-baked sprites at three parallax depths
-    let depths: [(f32, f32, f32, f32, f32, f32, f32); 3] = [
-        (0.028, 980.0, 7.0, 48.0, 168.0, 390.0, 150.0),
-        (0.060, 640.0, 13.0, 82.0, 240.0, 250.0, 182.0),
-        (0.108, 470.0, 21.0, 126.0, 300.0, 152.0, 198.0),
-    ];
-    for (fct, span, spd, ymin, ymax, cw, al) in depths {
-        let n = (w / span).ceil() as i32 + 3;
-        for k in -1..n + 1 {
-            let x = layer_x(k, cam, fct, t * spd, span);
-            if x < -cw || x > w + cw {
-                continue;
-            }
-            let mut seed = (k as i64).wrapping_mul(2654435761) as u64;
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(7);
-            let y = ymin + (((seed >> 8) % 1000) as f32 / 1000.0) * (ymax - ymin);
-            let wob = 5.0 * (t * 0.35 + (seed >> 4) as f32 * 0.013).sin();
-            let scale = 0.72 + ((seed >> 22) % 100) as f32 / 100.0 * 0.66;
-            // lit cotton-candy top over a pink belly
-            let body = c(255, 234, 246, al as u8);
-            let shade = c(246, 166, 208, (al * 0.85) as u8);
-            fx.cloud(x + ((seed >> 40) % 60) as f32 - 30.0, y + wob, cw * scale, body, shade);
-        }
+    // Mid-depth swaying dark teal kelp silhouettes
+    for k in 0..14 {
+        let x = layer_x(k, cam, 0.16, 0.0, 1180.0);
+        let h = 150.0 + ((k * 73) % 130) as f32;
+        let sway = (t * 1.1 + k as f32 * 0.9).sin() * 10.0;
+        let kx = x + sway * 0.35;
+        let prop = &tex.aqua.sea_kelp;
+        draw_texture_ex(prop, kx, 560.0 - h, c(36, 138, 120, 145), DrawTextureParams {
+            dest_size: Some(vec2(72.0, h)),
+            rotation: sway * 0.008,
+            pivot: Some(vec2(kx + 36.0, 560.0)),
+            ..Default::default()
+        });
     }
 
-    // 4. distant candy hills: two scalloped silhouette layers that give the
-    //    horizon something to sit against instead of an empty field of pink
-    let hills: [(f32, Color, f32, f32); 2] = [
-        (0.042, c(255, 186, 224, 170), 168.0, 74.0),
-        (0.082, c(246, 158, 208, 208), 118.0, 48.0),
-    ];
-    for (fct, col, span, amp) in hills {
-        let n = (w / span).ceil() as i32 + 2;
-        for k in -1..n + 1 {
-            let x = layer_x(k, cam, fct, 0.0, span);
-            draw_ellipse(x + span * 0.5, 508.0 + amp * 0.46, span * 0.64, amp, 0.0, col);
-        }
-    }
-
-    // 5. horizon haze welding sky to meadow, kept light so the lower sky keeps
-    //    its colour rather than bleaching to white
-    haze_band(452.0, 508.0, c(255, 228, 244, 255), 0.0, 0.26, 10);
-
-    // 6. sugar sparkles
-    sparkle_stars(fx, t, 18.0, 320.0, 26, c(255, 250, 255, 255), 0.55, 77);
-
-    // 7. candy balloons on a far parallax band
-    let span = 900.0;
-    for k in -1..3 {
-        let x = layer_x(k, cam, 0.15, t * 9.0, span);
-        if x < -74.0 || x > w + 74.0 {
-            continue;
-        }
-        let seed = k.wrapping_mul(97) as u64;
-        let bob = (t * 1.0 + k as f32).sin();
-        let y = 172.0 + ((seed * 7919) % 130) as f32 + bob * 13.0;
-        let col = [c(255, 118, 168, 226), c(132, 220, 208, 226), c(255, 212, 104, 226)]
-            [(k.rem_euclid(3)) as usize];
-        let bx = x + bob * 8.0;
-        for i in 0..5 {
-            let wob = (t * 3.0 + i as f32 * 0.7 + k as f32).sin() * 4.0;
-            draw_line(bx + wob, y + 22.0 + i as f32 * 9.0, bx + wob * 0.7, y + 31.0 + i as f32 * 9.0,
-                1.4, c(96, 64, 92, 140));
-        }
-        fx.glow_rect(bx, y, 104.0, 118.0, Color::new(col.r, col.g, col.b, 0.10));
-        draw_ellipse(bx, y, 17.0, 20.0, 0.0, col);
-        draw_triangle(Vec2::new(bx - 6.0, y + 17.0), Vec2::new(bx + 6.0, y + 17.0),
-            Vec2::new(bx, y + 25.0), col);
-        // specular gloss
-        draw_ellipse(bx - 5.5, y - 6.5, 4.2, 5.6, -0.4, Color::new(1.0, 1.0, 1.0, 0.42));
-    }
+    draw_bubbles(fx, t, 550.0, 14, c(195, 255, 235, 255));
 }
 
-fn aqua_sky(fx: &crate::art::fx::Fx, t: f32, cam: f32) {
+fn coral_sky(fx: &crate::art::fx::Fx, tex: &Textures, t: f32, cam: f32) {
     let w = screen_width();
+    fx.sky_draw(Biome::Coral, 0.0, 0.0, w, 560.0);
 
-    // Gradient runs to the sand line (560) so no clear-colour band can show
-    // between the water column and the sea floor.
-    fx.sky_draw(Biome::Aquarius, 0.0, 0.0, w, 560.0);
+    // Ansimuz layered background & midground reef formations
+    let bg = &tex.aqua.ansimuz_bg;
+    let bgh = 360.0;
+    let bgw = bg.width() * (bgh / bg.height().max(1.0));
+    let n = (w / bgw).ceil() as i32 + 2;
+    for k in -1..n {
+        let x = layer_x(k, cam, 0.05, 0.0, bgw);
+        draw_texture_ex(bg, x, 560.0 - bgh, c(200, 235, 255, 165), DrawTextureParams {
+            dest_size: Some(vec2(bgw + 1.0, bgh)),
+            ..Default::default()
+        });
+    }
 
-    // 1. the surface far overhead: the biome's actual light source. Without a
-    //    visible ceiling the column reads as a blue sky, not as water.
+    // Sunlit shimmering water ceiling
     for i in 0..4 {
-        let yy = -6.0 + i as f32 * 10.0;
-        let n = (w / 10.0) as i32 + 1;
-        for k in 0..n {
-            let px = k as f32 * 10.0;
-            let wv = ((px + cam * 0.35) * 0.014 + t * 0.85 + i as f32 * 1.7).sin();
-            let a = (22.0 + 26.0 * wv).max(0.0) as u8;
-            if a == 0 {
-                continue;
+        let yy = -4.0 + i as f32 * 9.0;
+        let steps = (w / 12.0) as i32 + 1;
+        for k in 0..steps {
+            let px = k as f32 * 12.0;
+            let wv = ((px + cam * 0.35) * 0.015 + t * 0.9 + i as f32 * 1.7).sin();
+            let a = (24.0 + 28.0 * wv).max(0.0) as u8;
+            if a > 0 {
+                draw_rectangle(px, yy + wv * 5.0, 12.0, 3.0, c(210, 248, 255, a));
             }
-            draw_rectangle(px, yy + wv * 6.0, 10.0, 3.0, c(206, 244, 255, a));
         }
     }
-    fx.glow_rect(w * 0.5, -80.0, 1400.0, 560.0, c(168, 226, 255, 22));
 
-    // 2. god rays leaning through the column
+    // God rays
     for i in 0..6 {
         let x = layer_x(i, cam, 0.035, 0.0, 780.0) + 40.0;
         let lean = (t * 0.22 + i as f32 * 1.7).sin() * 0.11;
         let flick = 0.5 + 0.5 * (t * 0.5 + i as f32 * 2.3).sin();
-        let a = 0.048 + flick * 0.070;
-        fx.beam_strip(x, -40.0, 140.0 + i as f32 * 24.0, 600.0,
-            c(196, 238, 255, (a * 255.0) as u8), lean);
+        fx.beam_strip(
+            x, -40.0, 140.0 + i as f32 * 24.0, 600.0,
+            c(196, 238, 255, ((0.048 + flick * 0.070) * 255.0) as u8), lean,
+        );
     }
 
-    // 3. drifting shimmer blobs
-    for i in 0..7 {
-        let x = layer_x(i, cam, 0.075, t * 26.0, 700.0);
-        let y = 70.0 + ((i * 211) % 290) as f32 + (t * 0.7 + i as f32).sin() * 20.0;
-        let r = 150.0 + ((i * 47) % 90) as f32;
-        let a = 0.028 + 0.020 * (t * 0.8 + i as f32).sin().abs();
-        fx.light_sprite(x, y, r, c(190, 232, 255, (a * 255.0) as u8), i as usize);
+    // Ansimuz midground coral silhouettes
+    let mid = &tex.aqua.ansimuz_mid;
+    let mh = 220.0;
+    let mw = mid.width() * (mh / mid.height().max(1.0));
+    let mn = (w / mw).ceil() as i32 + 2;
+    for k in -1..mn {
+        let x = layer_x(k, cam, 0.14, 0.0, mw);
+        draw_texture_ex(mid, x, 560.0 - mh, c(175, 224, 248, 210), DrawTextureParams {
+            dest_size: Some(vec2(mw + 1.0, mh)),
+            ..Default::default()
+        });
     }
 
-    // 4. distant reef silhouettes at two depths with lit crests
-    let depths: [(f32, Color, f32, Color); 2] = [
-        (0.055, c(20, 70, 110, 255), 56.0, c(30, 92, 138, 255)),
-        (0.125, c(11, 44, 76, 255), 40.0, c(17, 60, 98, 255)),
-    ];
-    for (fct, col, amp, crest) in depths {
-        let step = 22.0;
-        let n = (w / step) as i32 + 2;
-        let off = (cam * fct).rem_euclid(step * 6.0);
-        for i in -1..n + 1 {
-            let sxx = i as f32 * step - off;
-            let hh = 42.0 + amp * ((sxx * 0.05 + i as f32 * 1.7).sin() * 0.5 + 0.5)
-                + 13.0 * (sxx * 0.021 - i as f32).sin();
-            let hh = hh.max(14.0);
-            draw_rectangle(sxx, 560.0 - hh, step + 1.0, hh, col);
-            // rounded crown: without it the reef skyline was a row of hard
-            // rectangles that read as a city block, not a reef.
-            draw_ellipse(sxx + step * 0.5, 560.0 - hh, step * 0.86, 11.0, 0.0, col);
-            draw_ellipse(sxx + step * 0.5, 560.0 - hh, step * 0.72, 5.0, 0.0, crest);
-        }
-    }
-
-    // 5. rising bubbles: soft ring sprite plus a specular dot
-    for i in 0..14 {
-        let seed = (i as u64).wrapping_mul(6364136223846793005).wrapping_add(3);
-        let bx = ((seed >> 33) % 1024) as f32;
-        let cyc = (t * 0.28 + i as f32 * 0.11) % 1.0;
-        let y = 560.0 - cyc * 700.0;
-        let sway = (t * 0.8 + i as f32 * 1.3).sin() * 26.0;
-        let r = 9.0 + ((seed >> 20) % 26) as f32 + (1.0 - cyc) * 8.0;
-        let a = 0.18 + 0.32 * (1.0 - cyc);
-        let spr = &fx.sprites.circle[i % 3];
-        draw_texture_ex(spr, bx + sway - r, y - r, c(214, 242, 255, (a * 255.0) as u8),
-            DrawTextureParams { dest_size: Some(Vec2::new(r * 2.0, r * 2.0)), ..Default::default() });
-        draw_circle(bx + sway - r * 0.32, y - r * 0.34, 1.8,
-            c(240, 255, 255, (a * 330.0).min(255.0) as u8));
-    }
-
-    // 6. warm seam light where the water meets the sand
-    haze_band(498.0, 560.0, c(255, 236, 190, 255), 0.0, 0.08, 9);
+    draw_bubbles(fx, t, 550.0, 16, c(214, 242, 255, 255));
 }
 
-fn home_sky(fx: &crate::art::fx::Fx, t: f32, _cam: f32) {
-    let w = screen_width();
-    // warm room: cream wall glow from an unseen window, wood trim below
-    fx.sky_draw(Biome::Home, 0.0, 0.0, w, 470.0);
-
-    // lamplight shafts from above
-    for i in 0..3 {
-        let x = 150.0 + i as f32 * 300.0;
-        let lean = (t * 0.3 + i as f32).sin() * 0.05;
-        fx.beam_strip(x, 0.0, 330.0, 520.0, c(255, 232, 168, 20), lean);
-    }
-    // dust motes drifting in the light
-    sparkle_stars(fx, t, 90.0, 430.0, 30, c(255, 240, 205, 255), 0.34, 200);
-
-    // wall baseboard
-    draw_rectangle(0.0, 448.0, w, 11.0, c(158, 116, 80, 255));
-    draw_rectangle(0.0, 448.0, w, 3.0, c(120, 84, 56, 255));
-}
-
-fn cosma_sky(fx: &crate::art::fx::Fx, t: f32, cam: f32) {
+fn slums_sky(fx: &crate::art::fx::Fx, tex: &Textures, t: f32, cam: f32) {
     let w = screen_width();
     let h = screen_height();
-    fx.sky_draw(Biome::Cosma, 0.0, 0.0, w, h);
+    fx.sky_draw(Biome::Slums, 0.0, 0.0, w, h);
 
-    // 1. nebula: huge soft metaball clouds in three colour families. Replaces
-    //    the concentric translucent circles, which read as onion rings.
+    // Abyssal nebula clouds + faint aurora
     let fams: [(Color, Color); 3] = [
-        (c(96, 62, 178, 30), c(150, 90, 220, 20)),
-        (c(168, 52, 128, 24), c(214, 92, 176, 16)),
-        (c(40, 116, 168, 20), c(80, 176, 210, 13)),
+        (c(86, 56, 160, 28), c(138, 78, 200, 18)),
+        (c(142, 46, 118, 22), c(186, 82, 162, 15)),
+        (c(34, 98, 148, 20), c(68, 156, 192, 12)),
     ];
     for (fi, (body, shade)) in fams.iter().enumerate() {
         let span = 1180.0 + fi as f32 * 300.0;
         let n = (w / span).ceil() as i32 + 2;
         for k in -1..n + 1 {
-            let x = layer_x(k, cam, 0.02, t * 2.2 + fi as f32 * 300.0, span);
+            let x = layer_x(k, cam, 0.02, t * 2.0 + fi as f32 * 300.0, span);
             if x < -720.0 || x > w + 720.0 {
                 continue;
             }
             let seed = ((k as i64 + fi as i64 * 31).wrapping_mul(2654435761)) as u64;
-            let y = 20.0 + ((seed >> 12) % 420) as f32;
-            let size = 540.0 + ((seed >> 4) % 280) as f32;
+            let y = 20.0 + ((seed >> 12) % 360) as f32;
+            let size = 500.0 + ((seed >> 4) % 260) as f32;
             fx.cloud(x, y, size, *body, *shade);
-            fx.cloud(x + size * 0.30, y + 66.0, size * 0.72, *shade, *body);
         }
     }
 
-    // 2. aurora ribbons: soft beams laid nearly flat
     for i in 0..4 {
         let x = layer_x(i, cam, 0.012, t * 5.0, 1100.0);
-        let y = 118.0 + i as f32 * 48.0 + (t * 0.4 + i as f32).sin() * 26.0;
+        let y = 112.0 + i as f32 * 48.0 + (t * 0.4 + i as f32).sin() * 22.0;
         let lean = -0.16 + (t * 0.15 + i as f32).sin() * 0.10;
-        let a = 0.045 + 0.035 * (t * 0.5 + i as f32 * 1.4).sin().abs();
-        fx.beam_strip(x, y, 800.0, 86.0, c(90, 240, 230, (a * 255.0) as u8), lean);
+        let a = 0.042 + 0.032 * (t * 0.5 + i as f32 * 1.4).sin().abs();
+        fx.beam_strip(x, y, 780.0, 82.0, c(90, 236, 224, (a * 255.0) as u8), lean);
     }
 
     draw_cosma_stars(fx, t);
 
-    // 3. shooting star with a streaking trace sprite
-    let cyc = t % 6.0;
-    if cyc < 1.5 {
-        let seed = ((t / 6.0) as u64).wrapping_mul(6364136223846793005).wrapping_add(7);
-        let sx = (seed >> 33) % 640;
-        let sy = 26 + (seed >> 20) % 150;
-        let x = sx as f32 + cyc * 780.0;
-        let y = sy as f32 + cyc * 230.0;
-        let a = (1.0 - cyc / 1.5).powf(0.8);
-        let spr = &fx.sprites.trace[0];
-        draw_texture_ex(spr, x - 46.0, y - 46.0, c(255, 250, 220, (a * 190.0) as u8),
-            DrawTextureParams {
-                dest_size: Some(Vec2::new(92.0, 92.0)),
-                rotation: 0.29,
-                ..Default::default()
-            });
-        draw_circle(x, y, 2.4, c(255, 255, 245, (a * 255.0) as u8));
-        fx.light_pool(x, y, 120.0, Color::new(1.0, 0.98, 0.82, a * 0.16));
+    // Distant fractured planets above the Somber Trench sky
+    for i in 0..2 {
+        let p = &tex.cosma.planets[i % tex.cosma.planets.len()];
+        let px = layer_x(i as i32, cam, 0.03, 180.0, 1100.0);
+        draw_texture_ex(p, px, 72.0 + i as f32 * 56.0, c(160, 145, 220, 130), DrawTextureParams {
+            dest_size: Some(vec2(108.0 - i as f32 * 24.0, 108.0 - i as f32 * 24.0)),
+            ..Default::default()
+        });
+    }
+
+    // Distant abyssal ruin arches lurking in trench mist
+    let hall = &tex.aqua.ruin_hall;
+    for k in 0..3 {
+        let x = layer_x(k, cam, 0.11, 140.0, 960.0);
+        draw_texture_ex(hall, x, 560.0 - 210.0, c(36, 32, 74, 150), DrawTextureParams {
+            dest_size: Some(vec2(260.0, 200.0)),
+            ..Default::default()
+        });
+    }
+
+    // Slow drifting bioluminescent marine snow
+    for i in 0..28 {
+        let seed = (i as u64).wrapping_mul(6364136223846793005).wrapping_add(19);
+        let sx = (((seed >> 33) % 1024) as f32 + t * 8.0 + (t * 0.7 + i as f32).sin() * 18.0) % 1024.0;
+        let sy = (((seed >> 20) % 520) as f32 + t * 14.0) % 540.0;
+        let a = 110 + ((seed >> 8) % 90) as u8;
+        draw_circle(sx, sy, 1.5, c(166, 240, 255, a));
     }
 }
 
-fn draw_cosma_stars(fx: &crate::art::fx::Fx, t: f32) {
+fn home_sky(fx: &crate::art::fx::Fx, t: f32, _cam: f32) {
+    let w = screen_width();
+    fx.sky_draw(Biome::Home, 0.0, 0.0, w, 470.0);
+    for i in 0..3 {
+        let x = 150.0 + i as f32 * 300.0;
+        let lean = (t * 0.3 + i as f32).sin() * 0.05;
+        fx.beam_strip(x, 0.0, 320.0, 520.0, c(255, 220, 148, 22), lean);
+    }
+    sparkle_stars(fx, t, 85.0, 425.0, 26, c(255, 236, 198, 255), 0.34, 200);
+}
+
+pub fn draw_cosma_stars(fx: &crate::art::fx::Fx, t: f32) {
     let mut seed = 7u64;
-    for idx in 0..110usize {
+    for idx in 0..95usize {
         seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         let x = ((seed >> 33) % 1024) as f32 + 1.0;
-        let y = ((seed >> 20) % 720) as f32 + 1.0;
+        let y = ((seed >> 20) % 680) as f32 + 1.0;
         let col = match (seed >> 8) % 4 {
-            0 => c(255, 230, 90, 255),
-            1 => c(90, 160, 255, 255),
-            2 => c(255, 90, 110, 255),
-            _ => c(240, 240, 255, 255),
+            0 => c(255, 230, 110, 255),
+            1 => c(110, 190, 255, 255),
+            2 => c(255, 118, 168, 255),
+            _ => c(238, 242, 255, 255),
         };
-        let tw = 0.45 + 0.55 * (t * 1.8 + (x % 13.0) * 0.7 + (y % 7.0)).sin().abs();
-        if (seed >> 41) % 17 == 0 {
-            // hero star: neon 4-point sprite over a soft pool
-            let s = 16.0 + ((seed >> 30) % 4) as f32 * 7.0;
-            fx.light_pool(x, y, s * 2.4, Color::new(col.r, col.g, col.b, 0.10 * tw));
+        let tw = 0.40 + 0.60 * (t * 1.6 + (x % 13.0) * 0.7 + (y % 7.0)).sin().abs();
+        if (seed >> 41) % 15 == 0 {
+            let s = 15.0 + ((seed >> 30) % 4) as f32 * 6.0;
+            fx.light_pool(x, y, s * 2.2, Color::new(col.r, col.g, col.b, 0.11 * tw));
             let spr = fx.sprites.star_at(idx);
             draw_texture_ex(spr, x - s / 2.0, y - s / 2.0, Color::new(col.r, col.g, col.b, tw),
                 DrawTextureParams {
