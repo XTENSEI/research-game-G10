@@ -1,38 +1,140 @@
-//! The Grave Cave Maze of Craze. Directional questions with random-to-direction
-//! mapping, NPC/environment clues, and silent send-back on failure.
+//! Aquarius Puzzle: The Grave Cave Maze of Craze (SCRIPT RES.pdf pp. 16-17).
+//! Cardinal N/E/S/W randomized chambers. Right answers advance depth toward exit;
+//! wrong answers silently return the traveler one step back with NO visual cue.
 
-pub struct MazeQ {
-    pub question: &'static str,
-    /// Correct direction: 0=North 1=East 2=South 3=West
-    pub dir: usize,
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Dir {
+    North,
+    East,
+    South,
+    West,
 }
 
-pub struct MazeClue {
-    #[allow(dead_code)]
-    pub who: &'static str,
-    pub text: &'static str,
+impl Dir {
+    pub fn label(self) -> &'static str {
+        match self {
+            Dir::North => "NORTH",
+            Dir::East => "EAST",
+            Dir::South => "SOUTH",
+            Dir::West => "WEST",
+        }
+    }
 }
 
-pub const MAZE_CLUES: &[MazeClue] = &[
-    MazeClue { who: "Gillbert", text: "hey, do you know where wild sea berries grow?" },
-    MazeClue { who: "Scalleon", text: "hmm, I believe it's in the *west*, i think?" },
-    MazeClue { who: "Market Lady", text: "do you wanna know where fresh sea berries grow?" },
-    MazeClue { who: "Market Lady", text: "real ones grow from the *North*" },
-    MazeClue { who: "(Environment)", text: "City hall faces to the *east*" },
-    MazeClue { who: "(Environment)", text: "the sun is the light that leaves at night" },
+#[derive(Clone, Copy)]
+pub struct MazeQuestion {
+    pub dir: Dir,
+    pub prompt: &'static str,
+    pub choices: [&'static str; 4],
+    pub correct: usize,
+}
+
+/// Verbatim 8-question cardinal bank from SCRIPT RES.pdf pp. 16-17.
+pub const QUESTIONS: &[MazeQuestion] = &[
+    // North
+    MazeQuestion {
+        dir: Dir::North,
+        prompt: "Which sentence demonstrates correct subject-verb agreement?",
+        choices: [
+            "The reef dolphins swims beside Tow-Tou.",
+            "Neither Gillbert nor the guards was late.",
+            "A school of glowing lanterns drifts above the trench.",
+            "The twin pearls on the pedestal sparkles loudly.",
+        ],
+        correct: 2,
+    },
+    MazeQuestion {
+        dir: Dir::North,
+        prompt: "What tense is the verb in: \"The cat sits on the mat\"?",
+        choices: [
+            "Past simple",
+            "Present simple",
+            "Future progressive",
+            "Present perfect",
+        ],
+        correct: 1,
+    },
+    // East
+    MazeQuestion {
+        dir: Dir::East,
+        prompt: "\"This is the most delicious meal I have ever tasted.\"\nWhat degree of comparison is 'most delicious'?",
+        choices: [
+            "Positive degree",
+            "Comparative degree",
+            "Superlative degree",
+            "Participial modifier",
+        ],
+        correct: 2,
+    },
+    MazeQuestion {
+        dir: Dir::East,
+        prompt: "\"In order to succeed, you must study hard every day.\"\nWhat role does 'In order to succeed' play?",
+        choices: [
+            "Independent main clause",
+            "Infinitive phrase of purpose",
+            "Appositive noun phrase",
+            "Coordinating conjunction",
+        ],
+        correct: 1,
+    },
+    // South
+    MazeQuestion {
+        dir: Dir::South,
+        prompt: "\"While she was cooking dinner, the lantern flickered.\"\nWhat type of clause is 'While she was cooking dinner'?",
+        choices: [
+            "Dependent adverbial clause",
+            "Independent sentence",
+            "Relative adjective clause",
+            "Prepositional fragment",
+        ],
+        correct: 0,
+    },
+    MazeQuestion {
+        dir: Dir::South,
+        prompt: "Fill in the blank for logical cause and effect:\n\"She was tired, ____ she went to bed early.\"",
+        choices: [
+            "yet",
+            "so",
+            "unless",
+            "nor",
+        ],
+        correct: 1,
+    },
+    // West
+    MazeQuestion {
+        dir: Dir::West,
+        prompt: "\"Although it was raining, the travelers pressed onward.\"\nWhat grammatical function does 'Although' serve?",
+        choices: [
+            "Subordinating conjunction showing contrast",
+            "Modal auxiliary verb",
+            "Possessive determiner",
+            "Correlative pronoun",
+        ],
+        correct: 0,
+    },
+    MazeQuestion {
+        dir: Dir::West,
+        prompt: "Choose the proper subjunctive mood:\n\"If I ___ you, I would bring Tow-Tou's spare wrench.\"",
+        choices: [
+            "was",
+            "am",
+            "were",
+            "will be",
+        ],
+        correct: 2,
+    },
 ];
 
-/// Questions from the script. The mapping question -> direction is shuffled at runtime;
-/// `dir` here is the *correct* direction for the mechanic, display order is shuffled too.
-pub const MAZE_QUESTIONS: &[MazeQ] = &[
-    MazeQ { question: "Things go wrong, Things go...", dir: 2 },                        // South
-    MazeQ { question: "I sound like \"down\", but I'm technically not down", dir: 2 },   // South
-    MazeQ { question: "I am a red needle for the path you take", dir: 0 },               // North
-    MazeQ { question: "Where the fresh sea berries grow", dir: 0 },                      // North
-    MazeQ { question: "It wouldn't be an *occident* to orient yourself to me", dir: 1 }, // East
-    MazeQ { question: "Direction where the city hall faces", dir: 1 },                   // East
-    MazeQ { question: "Where the locals *claim* the sea berries grow", dir: 3 },         // West
-    MazeQ { question: "I am the nest for where it rests ; it is the light that leaves at night", dir: 3 }, // West (sun)
-];
+pub const MAZE_TARGET_DEPTH: u8 = 4;
 
-pub const DIR_NAMES: &[&str] = &["North", "East", "South", "West"];
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maze_covers_every_direction() {
+        for d in [Dir::North, Dir::East, Dir::South, Dir::West] {
+            assert_eq!(QUESTIONS.iter().filter(|q| q.dir == d).count(), 2);
+        }
+    }
+}

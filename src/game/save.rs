@@ -1,55 +1,63 @@
-//! Save/load run progress to a small local file next to the game.
+//! Save/load run progress to a small local file next to the executable (no-op on wasm).
 
 use crate::game::script::Biome;
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum BiomeId { Candy = 0, Aquarius = 1, Cosma = 2, Home = 3 }
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum BiomeId {
+    Kelp = 0,
+    Coral = 1,
+    Slums = 2,
+    Home = 3,
+}
 
 impl BiomeId {
     pub fn from_biome(b: Biome) -> Self {
         match b {
-            Biome::Candy => BiomeId::Candy,
-            Biome::Aquarius => BiomeId::Aquarius,
-            Biome::Cosma => BiomeId::Cosma,
+            Biome::Kelp => BiomeId::Kelp,
+            Biome::Coral => BiomeId::Coral,
+            Biome::Slums => BiomeId::Slums,
             Biome::Home => BiomeId::Home,
         }
     }
+
     pub fn to_biome(self) -> Biome {
         match self {
-            BiomeId::Candy => Biome::Candy,
-            BiomeId::Aquarius => Biome::Aquarius,
-            BiomeId::Cosma => Biome::Cosma,
+            BiomeId::Kelp => Biome::Kelp,
+            BiomeId::Coral => Biome::Coral,
+            BiomeId::Slums => Biome::Slums,
             BiomeId::Home => Biome::Home,
         }
     }
 }
 
 pub struct SaveData {
-    pub has_horse: bool,
-    pub candy_riddles: u32,
-    pub aqua_riddles: u32,
-    pub cosma_riddles: u32,
+    pub swift_swim: bool,
+    pub kelp_riddles: u32,
+    pub coral_riddles: u32,
+    pub slums_riddles: u32,
     pub gate_solved: bool,
     pub maze_solved: bool,
-    pub ingredients: u32,
+    pub elixir: u32,
     pub biome: BiomeId,
     pub player_x: f32,
 }
 
 pub fn save_path() -> std::path::PathBuf {
-    std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")).join("save.txt")
+    std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("save.txt")
 }
 
 pub fn save(data: &SaveData) -> bool {
     let txt = format!(
-        "horse={}\ncandy={}\naqua={}\ncosma={}\ngate={}\nmaze={}\ningredients={}\nbiome={}\nx={:.0}\n",
-        data.has_horse as i32,
-        data.candy_riddles,
-        data.aqua_riddles,
-        data.cosma_riddles,
+        "swift={}\nkelp={}\ncoral={}\nslums={}\ngate={}\nmaze={}\nelixir={}\nbiome={}\nx={:.0}\n",
+        data.swift_swim as i32,
+        data.kelp_riddles,
+        data.coral_riddles,
+        data.slums_riddles,
         data.gate_solved as i32,
         data.maze_solved as i32,
-        data.ingredients,
+        data.elixir,
         data.biome as i32,
         data.player_x,
     );
@@ -59,26 +67,34 @@ pub fn save(data: &SaveData) -> bool {
 pub fn load() -> Option<SaveData> {
     let txt = std::fs::read_to_string(save_path()).ok()?;
     let mut d = SaveData {
-        has_horse: false, candy_riddles: 0, aqua_riddles: 0, cosma_riddles: 0,
-        gate_solved: false, maze_solved: false, ingredients: 0,
-        biome: BiomeId::Candy, player_x: 140.0,
+        swift_swim: false,
+        kelp_riddles: 0,
+        coral_riddles: 0,
+        slums_riddles: 0,
+        gate_solved: false,
+        maze_solved: false,
+        elixir: 0,
+        biome: BiomeId::Kelp,
+        player_x: 140.0,
     };
     for line in txt.lines() {
         let (k, v) = line.split_once('=')?;
         match k {
-            "horse" => d.has_horse = v == "1",
-            "candy" => d.candy_riddles = v.parse().unwrap_or(0),
-            "aqua" => d.aqua_riddles = v.parse().unwrap_or(0),
-            "cosma" => d.cosma_riddles = v.parse().unwrap_or(0),
+            "swift" => d.swift_swim = v == "1",
+            "kelp" => d.kelp_riddles = v.parse().unwrap_or(0),
+            "coral" => d.coral_riddles = v.parse().unwrap_or(0),
+            "slums" => d.slums_riddles = v.parse().unwrap_or(0),
             "gate" => d.gate_solved = v == "1",
             "maze" => d.maze_solved = v == "1",
-            "ingredients" => d.ingredients = v.parse().unwrap_or(0),
-            "biome" => d.biome = match v.parse::<i32>().unwrap_or(0) {
-                1 => BiomeId::Aquarius,
-                2 => BiomeId::Cosma,
-                3 => BiomeId::Home,
-                _ => BiomeId::Candy,
-            },
+            "elixir" => d.elixir = v.parse().unwrap_or(0),
+            "biome" => {
+                d.biome = match v.parse::<i32>().unwrap_or(0) {
+                    1 => BiomeId::Coral,
+                    2 => BiomeId::Slums,
+                    3 => BiomeId::Home,
+                    _ => BiomeId::Kelp,
+                }
+            }
             "x" => d.player_x = v.parse().unwrap_or(140.0),
             _ => {}
         }

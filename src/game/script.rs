@@ -1,295 +1,409 @@
-//! Every line of SCRIPT RES.md, encoded as data. Nothing paraphrased.
+//! Full dialogue, riddles, and biome progression matching SCRIPT RES.pdf.
 
-/// One spoken line: speaker + text.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Biome {
+    Kelp,
+    Coral,
+    Slums,
+    Home,
+}
+
+#[derive(Clone, Copy)]
 pub struct Line {
     pub who: &'static str,
+    pub expr: &'static str,
     pub text: &'static str,
 }
 
-pub const fn l(who: &'static str, text: &'static str) -> Line {
-    Line { who, text }
+impl Line {
+    pub const fn new(who: &'static str, text: &'static str) -> Self {
+        Self { who, expr: "normal", text }
+    }
+    pub const fn expr(who: &'static str, expr: &'static str, text: &'static str) -> Self {
+        Self { who, expr, text }
+    }
 }
 
-// ============ CANDY LAND OPENING ============
-
-pub const WAKE_SCENE: &[Line] = &[
-    l("River", "Where... where am I?"),
-    l("River", "This isn't home. This isn't even Earth."),
-    l("(Narration)", "River looks around their surroundings and notices a castle."),
-    l("(Narration)", "River starts walking on the forest path."),
-];
-
-#[allow(dead_code)]
-pub const WAKE: Line = l("River", "Where... where am I?");
-#[allow(dead_code)]
-pub const WAKE2: Line = l("River", "This isn't home. This isn't even Earth.");
-#[allow(dead_code)]
-pub const LOOK: Line = l("(Narration)", "River looks around their surroundings and notices a castle.");
-
-// ============ JIN ENCOUNTER ============
-
-pub const JIN_INTRO: &[Line] = &[
-    l("Jin", "Howdy!"),
-    l("Jin", "I was just in the forest earlier grabbing some licorice, could you help me out here? I left my horse at home and whooo boy these sure are a bunch of sticks."),
-    l("Jin", "Say, you from around here?"),
-];
-
-pub const JIN_WHERE: &[Line] = &[l("Jin", "Well we're in the red licorice forest ofcourse...")];
-pub const JIN_NO: &[Line] = &[
-    l("Jin", "Oh, well where are you from?"),
-    l("Jin", "Aquarius? or Cosma?"),
-];
-
-pub const JIN_WARN: &[Line] = &[
-    l("Jin", "I gotta warn you about some of the wild life out here.. They're pretty annoying to deal with"),
-];
-
-pub const JIN_ANNOY: &[Line] = &[
-    l("Jin", "Well, yeah?"),
-    l("Jin", "Everything is annoying"),
-    l("Jin", "Everyone gives you riddles to solve, questions to answer, just to prove that they're better than you. And there are a lot of them here in the forest."),
-    l("Jin", "But I don't bother with that stuff, that's why I live alone, heck it was a risk even asking you for help."),
-];
-
-pub const JIN_RISK: &[Line] = &[
-    l("Jin", "Yeah it's a risk? I mean you could beat me, that would be bad"),
-    l("Jin", "You really aren't from here. Like at all. Let me demonstrate."),
-];
-
-pub const JIN_RIDDLE_DEMO: &[Line] = &[
-    l("Jin", "Yeah? I mean you could ask me a riddle/question and beat me, that would be bad"),
-    l("Jin", "You really aren't from here. Like at all. Let me demonstrate."),
-];
-
-pub const JIN_LOSE: &[Line] = &[l("Jin", "Aw shucks, looks like you don't got what it takes.")];
-pub const JIN_WIN: &[Line] = &[
-    l("Jin", "Wow! You are a natural! Can you help me pick up these licorice sticks now.."),
-];
-
-pub const JIN_PERFECT: &[Line] = &[
-    l("Jin", "I really do appreciate it, partner! If you want, you could go ahead and take my horse. It's yours, really!"),
-];
-pub const JIN_LOST_ONE: &[Line] = &[
-    l("Jin", "Thanks partner! You better go along then, it's getting pretty late"),
-];
-
-pub const JIN_BOOK_OFFER: &[Line] = &[
-    l("(Narration)", "River notices a big castle while at Jin's house."),
-    l("(Narration)", "They notice a book laying on the table in Jin's house, it's River's family heirloom."),
-];
-
-pub const JIN_BOOK_THIS: &[Line] = &[
-    l("Jin", "Oh, *that* book? I found it three days earlier. Around the same area I found you!"),
-];
-pub const JIN_BOOK_MINE: &[Line] = &[
-    l("Jin", "Apologies! I actually found it in the same area I found you!"),
-];
-
-pub const JIN_BOOK_RETURN: &[Line] = &[
-    l("River", "..."),
-    l("River", "Could I have it back?"),
-    l("Jin", "Ofcourse!"),
-];
-
-// ============ GUARDS ============
-
-pub const KANDY_INTRO_SCENE: &[Line] = &[
-    l("Kandy Kween", "WHO GOES THERE..?"),
-    l("(Narration)", "*Lights turn on*"),
-    l("Kandy Kween", "Matt, who is this?"),
-    l("Matt", "I am unaware madame."),
-    l("Matt", "Whoever it is, they made it through the guards and trials."),
-    l("Kandy Kween", "Well that isn't very reassuring, I made those myself."),
-    l("(Narration)", "River notices that Kandy Kween's necklace contains an essential ingredient for the elixir."),
-];
-
-pub const CLUE_GILL: &[Line] = &[
-    l("Gillbert", "hey, do you know where wild sea berries grow?"),
-];
-pub const CLUE_SCAL: &[Line] = &[
-    l("Scalleon", "hmm, I believe it's in the *west*, i think?"),
-];
-pub const CLUE_LADY: &[Line] = &[
-    l("Market Lady", "real ones grow from the *North*. And the city hall? It faces the *east*."),
-];
-
-pub const PORTAL_SCENE: &[Line] = &[
-    l("(Narration)", "The stone circle blazes to life. The Rainbow Road ignites."),
-    l("(Narration)", "But the world itself starts to shake..."),
-];
-
-pub const GUARDS: &[Line] = &[
-    l("Guard 1", "One of us speaks truth, the other-"),
-    l("Guard 2", "you don't seem like you're from around here"),
-    l("Guard 2", "Oh we're sticking to the script? My bad."),
-    l("Guard 2", "Yes, whatever he said."),
-    l("Guard 1", "You know what, I'm not even in the mood for it anymore"),
-    l("Guard 2", "No but we were gonna do it"),
-    l("Guard 2", "I mean we have to do it."),
-    l("Guard 1", "Yeah well you ruined it"),
-    l("(Narration)", "The guards fight, letting River pass through quietly."),
-];
-
-// ============ KANDY KWEEN ============
-
-#[allow(dead_code)]
-pub const KANDY_INTRO: &[Line] = &[
-    l("Kandy Kween", "WHO GOES THERE..?"),
-    l("(Narration)", "*Lights turn on*"),
-    l("Kandy Kween", "Matt, who is this?"),
-    l("Matt", "I am unaware madame."),
-    l("Matt", "Whoever it is, they made it through the guards and trials."),
-    l("Kandy Kween", "Well that isn't very reassuring, I made those myself."),
-    l("(Narration)", "River notices that Kandy Kween's necklace contains an essential ingredient for the elixir."),
-];
-
-pub const KANDY_GREAT_TEXTS: &[Line] = &[
-    l("Kandy Kween", "Thanks, here's your reward..."),
-];
-pub const KANDY_EASY_TEXTS: &[Line] = &[
-    l("(Narration)", "Kandy Kween starts fuming"),
-    l("Kandy Kween", "OH REALLY ??"),
-];
-pub const KANDY_SUCKED_TEXTS: &[Line] = &[
-    l("(Narration)", "Kandy Kween starts fuming"),
-    l("Kandy Kween", "NOW WERE THEY ?"),
-    l("Kandy Kween", "YOU KNOW WHAT ELSE SUCKS ?"),
-    l("River", "..."),
-    l("River", "no"),
-];
-
-pub const TRAPDOOR: &[Line] = &[
-    l("(Narration)", "Kandy Kween activates a trap door regardless of which dialogue option you pick."),
-    l("(Narration)", "River is dropped in this candy cave that transitions into an actual rock cave."),
-    l("(Narration)", "They plummet into the water and notice that what surrounds them are remains of candy people."),
-];
-
-// ============ QTE NARRATION ============
-
-pub const QTE_LINES: &[Line] = &[
-    l("(Narration)", "River dives down into the water."),
-    l("(Narration)", "River sees a light down in the depths."),
-    l("(Narration)", "The light becomes bigger, River noticed this and tries to swim back up."),
-];
-
-pub const DRAGGED: &[Line] = &[
-    l("(Narration)", "Something drags River down into the depths."),
-    l("(Narration)", "*pitch black*"),
-];
-
-/// Script: "[Eye lids open, we see blurry lights] [Shot of Rivers eye]
-/// [River finds themselves...]" - the hand-off from the plunge into Aquarius.
-pub const AQUA_WAKE: &[Line] = &[
-    l("(Narration)", "Eyelids open. Blurry lights."),
-    l("(Narration)", "A shot of River's eye."),
-    l("River", "...It's water. The whole sky is water."),
-    l("(Narration)", "River finds themselves on the sand of Aquarius."),
-];
-
-/// Aquarius to Cosma: the current opens onto the neon void.
-pub const COSMA_ARRIVE: &[Line] = &[
-    l("(Narration)", "The last cave opens, and the water simply stops."),
-    l("(Narration)", "Beyond it: black space, and neon stars for a sky."),
-    l("River", "Cosma. The last component is here."),
-];
-
-/// The elixir is finally mixed, at home, at Nadia's bedside.
-pub const ENDING: &[Line] = &[
-    l("(Narration)", "River mixes the three components into the Gift of Education."),
-    l("River", "Nadia. Drink this. Please."),
-    l("Nadia", "...River? I... I can read it. I can read the whole thing!"),
-    l("River", "Welcome back, Nadia."),
-    l("(Narration)", "The Gift of Education worked. The world is quiet again."),
-];
-
-// ============ INTRO (house) ============
-
-/// Marker scene: the intro renders as picture panels, not dialogue.
-pub const INTRO_SCENE: &[Line] = &[l("(Intro)", "intro")];
-
-pub const INTRO_LINES: &[&str] = &[
-    "Nadia has fallen sick.",
-    "The doctors call it \"illiteracy\".",
-    "The Grandparent gives River the Family Heirloom.",
-    "A book that might be the key.",
-    "River thinks nothing of it.",
-    "Until they try to read it...",
-];
-
-// ============ RIDDLES (one-try only) ============
-
+#[derive(Clone, Copy)]
 pub struct Riddle {
-    pub question: &'static str,
-    pub options: &'static [&'static str],
-    pub answer: usize,
-    #[allow(dead_code)]
     pub biome: Biome,
+    pub title: &'static str,
+    pub prompt: &'static str,
+    pub choices: [&'static str; 4],
+    pub correct: usize,
+    pub explain: &'static str,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum Biome { Candy, Aquarius, Cosma, Home }
+pub fn biome_title(b: Biome) -> &'static str {
+    match b {
+        Biome::Kelp => "BIOME 1 — KELP FOREST & CRAB CASTLE",
+        Biome::Coral => "BIOME 2 — CORAL CITY (AQUARIUS)",
+        Biome::Slums => "BIOME 3 — SOMBER SLUMS & RAINBOW ROAD",
+        Biome::Home => "HEARTHSIDE COTTAGE",
+    }
+}
 
-pub const CANDY_RIDDLES: &[Riddle] = &[
+// ---------------------------------------------------------------------------
+// Intro Storybook (4 Undertale plates: assets/game/intro/plate_0..3.png)
+// ---------------------------------------------------------------------------
+
+pub const INTRO_PLATES: &[(usize, &str, &str)] = &[
+    (
+        0,
+        "Nadia",
+        "Little Nadia fell gravely ill with *illiteracy* — every letter drifts away in a blur whenever she opens a page.",
+    ),
+    (
+        1,
+        "Mark",
+        "Grandparent and elder sibling Mark taught day and night. River searched through books, archives, and tales for an *elixir* to mend what dimmed.",
+    ),
+    (
+        2,
+        "River",
+        "Worn down to the bone, River sat upon the cold moonlit beach... until a warm, *glowing* *storybook* washed onto the wet sand.",
+    ),
+    (
+        3,
+        "River",
+        "As River rested beside the open cover, ripples of starlight pulled them down beneath the tide into another realm...",
+    ),
+];
+
+// ---------------------------------------------------------------------------
+// Biome 1 — Kelp Forest & Crab Castle (pp. 1-3, 15-16)
+// ---------------------------------------------------------------------------
+
+pub const KELP_ARRIVE: &[Line] = &[
+    Line::expr("River", "shocked", "Huh...? Wait—why is there drag around my arms?!"),
+    Line::expr("River", "shocked", "What is all this tall green stuff swaying everywhere... kelp?!"),
+    Line::new("River", "Am I... *in* *water*?! Hang on... I can breathe completely fine!"),
+    Line::expr("River", "shocked", "WHOA! What is THAT?! A giant red crab with a *kelp* *slingbag*?!"),
+];
+
+pub const KENNY_QTE_PASS: &[Line] = &[
+    Line::new("River", "Phew... *that* *was* *close...* Looks like I outswam whatever that thing was."),
+    Line::expr("Kenny", "worried", "*panting* Hey! Wait up! Stop swimming like a torpedo!"),
+    Line::expr("River", "shocked", "Gah!! Wait—didn't I leave you back at the kelp bend?!"),
+];
+
+pub const KENNY_QTE_FAIL: &[Line] = &[
+    Line::new("River", "Aw *shucks*—my boots got tangled in the sea-grass!!"),
+    Line::expr("Kenny", "happy", "Gotcha! Tap, tap. Relax, kid—I wasn't chasing you to pinch you!"),
+];
+
+pub const KENNY_INTRO: &[Line] = &[
+    Line::expr("Kenny", "worried", "Look, friend—I'm just tryna help you. Stop running away like I'm some sea monster..."),
+];
+
+pub const KENNY_HOME_Q: &str = "You know? *Home*. Coral City, I presume?";
+
+pub const KENNY_WORLD_EXPLAIN: &[Line] = &[
+    Line::expr("Kenny", "normal", "Well regardless of where we're headed, you'd best learn how to fight down here before you wander off!"),
+    Line::expr("Kenny", "normal", "In this realm, *the* *King* *prohibited* *all* *weapons* and physical brawling across every reef and ruin."),
+];
+
+pub const KENNY_PRE_DUEL: &[Line] = &[
+    Line::expr("Kenny", "happy", "Yes, yes—*questions*! Riddles, grammar, and razor-sharp comprehension settle every duel!"),
+    Line::expr("Kenny", "normal", "Name's *Kenny*, by the way. Show me what your mind can parry!"),
+];
+
+pub const KENNY_RETRY_PROMPT: &str = "Aw shucks... Maybe you're not ready for the Castle yet. Want another shot with fewer waves?";
+
+pub const KENNY_FLAWLESS_WIN: &[Line] = &[
+    Line::expr("Kenny", "happy", "Whoa—flawless!! Not a single scratch AND every question nailed!"),
+    Line::expr("Kenny", "happy", "Come visit my humble abode right beside the kelp grove anytime. Here—take this *Swift* *Current* *charm* and this ancient storybook!"),
+    Line::new("River", "Wait—this storybook has the exact crest as the one on the beach! I can dash through kelp currents now!"),
+];
+
+pub const KENNY_EVEN_WIN: &[Line] = &[
+    Line::expr("Kenny", "normal", "Okay! Now that we're even, you'd better head along toward the plains then—it's getting pretty late."),
+    Line::new("River", "Wait—look on that stone ledger! That's the magic book from the beach. Time to find the Queen's elixir!"),
+];
+
+pub const GUARDS_SCENE: &[Line] = &[
+    Line::new("Guard 1", "Halt! None pass the Crimson Causeway without answering the Royal Trio—er, Pair!"),
+    Line::new("Guard 2", "One of us *only* *speaks* *truth*, and the other *only* *speaks* *lies*!"),
+    Line::new("Guard 1", "Wait—no, Carl, YOU took *my* line from page two of the decree!"),
+    Line::new("Guard 2", "Did not! I practiced in the barracks mirror all morning! Besides, nobody knows who asks the riddle!"),
+    Line::new("Guard 1", "Ugh, come over to the torch post while we sort out our script—"),
+    Line::new("River", "...Did they seriously just walk aside arguing over cue cards? I'll slip right through!"),
+];
+
+pub const QUEEN_CRAB_INTRO: &[Line] = &[
+    Line::expr("Queen Crab", "normal", "WHO GOES THERE..? Who dares step upon the coral carpet of the Kelp Throne?!"),
+    Line::new("Sophie", "*Honk-jingle!* Hold on, Your Majesty—let me flip the candelabra switch!"),
+    Line::expr("Queen Crab", "normal", "Sophie, *who* *is* *this*? Some dry-land surface dweller?"),
+    Line::new("Sophie", "Beats me, Queenie! Kinda looks like a *mutated* *sea* *pickle* wearing blue flannel!"),
+    Line::expr("River", "shocked", "Hey! I'm River! And that glowing pearl around your neck—that's the first *Elixir* component, isn't it?!"),
+];
+
+pub const QUEEN_EVAL_Q: &str = "Hmph! Well, sea-pickle, before I decide your fate... what did you think of my guards and puzzles?";
+
+pub const QUEEN_SUCK_REPLY: &[Line] = &[
+    Line::expr("Queen Crab", "fuming", "WHAT?! *YOU* *KNOW* *WHAT* *ELSE* *SUCKS?*"),
+    Line::expr("River", "shocked", "...No??"),
+    Line::expr("Queen Crab", "fuming", "THE *TRAPDOOR* UNDER YOUR BOOTS!!"),
+];
+
+pub const QUEEN_PASS_REPLY: &[Line] = &[
+    Line::expr("Queen Crab", "normal", "Flattery won't spare you from my royal *trapdoor*, landlubber—SEIZE THE ELIXIR NEVERMORE!"),
+];
+
+pub const QUEEN_DROP: &[Line] = &[
+    Line::expr("River", "shocked", "WAAAAH—Wait, I grabbed the glowing *Pearl* *of* *Clarity* on the way down!!"),
+];
+
+// ---------------------------------------------------------------------------
+// Biome 2 — Coral City / Aquarius (pp. 3-9, 12-13, 16-17, 20)
+// ---------------------------------------------------------------------------
+
+pub const AQUA_WAKE: &[Line] = &[
+    Line::new("River", "[...Pitch black. Blurry aquarium lanterns slowly drift into focus...]"),
+    Line::expr("Jill", "shocked", "*Gasp!* Jack, the specimen's eyelids are twitching—they're waking up!!"),
+    Line::expr("Jack", "normal", "Fascinating... A creature from above falling three hundred fathoms, yet you didn't dissolve or crumble into ash at that height!"),
+    Line::expr("River", "shocked", "Ow... Where am I?! Wait—why am I tied to an operating chair by two swordfish in lab suits?!"),
+    Line::expr("Jill", "normal", "Well of all the *weird* *looking* *fish* to tumble through our ceiling skylight—"),
+    Line::expr("River", "normal", "A 'weird looking fish'? That's offensive! *You're* the weird-looking fish with a sword on your nose!"),
+    Line::expr("Jack", "normal", "Heh... sharp wit, aren't we? Let us call it *sarcasm*."),
+    Line::expr("Jill", "normal", "Wait Jack, didn't you mean... *sarcastic*?"),
+    Line::expr("Jack", "normal", "No, my dear Jill. Definitely *sarcanistic*."),
+    Line::expr("River", "normal", "Alright, alright—can you untie me? I need to brew an elixir to heal my little sister Nadia back home!"),
+    Line::expr("Jack", "normal", "An Elixir of Literacy! Hold on—Coral City's apothecary lacks three *rare* *reef* *ingredients*."),
+    Line::expr("Jill", "normal", "Bring us a *Blue* *Seashroom*, a *Tentacle* *Anemone*, and the elusive *True* *Seaberry* from the market!"),
+    Line::expr("Jack", "normal", "Careful with the berries—only trust the Market clues. Then take our *shore* *cut* to Tow-Tou's garage!"),
+];
+
+pub const ALLEY_DUEL: &[Line] = &[
+    Line::new("AngelFish", "Preposterous! Your informal contractions undermine every tenet of Aquarius etiquette!"),
+    Line::new("StoneFish", "Chill out, fancy fins! Remember the King's decree—no swinging fists, only sharpest *words*!"),
+    Line::new("AngelFish", "Very well! Define *antithesis* before my powdered wig uncurls in dismay!"),
+    Line::new("River", "Whoa... even street arguments down here are pure vocabulary duels."),
+];
+
+pub const CLUE_GILL_SCAL: &[Line] = &[
+    Line::new("Gillbert", "Looking for the *True* *Seaberry* for Jack & Jill? Carefule—counterfeit kelp-berries are everywhere!"),
+    Line::new("Scalleon", "Here's what the harbormaster logged: search toward the *WEST* market terrace—don't follow fake rumors!"),
+    Line::new("Gillbert", "Wait, don't stop there—ask the *Old* *Market* *Lady* and check *Neptune's* *Statue* at City Hall too!"),
+];
+
+pub const MARKET_LADY_ASK: &str = "Sweetheart, hunting for True Seaberries? Tell an old reef granny—did Scalleon send you nicely?";
+
+pub const MARKET_LADY_CLUE: &[Line] = &[
+    Line::new("Market Lady", "Bless your manners! *NORTH*—that's where I've seen and eaten those sweet *True* *Seaberries*! Check the northern patch of the market terrace!"),
+];
+
+pub const NEPTUNE_STATUE_EXAMINE: &[Line] = &[
+    Line::new("River", "An ancient moss-carved *Statue* *of* *Neptune* towering beside City Hall!"),
+    Line::new("River", "Look at the trident and engraved compass base—Neptune's gaze points *strictly* *EAST*!"),
+];
+
+pub const TRUE_SEABERRY_FOUND: &[Line] = &[
+    Line::expr("River", "normal", "Combining Gillbert's *West*, Market Lady's *North*, and Neptune's *East* sightline..."),
+    Line::expr("River", "normal", "Look beneath this glowing lantern bush! Deep sapphire shimmer—a genuine *True* *Seaberry*!!"),
+];
+
+pub const DECOY_BERRY_WARN: &[Line] = &[
+    Line::expr("River", "shocked", "Whoa, sour ink-bubble! That's a decoy kelp-berry—let me check `[Tab] Field Notes` for all three NPC clues first!"),
+];
+
+pub const SEASHROOM_PICK: &[Line] = &[
+    Line::new("River", "Found a pulsing *Blue* *Seashroom* growing beside the reef arch! Just one glowing fungus down."),
+];
+
+pub const ANEMONE_PICK: &[Line] = &[
+    Line::new("River", "Snipped a safe *Tentacle* *Anemone* frond! That's another elixir reagent secured."),
+];
+
+pub const TOWTOU_GREET: &[Line] = &[
+    Line::new("Tow-Tou", "Well blow my barnacles! All three Aquarius reagents packed neat in Jack & Jill's satchel!"),
+    Line::new("Tow-Tou", "Name's *Tow-Tou*—leatherback hauler, brass-finned mechanic, fastest shell-cart in Coral City!"),
+    Line::new("River", "Whoa, that's a whole *cart* strapped right onto your shell! Can you drive me toward the mountain ridge?!"),
+    Line::new("Tow-Tou", "Hop in, kid! Hang onto your flannel—next stop, the *Jevil* *Seamountain* *Range*!!"),
+];
+
+pub const ANGLERS_AMBUSH: &[Line] = &[
+    Line::new("Angler A", "*Click-flash!* Hold it, shell-taxi! Nobody crosses the Jevil ridge without surviving our reef cypher!"),
+    Line::new("Angler B", "The King banned fists, yeah—so our *Three* *Sea* *Anglers* settle tolls on the *MIC*!"),
+    Line::new("Angler C", "Drop clean bars on the beat and pick the sharpest rhyme, kid—or walk home backwards!!"),
+];
+
+pub const ANGLERS_WIN: &[Line] = &[
+    Line::new("Angler A", "*Wait...* that internal rhyme scheme was actually fire?!"),
+    Line::new("Tow-Tou", "Ha!! Never doubt a kid carrying a glowing storybook! Ahead lies the *Grave* *Cave* *Maze* *of* *Craze*—watch every answer, it plays silent tricks!"),
+];
+
+// ---------------------------------------------------------------------------
+// Biome 3 — Somber Slums & Rainbow Road (pp. 9, 14, 17-21)
+// ---------------------------------------------------------------------------
+
+pub const SLUMS_ARRIVE: &[Line] = &[
+    Line::new("River", "Brrr... the warm lagoon vanished. Nothing down here except sunken shipwrecks, whale bones, and silent abyssal shacks..."),
+    Line::new("Thaumiel", "Hold your lantern high, surface traveler. The *Somber* *Slums* swallow anyone who rushes blindly."),
+    Line::new("River", "Oh! You're an anglerfish... with the softest sky-blue lantern light! Who's blocking the bone bridge?"),
+    Line::new("Tenebris", "*...Hmph.* Name's *Tenebris*. Only those who understand what hides in shadow pass my bridge. Care to test your wit?"),
+];
+
+pub const ALGAE_TEMPLE_PRE: &[Line] = &[
+    Line::new("Thaumiel", "Here stands the forgotten *Temple* *of* *The* *Figurate* *Algae*—where language and geometry crystalize into alchemy."),
+    Line::new("Thaumiel", "Align all three poetic metaphors and glowing figurate stones to fuse your Aquarius reagents with Queen Crab's pearl!"),
+];
+
+pub const ALGAE_TEMPLE_POST: &[Line] = &[
+    Line::new("Thaumiel", "Look at that luminous azure radiance—the *Elixir* *of* *Literacy* is whole inside its crystal vial!"),
+    Line::new("River", "Just *The* *Rainbow* *Road* left between us and the portal home... Wait, look at the darkening void behind us!"),
+];
+
+pub const RAINBOW_GENIE_INTRO: &[Line] = &[
+    Line::new("Magic Fire Genie", "HALT, SEEKER OF LETTERS! Four starlight slabs ignited the Rainbow Road—now prove you *felt* the verse you carved!"),
+    Line::new("River", "Try me! Nadia's waiting at home!"),
+];
+
+pub const CRUMBLE_START: &[Line] = &[
+    Line::expr("River", "shocked", "WHAT—THE FLOOR IS SHATTERING!!"),
+    Line::expr("Magic Fire Genie", "normal", "THIS DIMENSION WAS ONLY HELD BY ANCIENT SYNTAX—RUN THROUGH THE HOMEWARD PORTAL NOW!!"),
+];
+
+pub const HOME_ENDING: &[Line] = &[
+    Line::expr("River", "normal", "*Gasp...!* Warm morning light... wood planks... I made it back before the last shard collapsed!!"),
+    Line::new("Mark", "River!! Where were you all night?! We checked the beach—wait, what's glowing in your satchel?!"),
+    Line::new("Grandparent", "By the stars... Is that the *Elixir* from the heirloom chronicle?! Hurry, give a spoonful to Nadia!"),
+    Line::expr("Nadia", "cured", "...\"*Once* *upon* *a* *moonlit* *tide...*\" Wait—the words aren't blurry anymore!! I can read EVERY letter!!"),
+    Line::expr("River", "normal", "You're cured, Nadia!! Every riddle, verse, and puzzle brought every word back home."),
+];
+
+// ---------------------------------------------------------------------------
+// Locked 1-Try Riddles (2-3 per biome, verbatim SCRIPT RES.pdf pp. 15-19)
+// ---------------------------------------------------------------------------
+
+pub const RIDDLES: &[Riddle] = &[
+    // --- Kelp Forest & Crab Castle ---
     Riddle {
-        question: "\"He always obfuscates his instructions for the candy housing projects because it's obvious that he wants us to fail and be humiliated.\" \"I can't even understand your plan, it's like you're obfuscating it.\"\nBased on the statements above, what does OBFUSCATE mean?",
-        options: &[
-            "Harshness in tone or behavior due to personal reasons",
-            "Faking or fabricating of evidence",
-            "Making something vague and unintelligible",
-            "A confused mixture",
+        biome: Biome::Kelp,
+        title: "Kelp Monolith I — Vocabulary",
+        prompt: "\"Due to the complexity of the sandstone highway projects, critics say the city has used unclear terminology to OBFUSCATE the project's real environmental cost.\"",
+        choices: [
+            "a) Making something clearer and transparent",
+            "b) Highlighting important project details",
+            "c) Making something vague and unintelligible",
+            "d) Summarizing findings concisely",
         ],
-        answer: 2,
-        biome: Biome::Candy,
+        correct: 2,
+        explain: "'Obfuscate' means deliberately making meaning unclear, obscure, or confusing.",
     },
     Riddle {
-        question: "What word was correctly spelled?",
-        options: &["Acommodate", "Acomodate", "Accomodate", "Accommodate"],
-        answer: 3,
-        biome: Biome::Candy,
+        biome: Biome::Kelp,
+        title: "Kelp Monolith II — Orthography",
+        prompt: "Only one tablet preserves the royal spelling decree. Which is spelled correctly?",
+        choices: [
+            "a) Acommodate",
+            "b) Acomodate",
+            "c) Accomodate",
+            "d) Accommodate",
+        ],
+        correct: 3,
+        explain: "'Accommodate' takes BOTH double 'c' and double 'm' — plenty of room for two pairs!",
+    },
+    Riddle {
+        biome: Biome::Kelp,
+        title: "Kelp Monolith III — Clause Repair",
+        prompt: "Which revision fixes this comma splice cleanly?\n\"The lagoon glimmered, we followed the kelp path.\"",
+        choices: [
+            "a) \"The lagoon glimmered, so we followed the kelp path.\"",
+            "b) \"The lagoon glimmered, because we followed.\"",
+            "c) \"The lagoon glimmered, yet however we followed.\"",
+            "d) Leave the comma splice unchanged",
+        ],
+        correct: 0,
+        explain: "Two independent clauses need a coordinating conjunction (, so / , and), semicolon, or period.",
+    },
+    // --- Coral City / Aquarius ---
+    Riddle {
+        biome: Biome::Coral,
+        title: "Coral Tablet I — Italic Emphasis",
+        prompt: "What does italicizing *Neptune* imply in:\n\"Scalleon said that Gillbert doesn't believe in *Neptune*\"?",
+        choices: [
+            "a) Gillbert doubts Scalleon himself",
+            "b) Gillbert only whispers the name",
+            "c) Nobody lives in Aquarius anymore",
+            "d) Gillbert believes in other gods, just not *Neptune* specifically",
+        ],
+        correct: 3,
+        explain: "Contrastive italics single out *Neptune* as the specific exception among deities.",
+    },
+    Riddle {
+        biome: Biome::Coral,
+        title: "Coral Tablet II — Reading in Context",
+        prompt: "Based on the statues, proverbs, and dialogue across this sunken dimension, who/what is *Neptune*?",
+        choices: [
+            "a) Their god",
+            "b) A rival crab merchant",
+            "c) A lost library book",
+            "d) The bridge toll collector",
+        ],
+        correct: 0,
+        explain: "Belief debates at City Hall and sacred reef monuments establish *Neptune* as their deity.",
+    },
+    Riddle {
+        biome: Biome::Coral,
+        title: "Coral Tablet III — Precision Word Choice",
+        prompt: "Which word correctly completes AngelFish's duel rebuttal?\n\"Nothing you shout can ___ our city's grammar standards!\"",
+        choices: [
+            "a) effect",
+            "b) affect",
+            "c) infect",
+            "d) defect",
+        ],
+        correct: 1,
+        explain: "'Affect' is the verb meaning to influence or alter; 'effect' is normally the resulting noun.",
+    },
+    // --- Somber Slums ---
+    Riddle {
+        biome: Biome::Slums,
+        title: "Abyss Bridge I — Metaphor",
+        prompt: "Tenebris's First Whisper:\n\"The more of me you discover, the larger I become. What am I?\"",
+        choices: [
+            "a) The unknown",
+            "b) A burning candle",
+            "c) Sunken treasure",
+            "d) An hourglass",
+        ],
+        correct: 0,
+        explain: "As knowledge expands, the frontier touching what remains unexplained grows wider: *the unknown*.",
+    },
+    Riddle {
+        biome: Biome::Slums,
+        title: "Abyss Bridge II — Elegy Imagery",
+        prompt: "Tenebris's Second Verse:\n\"Once you were here, now a memory in my hand.\nCarried by the breeze, scattered across the land.\nTears fall heavy, yet you are free at last.\nA final goodbye to the days that have passed.\"",
+        choices: [
+            "a) Dried autumn petals in a locket",
+            "b) Rippling lantern reflections",
+            "c) Scattering a loved one's ashes",
+            "d) Torn pages lost to sea foam",
+        ],
+        correct: 2,
+        explain: "Every tactile image—held in hand, carried on breeze, scattered over land, final farewell—is elegiac ash scattering.",
     },
 ];
 
-pub const COSMA_RIDDLES: &[Riddle] = &[
-    Riddle {
-        question: "The more of me you discover, the less you actually know. I outweigh everything you can see, yet you cannot see me at all.",
-        options: &[
-            "Knowledge",
-            "Darkness",
-            "The ocean",
-            "Time",
-        ],
-        answer: 0,
-        biome: Biome::Cosma,
-    },
-    Riddle {
-        question: "Short story: Mina saved her coins for a year. On market day she walked past the toy stall, past the sweet stall, and stopped at the book cart. She traded every coin for one worn volume, hugged it to her chest, and walked home barefoot and smiling.\nWhat does the story suggest about Mina?",
-        options: &[
-            "She values learning above material things",
-            "She lost her shoes at the market",
-            "She could not afford toys or sweets",
-            "She dislikes going to the market",
-        ],
-        answer: 0,
-        biome: Biome::Cosma,
-    },
-];
+#[cfg(test)]
+pub fn biome_riddles(b: Biome) -> Vec<(usize, &'static Riddle)> {
+    RIDDLES
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.biome == b)
+        .collect()
+}
 
-pub const AQUARIUS_RIDDLES: &[Riddle] = &[
-    Riddle {
-        question: "Which italicization correctly specifies that Gillbert specifically does not particularly believe in Neptune?",
-        options: &[
-            "Scalleon said that Gillbert *doesn't* believe in Neptune",
-            "Scalleon said that *Gillbert* doesn't believe in Neptune",
-            "Scalleon *said* that Gillbert doesn't believe in Neptune",
-            "Scalleon said that Gillbert doesn't believe in *Neptune*",
-        ],
-        answer: 3,
-        biome: Biome::Aquarius,
-    },
-    Riddle {
-        question: "Based on this dimension, what is Neptune?",
-        options: &["Their god", "Their supreme leader", "A book", "A region they live in"],
-        answer: 0,
-        biome: Biome::Aquarius,
-    },
-];
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_biome_has_two_to_three_riddles() {
+        for b in [Biome::Kelp, Biome::Coral, Biome::Slums] {
+            let n = biome_riddles(b).len();
+            assert!((2..=3).contains(&n), "{:?} had {} riddles", b, n);
+        }
+    }
+}
