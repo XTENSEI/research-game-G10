@@ -106,14 +106,12 @@ pub enum MusicTrack {
 }
 
 pub struct Sfx {
-    pub blip: Sound,
     pub good: Sound,
     pub bad: Sound,
     pub page: Sound,
     pub splash: Sound,
     pub click: Sound,
     pub select: Sound,
-    pub back: Sound,
     pub question: Sound,
     pub coin: Sound,
     pub steps: Vec<Sound>,
@@ -129,17 +127,9 @@ pub struct MusicTracks {
     pub battle: Sound,
 }
 
-pub struct Ambience {
-    pub candy: Sound,
-    pub aqua: Sound,
-    pub cosma: Sound,
-    pub house: Sound,
-}
-
 pub struct AudioSys {
     pub sfx: Sfx,
     pub mus: MusicTracks,
-    pub amb: Ambience,
     pub blips: [Sound; 5],
     active: Option<MusicTrack>,
     pub muted: bool,
@@ -188,10 +178,6 @@ impl AudioSys {
     pub fn set_music_vol(&mut self, v: f32) {
         self.music_vol = v.clamp(0.0, 1.0);
         self.apply_music_vol();
-    }
-
-    pub fn set_sfx_vol(&mut self, v: f32) {
-        self.sfx_vol = v.clamp(0.0, 1.0);
     }
 
     fn apply_music_vol(&self) {
@@ -303,55 +289,69 @@ pub async fn load() -> AudioSys {
         "step_stone_a", "step_stone_b", "step_wood_a", "step_wood_b",
         "step_snow_a", "step_snow_b",
     ];
-    let mut steps = Vec::with_capacity(step_names.len());
-    for n in step_names {
-        steps.push(sfx(n, &click).await);
-    }
+    let steps = crate::game::join_all(step_names.iter().map(|n| sfx(n, &click)).collect()).await;
 
     let town_pad = pad(&[130.8, 164.8, 196.0], 0.4, 4.0, 0.25, 0.25, 3);
     let kelp_pad = pad(&[196.0, 246.9, 293.7, 392.0], 0.5, 4.0, 0.55, 0.4, 17);
     let coral_pad = pad(&[98.0, 130.8, 164.8], 0.25, 4.0, 0.85, 0.3, 29);
     let slums_pad = pad(&[110.0, 146.8, 174.6, 220.0], 0.4, 4.0, 0.90, 0.65, 41);
 
-    let town = mus("mus_town", &town_pad).await;
-    let kelp = mus("mus_kelp", &kelp_pad).await;
-    let coral = mus("mus_coral", &coral_pad).await;
-    let cave = mus("mus_cave", &coral_pad).await;
-    let slums = mus("mus_slums", &slums_pad).await;
-    let rainbow = mus("mus_rainbow", &kelp_pad).await;
-    let battle = mus("mus_battle", &slums_pad).await;
+    let mut mus_it = crate::game::join_all(vec![
+        mus("mus_town", &town_pad),
+        mus("mus_kelp", &kelp_pad),
+        mus("mus_coral", &coral_pad),
+        mus("mus_cave", &coral_pad),
+        mus("mus_slums", &slums_pad),
+        mus("mus_rainbow", &kelp_pad),
+        mus("mus_battle", &slums_pad),
+    ]).await.into_iter();
+    let town = mus_it.next().unwrap();
+    let kelp = mus_it.next().unwrap();
+    let coral = mus_it.next().unwrap();
+    let cave = mus_it.next().unwrap();
+    let slums = mus_it.next().unwrap();
+    let rainbow = mus_it.next().unwrap();
+    let battle = mus_it.next().unwrap();
 
-    let amb = Ambience {
-        house: town.clone(),
-        candy: kelp.clone(),
-        aqua: coral.clone(),
-        cosma: slums.clone(),
-    };
+    let mut sfx_it = crate::game::join_all(vec![
+        sfx("good", &good),
+        sfx("bad", &bad),
+        sfx("page", &page),
+        sfx("splash", &splash),
+        sfx("click", &click),
+        sfx("select", &click),
+        sfx("question", &blip),
+        sfx("coin", &good),
+    ]).await.into_iter();
 
+    let mut blip_it = crate::game::join_all(vec![
+        load_sound_from_bytes(&write_wav(&tone(210.0, 0.048, 0.22, 38.0))),
+        load_sound_from_bytes(&write_wav(&tone(320.0, 0.045, 0.20, 42.0))),
+        load_sound_from_bytes(&write_wav(&tone(440.0, 0.042, 0.19, 44.0))),
+        load_sound_from_bytes(&write_wav(&tone(540.0, 0.040, 0.19, 46.0))),
+        load_sound_from_bytes(&write_wav(&tone(660.0, 0.038, 0.18, 48.0))),
+    ]).await.into_iter();
     let blips = [
-        load_sound_from_bytes(&write_wav(&tone(210.0, 0.048, 0.22, 38.0))).await.unwrap(),
-        load_sound_from_bytes(&write_wav(&tone(320.0, 0.045, 0.20, 42.0))).await.unwrap(),
-        load_sound_from_bytes(&write_wav(&tone(440.0, 0.042, 0.19, 44.0))).await.unwrap(),
-        load_sound_from_bytes(&write_wav(&tone(540.0, 0.040, 0.19, 46.0))).await.unwrap(),
-        load_sound_from_bytes(&write_wav(&tone(660.0, 0.038, 0.18, 48.0))).await.unwrap(),
+        blip_it.next().unwrap().unwrap(),
+        blip_it.next().unwrap().unwrap(),
+        blip_it.next().unwrap().unwrap(),
+        blip_it.next().unwrap().unwrap(),
+        blip_it.next().unwrap().unwrap(),
     ];
 
     AudioSys {
         sfx: Sfx {
-            blip: sfx("blip", &blip).await,
-            good: sfx("good", &good).await,
-            bad: sfx("bad", &bad).await,
-            page: sfx("page", &page).await,
-            splash: sfx("splash", &splash).await,
-            click: sfx("click", &click).await,
-            select: sfx("select", &click).await,
-            back: sfx("back", &click).await,
-            question: sfx("question", &blip).await,
-            coin: sfx("coin", &good).await,
+            good: sfx_it.next().unwrap(),
+            bad: sfx_it.next().unwrap(),
+            page: sfx_it.next().unwrap(),
+            splash: sfx_it.next().unwrap(),
+            click: sfx_it.next().unwrap(),
+            select: sfx_it.next().unwrap(),
+            question: sfx_it.next().unwrap(),
+            coin: sfx_it.next().unwrap(),
             steps,
         },
         mus: MusicTracks { town, kelp, coral, cave, slums, rainbow, battle },
-        amb,
         blips,
         active: None,
         muted: false,
