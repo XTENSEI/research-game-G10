@@ -110,6 +110,17 @@ pub struct World {
     pub bot_dir: f32,
     pub bot_y: f32,
     pub drawn_bottom: std::cell::Cell<f32>,
+    scale_x: f32,
+    scale_y: f32,
+    lean: f32,
+    was_moving: bool,
+    prev_facing: f32,
+    dash_t: f32,
+    dash_cd: f32,
+    afterimages: Vec<(f32, f32, f32, f32, bool)>,
+    cam_look: f32,
+    prompt_pop: f32,
+    prompt_target: Option<String>,
 }
 
 impl World {
@@ -136,6 +147,17 @@ impl World {
             bot_dir: 0.0,
             bot_y: 0.0,
             drawn_bottom: std::cell::Cell::new(0.0),
+            scale_x: 1.0,
+            scale_y: 1.0,
+            lean: 0.0,
+            was_moving: false,
+            prev_facing: 1.0,
+            dash_t: 0.0,
+            dash_cd: 0.0,
+            afterimages: Vec::new(),
+            cam_look: 0.0,
+            prompt_pop: 0.0,
+            prompt_target: None,
         };
         w.populate(biome, tex);
         w
@@ -146,8 +168,17 @@ impl World {
         self.actors.clear();
         self.props.clear();
         self.particles.clear();
+        self.afterimages.clear();
         self.click = None;
         self.cam = 0.0;
+        self.cam_look = 0.0;
+        self.scale_x = 1.0;
+        self.scale_y = 1.0;
+        self.lean = 0.0;
+        self.dash_t = 0.0;
+        self.dash_cd = 0.0;
+        self.prompt_pop = 0.0;
+        self.prompt_target = None;
 
         match biome {
             Biome::Kelp => {
@@ -341,8 +372,98 @@ impl World {
         if dx.abs() > 0.05 {
             self.facing = dx.signum();
         }
-        self.player.0 = (self.player.0 + dx.clamp(-1.0, 1.0) * spd * dt).clamp(40.0, self.length - 40.0);
+        let swimming = self.biome == Biome::Kelp || self.biome == Biome::Coral;
+        if self.dash_cd > 0.0 {
+            self.dash_cd = (self.dash_cd - dt).max(0.0);
+        }
+        if (is_key_pressed(KeyCode::LeftShift) || is_key_pressed(KeyCode::RightShift) || is_key_pressed(KeyCode::X))
+            && self.dash_cd <= 0.0
+        {
+            self.dash_t = 0.16;
+            self.dash_cd = 0.55;
+            self.scale_x = 1.32;
+            self.scale_y = 0.76;
+            for k in 0..4 {
+                if self.particles.len() < 100 {
+                    self.particles.push(Particle {
+                        x: self.player.0 - self.facing * (12.0 + k as f32 * 7.0),
+                        y: self.player.1 - 16.0 - k as f32 * 5.0,
+                        vx: -self.facing * (95.0 + k as f32 * 22.0),
+                        vy: -18.0 + (k as f32 - 1.5) * 14.0,
+                        life: 0.38,
+                        max_life: 0.38,
+                        kind: if swimming { 1 } else { 5 },
+                        size: 11.0,
+                        rot: 0.0,
+                        spin: 2.2,
+                        grav: if swimming { -12.0 } else { 14.0 },
+                        drag: 0.90,
+                    });
+                }
+            }
+        }
+        let mut eff_dx = dx.clamp(-1.0, 1.0);
+        let mut move_spd = spd;
+        if self.dash_t > 0.0 {
+            self.dash_t = (self.dash_t - dt).max(0.0);
+            if eff_dx.abs() < 0.1 {
+                eff_dx = self.facing;
+            }
+            move_spd = spd * 1.95;
+            if self.afterimages.len() < 8 {
+                self.afterimages.push((self.player.0, self.player.1, self.facing, 0.22, swimming));
+            }
+        }
+        for (_, _, _, life, _) in &mut self.afterimages {
+            *life -= dt;
+        }
+        self.afterimages.retain(|a| a.3 > 0.0);
+
+        self.player.0 = (self.player.0 + eff_dx * move_spd * dt).clamp(40.0, self.length - 40.0);
         self.player.1 = (self.player.1 + dy.clamp(-1.0, 1.0) * (spd * 0.55) * dt).clamp(538.0, 588.0);
+
+        // Soul Knight style squash/stretch & turn puffs
+        if self.moving && !self.was_moving {
+            self.scale_x = 1.15;
+            self.scale_y = 0.86;
+        } else if !self.moving && self.was_moving {
+            self.scale_x = 0.88;
+            self.scale_y = 1.14;
+        } else if dx.abs() > 0.05 && (self.facing - self.prev_facing).abs() > 0.5 {
+            self.scale_x = 1.18;
+            self.scale_y = 0.84;
+            if self.particles.len() < 95 {
+                self.particles.push(Particle {
+                    x: self.player.0 - self.facing * 8.0,
+                    y: self.player.1 - 6.0,
+                    vx: self.prev_facing * 48.0,
+                    vy: -16.0,
+                    life: 0.32,
+                    max_life: 0.32,
+                    kind: if swimming { 1 } else { 5 },
+                    size: 10.0,
+                    rot: 0.0,
+                    spin: 1.8,
+                    grav: 10.0,
+                    drag: 0.90,
+                });
+            }
+        }
+        self.was_moving = self.moving;
+        if dx.abs() > 0.05 {
+            self.prev_facing = self.facing;
+        }
+        let spring = (dt * 14.0).min(1.0);
+        self.scale_x += (1.0 - self.scale_x) * spring;
+        self.scale_y += (1.0 - self.scale_y) * spring;
+        let want_lean = if self.dash_t > 0.0 {
+            self.facing * 0.14
+        } else if self.moving {
+            self.facing * 0.055
+        } else {
+            0.0
+        };
+        self.lean += (want_lean - self.lean) * (dt * 15.0).min(1.0);
 
         if self.moving {
             self.bob_t += dt * 11.0;
@@ -352,7 +473,6 @@ impl World {
                 self.step_t = 0.0;
                 self.step_hit = true;
             }
-            let swimming = self.biome == Biome::Kelp || self.biome == Biome::Coral;
             if swimming && self.particles.len() < 90 {
                 self.amb_acc[7] += dt * if swift { 16.0 } else { 9.0 };
                 while self.amb_acc[7] >= 1.0 {
@@ -429,8 +549,25 @@ impl World {
             self.interact_cd = (self.interact_cd - dt).max(0.0);
         }
 
-        let target_cam = (self.player.0 - screen_width() * 0.44).clamp(0.0, (self.length - screen_width()).max(0.0));
-        self.cam += (target_cam - self.cam) * (dt * 7.5).min(1.0);
+        let want_look = if self.dash_t > 0.0 {
+            self.facing * 72.0
+        } else if self.moving {
+            self.facing * 46.0
+        } else {
+            self.facing * 14.0
+        };
+        self.cam_look += (want_look - self.cam_look) * (dt * 4.5).min(1.0);
+        let target_cam = (self.player.0 + self.cam_look - screen_width() * 0.44).clamp(0.0, (self.length - screen_width()).max(0.0));
+        self.cam += (target_cam - self.cam) * (dt * 8.0).min(1.0);
+
+        let next_lbl = self.nearest_label().map(|x| x.2.to_string());
+        if next_lbl != self.prompt_target {
+            self.prompt_target = next_lbl;
+            self.prompt_pop = 0.0;
+        }
+        if self.prompt_target.is_some() {
+            self.prompt_pop = (self.prompt_pop + dt * 7.5).min(1.0);
+        }
 
         if (is_key_pressed(KeyCode::E) || is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Enter)) && self.interact_cd <= 0.0 {
             if let Some(act) = self.nearest_action() {
@@ -604,14 +741,19 @@ impl World {
 
         self.draw_particles(fx, cam);
 
-        // Interaction badge floating over nearest target
+        // Interaction badge floating over nearest target with smooth pop-in
         if let Some((lx, ly, lbl)) = self.nearest_label() {
             let sx = lx - cam;
-            let bob = (t * 4.0).sin() * 3.0;
+            let e = 1.0 - (1.0 - self.prompt_pop).powi(3);
+            let bob = (t * 4.2).sin() * 3.0;
             let txt = format!("[E] {}", lbl);
             let pw = tag_width(&txt, 11) + 28.0;
-            draw_nine_slice(tex, sx - pw * 0.5, ly - 32.0 + bob, pw, 32.0, skin.chip, skin.accent);
-            draw_tag_shadow(&txt, sx - pw * 0.5 + 14.0, ly - 11.0 + bob, 11, skin.accent);
+            let ph = (32.0 * e).max(8.0);
+            let py = ly - 32.0 + bob + (32.0 - ph) * 0.5;
+            draw_nine_slice(tex, sx - pw * 0.5, py, pw, ph, skin.chip, skin.accent);
+            if e > 0.45 {
+                draw_tag_shadow(&txt, sx - pw * 0.5 + 14.0, py + 21.0, 11, skin.accent);
+            }
         }
 
         // Bottom toast hint
@@ -999,8 +1141,9 @@ impl World {
             1.0
         };
 
+        let near = a.patrol.is_none() && (self.player.0 - a.x).abs() <= REACH;
         let dw = spr.width() * a.scale;
-        let dh = spr.height() * a.scale * breath;
+        let dh = spr.height() * a.scale * breath * if near { 1.03 } else { 1.0 };
         let face = if a.patrol.is_none() && (self.player.0 - a.x).abs() < 230.0 {
             if self.player.0 >= a.x { 1.0 } else { -1.0 }
         } else {
@@ -1038,19 +1181,40 @@ impl World {
             &tex.river
         };
 
-        let dw = spr.width() * 3.0;
-        let dh = spr.height() * 3.0;
+        // Dash cyan afterimages matching Soul Knight roll ghosting
+        for &(ax, ay, aface, life, aswim) in &self.afterimages {
+            let k = (life / 0.22).clamp(0.0, 1.0);
+            let aspr = if aswim { &tex.river_swim[1] } else { &tex.river_walks[1] };
+            let aw = aspr.width() * 3.0 * self.scale_x;
+            let ah = aspr.height() * 3.0 * self.scale_y;
+            draw_texture_ex(
+                aspr,
+                ax - cam - aw * 0.5,
+                ay - ah,
+                c(110, 232, 255, (k * 135.0) as u8),
+                DrawTextureParams {
+                    dest_size: Some(vec2(aw, ah)),
+                    flip_x: aface < 0.0,
+                    ..Default::default()
+                },
+            );
+        }
+
+        let stride_bounce = if self.moving && !swimming { (self.bob_t.sin().abs()) * 0.035 } else { 0.0 };
+        let dw = spr.width() * 3.0 * (self.scale_x + stride_bounce * 0.5);
+        let dh = spr.height() * 3.0 * (self.scale_y - stride_bounce);
         let float_off = if swimming && self.moving {
             -12.0 + (t * 5.5).sin() * 4.5
         } else if swimming {
             -4.0 + (t * 2.4).sin() * 3.0
         } else {
-            0.0
+            -(self.bob_t.sin().abs()) * 3.0
         };
 
         if let Some(sh) = tex.shadow_of("river") {
-            let sw = sh.width() * 3.0;
-            let shh = sh.height() * 3.0;
+            let sh_scale = (1.0 - float_off.abs() * 0.012).clamp(0.65, 1.15);
+            let sw = sh.width() * 3.0 * sh_scale;
+            let shh = sh.height() * 3.0 * sh_scale;
             draw_texture_ex(sh, sx - sw * 0.5, feet_y - shh * 0.5, WHITE, DrawTextureParams {
                 dest_size: Some(vec2(sw, shh)),
                 ..Default::default()
@@ -1062,6 +1226,8 @@ impl World {
         draw_texture_ex(spr, sx - dw * 0.5, top_y, WHITE, DrawTextureParams {
             dest_size: Some(vec2(dw, dh)),
             flip_x: self.facing < 0.0,
+            rotation: self.lean,
+            pivot: Some(vec2(sx, top_y + dh * 0.5)),
             ..Default::default()
         });
     }

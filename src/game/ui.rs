@@ -20,13 +20,13 @@ pub async fn ensure_fonts() {
     if F_DIALOG.get().is_some() && F_TAG.get().is_some() {
         return;
     }
-    if let Ok(bytes) = macroquad::file::load_file("assets/fonts/VT323-Regular.ttf").await {
+    if let Ok(bytes) = crate::embedded::load_bytes("assets/fonts/VT323-Regular.ttf").await {
         if let Ok(mut f) = load_ttf_font_from_bytes(&bytes) {
             prewarm_font(&mut f, &[20, 22, 24, 26, 28]);
             let _ = F_DIALOG.set(f);
         }
     }
-    if let Ok(bytes) = macroquad::file::load_file("assets/fonts/PressStart2P-Regular.ttf").await {
+    if let Ok(bytes) = crate::embedded::load_bytes("assets/fonts/PressStart2P-Regular.ttf").await {
         if let Ok(mut f) = load_ttf_font_from_bytes(&bytes) {
             prewarm_font(&mut f, &[10, 11, 12, 13, 14, 15, 16, 18, 20, 28]);
             let _ = F_TAG.set(f);
@@ -254,6 +254,7 @@ pub struct DialogueBox {
     text: String,
     shown: usize,
     timer: f32,
+    open_t: f32,
     portrait: Option<Texture2D>,
     choices: Vec<(String, String)>,
     choice_sel: usize,
@@ -269,6 +270,7 @@ impl DialogueBox {
             text: String::new(),
             shown: 0,
             timer: 0.0,
+            open_t: 0.0,
             portrait: None,
             choices: Vec::new(),
             choice_sel: 0,
@@ -281,6 +283,9 @@ impl DialogueBox {
     }
 
     pub fn say_expr(&mut self, who: &str, expr: &str, text: &str, tex: &Textures) {
+        if !self.open {
+            self.open_t = 0.0;
+        }
         self.open = true;
         self.speaker = who.to_string();
         self.expr = expr.to_string();
@@ -322,6 +327,7 @@ impl DialogueBox {
         if !self.open {
             return None;
         }
+        self.open_t = (self.open_t + dt * 7.5).min(1.0);
         if self.shown < self.text.len() {
             self.timer += dt;
             let want = (self.timer * 52.0) as usize;
@@ -390,7 +396,8 @@ impl DialogueBox {
         let h = screen_height();
         let bw = (w - BOX_MARGIN * 2.0).min(960.0);
         let bx = (w - bw) * 0.5;
-        let by = h - BOX_H - BOX_MARGIN;
+        let ease = 1.0 - (1.0 - self.open_t).powi(3);
+        let by = h - BOX_H - BOX_MARGIN + (1.0 - ease) * 20.0;
         (bx, by, bw, BOX_H)
     }
 
