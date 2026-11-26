@@ -263,11 +263,7 @@ fn bake_beam(w: u16, h: u16) -> Texture2D {
 
 async fn fx_tex(name: &str) -> Texture2D {
     let path = format!("assets/game/fx/{}.png", name);
-    let t = macroquad::texture::load_texture(&path)
-        .await
-        .unwrap_or_else(|e| panic!("missing fx sprite {}: {:?}", path, e));
-    t.set_filter(FilterMode::Linear);
-    t
+    crate::embedded::load_tex(&path, FilterMode::Linear).await
 }
 
 /// The CC0 particle sprite kit (Kenney Particle Pack).

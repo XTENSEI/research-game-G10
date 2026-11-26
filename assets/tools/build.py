@@ -452,6 +452,17 @@ def make_custom_ui_icons():
 
 make_custom_ui_icons()
 
+# Export raw RGBA desktop window icons (16x16, 32x32, 64x64) from Elixir Tome
+_tome = Image.open(os.path.join(OUT_PROPS, "tome.png")).convert("RGBA")
+for _sz in (16, 32, 64):
+    _sq = Image.new("RGBA", (_sz, _sz), (0, 0, 0, 0))
+    _scale_w = max(1, int(round(_tome.width * (_sz / max(_tome.width, _tome.height)))))
+    _scale_h = max(1, int(round(_tome.height * (_sz / max(_tome.width, _tome.height)))))
+    _res = _tome.resize((_scale_w, _scale_h), Image.NEAREST)
+    _sq.paste(_res, ((_sz - _scale_w) // 2, (_sz - _scale_h) // 2), _res)
+    with open(os.path.join(OUT_UI, f"icon_{_sz}.rgba"), "wb") as _f:
+        _f.write(_sq.tobytes())
+
 # ---------------------------------------------------------------------------
 # 6. FX Particles (Kenney Particle Pack, CC0)
 # ---------------------------------------------------------------------------

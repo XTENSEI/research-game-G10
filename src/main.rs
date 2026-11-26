@@ -1,8 +1,24 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod audio;
 mod art;
+mod embedded;
 mod game;
 
 use macroquad::prelude::*;
+
+fn desktop_icon() -> Option<macroquad::miniquad::conf::Icon> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        return Some(macroquad::miniquad::conf::Icon {
+            small: *include_bytes!("../assets/game/ui/icon_16.rgba"),
+            medium: *include_bytes!("../assets/game/ui/icon_32.rgba"),
+            big: *include_bytes!("../assets/game/ui/icon_64.rgba"),
+        });
+    }
+    #[cfg(target_arch = "wasm32")]
+    None
+}
 
 fn conf() -> Conf {
     Conf {
@@ -10,6 +26,7 @@ fn conf() -> Conf {
         window_width: 1024,
         window_height: 720,
         high_dpi: true,
+        icon: desktop_icon(),
         ..Default::default()
     }
 }

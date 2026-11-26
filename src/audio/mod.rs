@@ -217,6 +217,11 @@ impl AudioSys {
 
 async fn sfx(name: &str, fallback: &[f32]) -> Sound {
     let path = format!("assets/game/audio/{}.ogg", name);
+    if let Some(bytes) = crate::embedded::desktop_bytes(&path) {
+        if let Ok(s) = load_sound_from_bytes(&bytes).await {
+            return s;
+        }
+    }
     if let Ok(s) = load_sound(&path).await {
         return s;
     }
@@ -227,6 +232,11 @@ async fn sfx(name: &str, fallback: &[f32]) -> Sound {
 
 async fn mus(name: &str, fallback: &[f32]) -> Sound {
     let path = format!("assets/game/audio/{}.ogg", name);
+    if let Some(bytes) = crate::embedded::desktop_bytes(&path) {
+        if let Ok(s) = load_sound_from_bytes(&bytes).await {
+            return s;
+        }
+    }
     if let Ok(s) = load_sound(&path).await {
         return s;
     }

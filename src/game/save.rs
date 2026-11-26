@@ -43,9 +43,30 @@ pub struct SaveData {
 }
 
 pub fn save_path() -> std::path::PathBuf {
-    std::env::current_dir()
-        .unwrap_or_else(|_| std::path::PathBuf::from("."))
-        .join("save.txt")
+    if let Ok(cwd) = std::env::current_dir() {
+        if cwd.join("assets/game").is_dir() {
+            return cwd.join("save.txt");
+        }
+    }
+    #[cfg(target_os = "windows")]
+    let base = std::env::var_os("LOCALAPPDATA")
+        .or_else(|| std::env::var_os("APPDATA"))
+        .map(|d| std::path::PathBuf::from(d).join("GiftOfEducation"));
+    #[cfg(not(target_os = "windows"))]
+    let base = std::env::var_os("XDG_DATA_HOME")
+        .map(|d| std::path::PathBuf::from(d).join("gift-of-education"))
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/share/gift-of-education"))
+        });
+
+    if let Some(dir) = base {
+        let _ = std::fs::create_dir_all(&dir);
+        return dir.join("save.txt");
+    }
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("save.txt")))
+        .unwrap_or_else(|| std::path::PathBuf::from("save.txt"))
 }
 
 pub fn save(data: &SaveData) -> bool {

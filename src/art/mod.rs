@@ -166,19 +166,11 @@ const COSMA_PLANETS: [&str; 7] = [
 ];
 
 async fn load_crisp(path: &str) -> Texture2D {
-    let t = macroquad::texture::load_texture(path)
-        .await
-        .unwrap_or_else(|e| panic!("missing art asset {}: {:?}", path, e));
-    t.set_filter(FilterMode::Nearest);
-    t
+    crate::embedded::load_tex(path, FilterMode::Nearest).await
 }
 
 async fn load_linear(path: &str) -> Texture2D {
-    let t = macroquad::texture::load_texture(path)
-        .await
-        .unwrap_or_else(|e| panic!("missing art asset {}: {:?}", path, e));
-    t.set_filter(FilterMode::Linear);
-    t
+    crate::embedded::load_tex(path, FilterMode::Linear).await
 }
 
 async fn char_tex(name: &str) -> Texture2D {
