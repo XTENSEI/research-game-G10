@@ -1044,22 +1044,37 @@ impl World {
             "item_0" => {
                 if !prog.items[0] {
                     let hover = (t * 3.0).sin() * 5.0;
-                    fx.glow_rect(sx, top + p.h * 0.5 + hover, 108.0, 108.0, c(90, 210, 255, 72));
+                    let cy = top + p.h * 0.5 + hover;
+                    fx.glow_rect(sx, cy, 118.0, 118.0, c(90, 210, 255, 76));
                     draw_texture_ex(&tex.props.item_seashroom, sx - p.w * 0.5, top + hover, WHITE, DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
+                    for k in 0..2 {
+                        let a = t * 2.4 + k as f32 * 3.14;
+                        draw_spr(fx.sprites.star_at(k), sx + a.cos() * 24.0, cy + a.sin() * 14.0, 12.0, t * 2.0, c(160, 248, 255, 195));
+                    }
                 }
             }
             "item_1" => {
                 if !prog.items[1] {
                     let hover = (t * 3.0 + 1.2).sin() * 5.0;
-                    fx.glow_rect(sx, top + p.h * 0.5 + hover, 108.0, 108.0, c(255, 130, 220, 72));
+                    let cy = top + p.h * 0.5 + hover;
+                    fx.glow_rect(sx, cy, 118.0, 118.0, c(255, 130, 220, 76));
                     draw_texture_ex(&tex.props.item_anemone, sx - p.w * 0.5, top + hover, WHITE, DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
+                    for k in 0..2 {
+                        let a = t * 2.4 + 1.0 + k as f32 * 3.14;
+                        draw_spr(fx.sprites.star_at(k + 1), sx + a.cos() * 24.0, cy + a.sin() * 14.0, 12.0, t * 2.0, c(255, 180, 240, 195));
+                    }
                 }
             }
             "item_2" => {
                 if !prog.items[2] {
                     let hover = (t * 3.2 + 2.4).sin() * 5.0;
-                    fx.glow_rect(sx, top + p.h * 0.5 + hover, 114.0, 114.0, c(96, 226, 255, 78));
+                    let cy = top + p.h * 0.5 + hover;
+                    fx.glow_rect(sx, cy, 122.0, 122.0, c(96, 226, 255, 82));
                     draw_texture_ex(&tex.props.item_seaberry, sx - p.w * 0.5, top + hover, WHITE, DrawTextureParams { dest_size: Some(vec2(p.w, p.h)), ..Default::default() });
+                    for k in 0..2 {
+                        let a = t * 2.6 + 2.0 + k as f32 * 3.14;
+                        draw_spr(fx.sprites.star_at(k + 2), sx + a.cos() * 26.0, cy + a.sin() * 14.0, 13.0, t * 2.2, c(160, 252, 255, 210));
+                    }
                 }
             }
             "decoy" => {
@@ -1142,8 +1157,9 @@ impl World {
         };
 
         let near = a.patrol.is_none() && (self.player.0 - a.x).abs() <= REACH;
+        let talk_hop = if near { -((phase_t * 6.0).sin().abs()) * 2.8 } else { 0.0 };
         let dw = spr.width() * a.scale;
-        let dh = spr.height() * a.scale * breath * if near { 1.03 } else { 1.0 };
+        let dh = spr.height() * a.scale * breath * if near { 1.035 } else { 1.0 };
         let face = if a.patrol.is_none() && (self.player.0 - a.x).abs() < 230.0 {
             if self.player.0 >= a.x { 1.0 } else { -1.0 }
         } else {
@@ -1158,7 +1174,7 @@ impl World {
                 ..Default::default()
             });
         }
-        draw_texture_ex(spr, sx - dw * 0.5, a.y - dh + hover_y, WHITE, DrawTextureParams {
+        draw_texture_ex(spr, sx - dw * 0.5, a.y - dh + hover_y + talk_hop, WHITE, DrawTextureParams {
             dest_size: Some(vec2(dw, dh)),
             flip_x: face < 0.0,
             ..Default::default()

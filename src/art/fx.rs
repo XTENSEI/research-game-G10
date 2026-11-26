@@ -87,6 +87,7 @@ uniform vec4 u_flash;
 uniform float u_iris;
 uniform float u_fade;
 uniform vec2 u_seed;
+uniform float u_time;
 
 void main() {
     vec3 base = texture2D(Texture, uv).rgb;
@@ -95,6 +96,15 @@ void main() {
 
     // Soft additive highlight bloom (never lifts cream sheets or dark backgrounds)
     vec3 col = base + b1 * 0.16 + b2 * 0.14;
+
+    // Subtle animated underwater light caustics across Kelp/Coral water columns
+    float water = clamp((u_grade.b - u_grade.r) * 1.8, 0.0, 1.0) * smoothstep(0.10, 0.92, uv.y);
+    if (water > 0.01) {
+        float w1 = sin(uv.x * 24.0 + u_time * 1.35 + sin(uv.y * 14.0 - u_time * 0.85));
+        float w2 = sin(uv.x * 17.0 - u_time * 1.05 + cos(uv.y * 19.0 + u_time * 1.15));
+        float caust = pow(clamp(w1 * w2, 0.0, 1.0), 2.0);
+        col += vec3(0.42, 0.90, 0.96) * caust * water * 0.042;
+    }
 
     // Per-biome subtle color grade
     col = mix(col, u_grade.rgb, u_grade.a);
@@ -426,6 +436,7 @@ impl Fx {
                     UniformDesc::new("u_iris", UniformType::Float1),
                     UniformDesc::new("u_fade", UniformType::Float1),
                     UniformDesc::new("u_seed", UniformType::Float2),
+                    UniformDesc::new("u_time", UniformType::Float1),
                 ],
             },
         )
@@ -685,6 +696,7 @@ impl Fx {
                 w / h.max(1.0),
                 ((self.t * 15.0).floor() % 120.0) * 1.37,
             ]);
+            self.composite_mat.set_uniform("u_time", self.t);
 
             gl_use_material(&self.composite_mat);
             self.screen_quad(&scene_tex, WHITE);
