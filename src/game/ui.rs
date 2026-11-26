@@ -209,13 +209,37 @@ pub fn draw_btn(tex: &Textures, x: f32, y: f32, w: f32, h: f32, label: &str, ski
     let fill = if active || hov { skin.sel } else { skin.chip };
     let border = if active || hov { skin.accent } else { skin.border };
     draw_nine_slice(tex, x, y, w, h, fill, border);
-    let tw = tag_width(label, 12);
+    let size = if tag_width(label, 12) <= w - 16.0 { 12 } else { 10 };
+    let tw = tag_width(label, size);
     let col = if active || hov { skin.accent } else { skin.ink };
-    draw_tag_shadow(label, x + (w - tw) * 0.5, y + h * 0.5 + 5.0, 12, col);
+    draw_tag_shadow(label, x + (w - tw) * 0.5, y + h * 0.5 + (size as f32 * 0.42), size, col);
     hov && is_mouse_button_pressed(MouseButton::Left)
 }
 
-/// Interactive pill/panel button featuring a 20x20 pixel icon beside its label.
+/// Interactive square icon button. Returns true if clicked this frame.
+pub fn draw_icon_only_btn(
+    tex: &Textures,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    ico: &Texture2D,
+    skin: &Skin,
+    active: bool,
+) -> bool {
+    let (mx, my) = mouse_position();
+    let hov = mx >= x && mx <= x + w && my >= y && my <= y + h;
+    let fill = if active || hov { skin.sel } else { skin.chip };
+    let border = if active || hov { skin.accent } else { skin.border };
+    draw_nine_slice(tex, x, y, w, h, fill, border);
+    draw_texture_ex(ico, x + (w - 22.0) * 0.5, y + (h - 22.0) * 0.5, WHITE, DrawTextureParams {
+        dest_size: Some(vec2(22.0, 22.0)),
+        ..Default::default()
+    });
+    hov && is_mouse_button_pressed(MouseButton::Left)
+}
+
+/// Interactive pill/panel button featuring a pixel icon cleanly padded beside its label.
 pub fn draw_btn_icon(
     tex: &Textures,
     x: f32,
@@ -234,14 +258,14 @@ pub fn draw_btn_icon(
     draw_nine_slice(tex, x, y, w, h, fill, border);
     let size = 10;
     let tw = tag_width(label, size);
-    let total = 20.0 + 7.0 + tw;
-    let x0 = x + (w - total) * 0.5;
-    draw_texture_ex(ico, x0, y + (h - 20.0) * 0.5, WHITE, DrawTextureParams {
-        dest_size: Some(vec2(20.0, 20.0)),
+    let total = (18.0 + 6.0 + tw).min(w - 14.0);
+    let x0 = (x + (w - total) * 0.5).max(x + 8.0);
+    draw_texture_ex(ico, x0, y + (h - 18.0) * 0.5, WHITE, DrawTextureParams {
+        dest_size: Some(vec2(18.0, 18.0)),
         ..Default::default()
     });
     let col = if active || hov { skin.accent } else { skin.ink };
-    draw_tag_shadow(label, x0 + 27.0, y + h * 0.5 + 4.0, size, col);
+    draw_tag_shadow(label, x0 + 24.0, y + h * 0.5 + 4.0, size, col);
     hov && is_mouse_button_pressed(MouseButton::Left)
 }
 
@@ -534,8 +558,15 @@ pub fn quiz_header_skinned(tex: &Textures, title: &str, x: f32, y: f32, w: f32, 
     let chip_w = (tag_width(title, 11) + 32.0).min(w);
     draw_nine_slice(tex, x, y - 4.0, chip_w.max(200.0), 36.0, skin.chip, skin.border);
     draw_tag_shadow(title, x + 16.0, y + 20.0, 11, skin.chip_ink);
-    draw_texture_ex(&tex.ui.divider, x, y + 40.0, skin.border, DrawTextureParams {
-        dest_size: Some(vec2(w, 4.0)),
+    let stem_w = (w - 28.0).max(16.0);
+    draw_texture_ex(&tex.ui.divider, x, y + 35.0, skin.border, DrawTextureParams {
+        source: Some(Rect::new(0.0, 0.0, 72.0, 22.0)),
+        dest_size: Some(vec2(stem_w, 16.0)),
+        ..Default::default()
+    });
+    draw_texture_ex(&tex.ui.divider, x + stem_w, y + 35.0, skin.accent, DrawTextureParams {
+        source: Some(Rect::new(72.0, 0.0, 24.0, 22.0)),
+        dest_size: Some(vec2(26.0, 16.0)),
         ..Default::default()
     });
 }
@@ -552,11 +583,17 @@ pub fn draw_option_row_skinned(
 ) -> bool {
     let (mx, my) = mouse_position();
     let hov = mx >= x && mx <= x + w && my >= y && my <= y + h;
-    let fill = if selected || hov { skin.sel } else { skin.chip };
-    let border = if selected || hov { skin.accent } else { skin.border };
+    let lit = selected || hov;
+    let fill = if lit { skin.sel } else { skin.chip };
+    let border = if lit { skin.accent } else { skin.border };
     draw_nine_slice(tex, x, y, w, h, fill, border);
-    let txt_col = if selected || hov { skin.accent } else { skin.ink };
-    draw_wrapped_rich(label, x + 18.0, y + 28.0, w - 36.0, 24, 24.0, txt_col, skin.accent);
+    if lit {
+        draw_rectangle(x + 7.0, y + 9.0, 4.0, (h - 18.0).max(8.0), skin.accent);
+    }
+    let lines = wrapped_line_count(label, w - 42.0, 24) as f32;
+    let start_y = y + (h - lines * 24.0) * 0.5 + 17.0;
+    let txt_col = if lit { skin.accent } else { skin.ink };
+    draw_wrapped_rich(label, x + 20.0, start_y, w - 40.0, 24, 24.0, txt_col, skin.accent);
     hov && is_mouse_button_pressed(MouseButton::Left)
 }
 

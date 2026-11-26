@@ -1879,29 +1879,33 @@ impl Game {
 
     fn draw_hud(&mut self, skin: &Skin) {
         let w = screen_width();
-        draw_nine_slice(&self.tex, 12.0, 12.0, 420.0, 44.0, skin.bg, skin.border);
-        draw_tag_shadow(script::biome_title(self.biome), 26.0, 40.0, 10, skin.accent);
+        let title = script::biome_title(self.biome);
+        draw_nine_slice(&self.tex, 12.0, 12.0, 400.0, 44.0, skin.bg, skin.border);
+        let bsize = if tag_width(title, 10) <= 372.0 { 10 } else { 9 };
+        draw_tag_shadow(title, 26.0, 39.0, bsize, skin.accent);
 
-        // Elixir vial & Riddle scroll badge
+        // Elixir vial & Riddle scroll badge cleanly spaced with 8px gutters
         let vial = match self.prog.elixir {
             0 => &self.tex.ui.vial_empty,
             1 => &self.tex.ui.vial_red,
             2 => &self.tex.ui.vial_green,
             _ => &self.tex.ui.vial_blue,
         };
-        draw_nine_slice(&self.tex, 440.0, 12.0, 286.0, 44.0, skin.bg, skin.border);
-        draw_texture_ex(vial, 450.0, 21.0, WHITE, DrawTextureParams { dest_size: Some(vec2(26.0, 26.0)), ..Default::default() });
-        draw_dlg_shadow(&format!("Elixir {}/3", self.prog.elixir), 482.0, 40.0, 22, skin.ink);
-        draw_texture_ex(&self.tex.ui.scroll, 588.0, 22.0, WHITE, DrawTextureParams { dest_size: Some(vec2(24.0, 24.0)), ..Default::default() });
-        draw_dlg_shadow(&format!("Riddles {}", self.prog.total_riddles_right()), 618.0, 40.0, 22, skin.ink);
+        draw_nine_slice(&self.tex, 420.0, 12.0, 248.0, 44.0, skin.bg, skin.border);
+        draw_texture_ex(vial, 428.0, 22.0, WHITE, DrawTextureParams { dest_size: Some(vec2(24.0, 24.0)), ..Default::default() });
+        draw_dlg_shadow(&format!("Elixir {}/3", self.prog.elixir), 456.0, 40.0, 21, skin.ink);
+        draw_texture_ex(&self.tex.ui.scroll, 548.0, 23.0, WHITE, DrawTextureParams { dest_size: Some(vec2(22.0, 22.0)), ..Default::default() });
+        draw_dlg_shadow(&format!("Riddles {}", self.prog.total_riddles_right()), 574.0, 40.0, 21, skin.ink);
 
-        if draw_btn_icon(&self.tex, w - 290.0, 12.0, 144.0, 44.0, &self.tex.ui.book, "NOTES [Tab]", skin, self.show_notes) {
+        let s_ico = if self.audio.muted { &self.tex.ui.sound_off } else { &self.tex.ui.sound_on };
+        if crate::game::ui::draw_icon_only_btn(&self.tex, w - 348.0, 12.0, 44.0, 44.0, s_ico, skin, self.audio.muted) {
+            self.audio.toggle_mute();
+        }
+        if draw_btn_icon(&self.tex, w - 296.0, 12.0, 152.0, 44.0, &self.tex.ui.book, "NOTES [Tab]", skin, self.show_notes) {
             self.show_notes = !self.show_notes;
             self.audio.play_sfx(&self.audio.sfx.page, 0.55);
         }
-        let s_ico = if self.audio.muted { &self.tex.ui.sound_off } else { &self.tex.ui.sound_on };
-        let m_lbl = if self.audio.muted { "MUTE [M]" } else { "PAUSE [Esc]" };
-        if draw_btn_icon(&self.tex, w - 138.0, 12.0, 126.0, 44.0, s_ico, m_lbl, skin, false) {
+        if draw_btn(&self.tex, w - 136.0, 12.0, 124.0, 44.0, "PAUSE [Esc]", skin, false) {
             self.paused = true;
         }
     }
@@ -2086,6 +2090,9 @@ impl Game {
 
         for (i, slot) in gate::SLOTS.iter().enumerate() {
             draw_frag(slot.before, &mut x, &mut y);
+            if !slot.before.is_empty() && !slot.before.ends_with(' ') && !slot.before.ends_with('\n') {
+                x += 3.0;
+            }
             let sym = picks[i].and_then(|pi| gate::PALETTE.get(pi)).map(|p| p.0).unwrap_or("?");
             let bw = (dlg_width(sym, 22) + 22.0).max(36.0);
             if x + bw > max_x {
@@ -2098,7 +2105,7 @@ impl Game {
             let fill = if sel { c(46, 130, 210, 255) } else if picks[i].is_some() { c(28, 86, 138, 255) } else { c(24, 58, 108, 255) };
             let bord = if sel || hov { skin.accent } else { c(110, 200, 255, 255) };
             draw_rectangle(x, by, bw, 24.0, fill);
-            draw_rectangle_lines(x, by, bw, 24.0, 2.0, bord);
+            draw_rectangle_lines(x, by, bw, 24.0, if sel { 2.5 } else { 2.0 }, bord);
             draw_dlg_shadow(sym, x + (bw - dlg_width(sym, 22)) * 0.5, y - 1.0, 22, WHITE);
             if hov && mclick {
                 next_active = Some(i);

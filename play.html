@@ -24,6 +24,15 @@
 <div id="wrap"><div id="stage"><canvas id="glcanvas" width="1024" height="720" tabindex="1"></canvas></div></div>
 <script>
   const stage = document.getElementById('stage');
+  (function() {
+    const cv = document.getElementById('glcanvas');
+    cv.focus();
+    window.addEventListener('keydown', function(e) {
+      if (['Tab', ' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+  })();
   function fit() {
     const s = Math.min(window.innerWidth / 1024, window.innerHeight / 720);
     stage.style.transform = 'scale(' + s + ')';
