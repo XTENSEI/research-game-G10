@@ -183,18 +183,18 @@ impl World {
         match biome {
             Biome::Kelp => {
                 self.length = 3800.0;
-                self.player = (160.0, 562.0);
-                // Actors grounded at feet_y ~ 560..572
+                self.player = (160.0, 568.0);
+                // Actors grounded at feet_y ~ 562..568
                 self.actors.push(
-                    Actor::new(560.0, 564.0, tex.kenny.clone(), "Kenny", "kenny")
+                    Actor::new(560.0, 565.0, tex.kenny.clone(), "Kenny", "kenny")
                         .anim("kenny"),
                 );
                 self.actors.push(
-                    Actor::new(2370.0, 562.0, tex.guard_a.clone(), "Guard 1", "guards")
+                    Actor::new(2370.0, 563.0, tex.guard_a.clone(), "Guard 1", "guards")
                         .anim("guard_a"),
                 );
                 self.actors.push(
-                    Actor::new(2470.0, 568.0, tex.guard_b.clone(), "Guard 2", "guards")
+                    Actor::new(2470.0, 567.0, tex.guard_b.clone(), "Guard 2", "guards")
                         .anim("guard_b"),
                 );
                 self.actors.push(
@@ -202,28 +202,28 @@ impl World {
                         .anim("sophie"),
                 );
                 self.actors.push(
-                    Actor::new(3440.0, 562.0, tex.queen_crab.clone(), "Queen Crab", "queen_crab")
+                    Actor::new(3440.0, 563.0, tex.queen_crab.clone(), "Queen Crab", "queen_crab")
                         .anim("queen_crab"),
                 );
 
-                // Landmarks & Riddles
-                self.props.push(Prop { id: "kenny_house", x: 780.0, y: 556.0, w: 192.0, h: 168.0, label: "", action: "" });
-                self.props.push(Prop { id: "riddle", x: 1060.0, y: 560.0, w: 84.0, h: 114.0, label: "Kelp Monolith I", action: "riddle_0" });
-                self.props.push(Prop { id: "riddle", x: 1460.0, y: 560.0, w: 84.0, h: 114.0, label: "Kelp Monolith II", action: "riddle_1" });
-                self.props.push(Prop { id: "gate", x: 1890.0, y: 558.0, w: 192.0, h: 210.0, label: "Stone Throne Gate", action: "gate" });
-                self.props.push(Prop { id: "riddle", x: 2820.0, y: 560.0, w: 84.0, h: 114.0, label: "Kelp Monolith III", action: "riddle_2" });
-                self.props.push(Prop { id: "crab_castle", x: 3560.0, y: 556.0, w: 320.0, h: 280.0, label: "", action: "" });
+                // Buildings planted solidly onto the turf surface (y=559 behind actors >=562)
+                self.props.push(Prop { id: "kenny_house", x: 780.0, y: 559.0, w: 192.0, h: 168.0, label: "", action: "" });
+                self.props.push(Prop { id: "riddle", x: 1060.0, y: 562.0, w: 84.0, h: 114.0, label: "Kelp Monolith I", action: "riddle_0" });
+                self.props.push(Prop { id: "riddle", x: 1460.0, y: 562.0, w: 84.0, h: 114.0, label: "Kelp Monolith II", action: "riddle_1" });
+                self.props.push(Prop { id: "gate", x: 1890.0, y: 559.0, w: 192.0, h: 210.0, label: "Stone Throne Gate", action: "gate" });
+                self.props.push(Prop { id: "riddle", x: 2820.0, y: 562.0, w: 84.0, h: 114.0, label: "Kelp Monolith III", action: "riddle_2" });
+                self.props.push(Prop { id: "crab_castle", x: 3560.0, y: 559.0, w: 320.0, h: 280.0, label: "", action: "" });
             }
             Biome::Coral => {
                 self.length = 4200.0;
-                self.player = (180.0, 562.0);
-                self.actors.push(Actor::new(390.0, 562.0, tex.jack.clone(), "Jack", "jack_jill").anim("jack"));
-                self.actors.push(Actor::new(480.0, 568.0, tex.jill.clone(), "Jill", "jack_jill").anim("jill"));
-                self.actors.push(Actor::new(880.0, 564.0, tex.angelfish.clone(), "AngelFish", "alley").anim("angelfish"));
-                self.actors.push(Actor::new(980.0, 568.0, tex.stonefish.clone(), "StoneFish", "alley").anim("stonefish"));
+                self.player = (180.0, 568.0);
+                self.actors.push(Actor::new(390.0, 563.0, tex.jack.clone(), "Jack", "jack_jill").anim("jack"));
+                self.actors.push(Actor::new(480.0, 567.0, tex.jill.clone(), "Jill", "jack_jill").anim("jill"));
+                self.actors.push(Actor::new(880.0, 563.0, tex.angelfish.clone(), "AngelFish", "alley").anim("angelfish"));
+                self.actors.push(Actor::new(980.0, 567.0, tex.stonefish.clone(), "StoneFish", "alley").anim("stonefish"));
 
                 self.actors.push(
-                    Actor::new(1480.0, 564.0, tex.gill.clone(), "Gillbert", "clue_gill_scal")
+                    Actor::new(1480.0, 563.0, tex.gill.clone(), "Gillbert", "clue_gill_scal")
                         .patrolling(1410.0, 1540.0, 32.0)
                         .anim("gill"),
                 );
@@ -232,52 +232,52 @@ impl World {
                         .anim("scal"),
                 );
                 self.actors.push(
-                    Actor::new(1940.0, 564.0, tex.lady.clone(), "Market Lady", "clue_lady")
+                    Actor::new(1940.0, 565.0, tex.lady.clone(), "Market Lady", "clue_lady")
                         .patrolling(1870.0, 2020.0, 28.0)
                         .anim("lady"),
                 );
-                self.actors.push(Actor::new(3350.0, 566.0, tex.towtou.clone(), "Tow-Tou", "towtou").anim("towtou"));
-                self.actors.push(Actor::new(3690.0, 564.0, tex.angler_a.clone(), "Angler Trio", "anglers").anim("angler_a"));
-                self.actors.push(Actor::new(3760.0, 568.0, tex.angler_b.clone(), "Angler B", "anglers").anim("angler_b"));
-                self.actors.push(Actor::new(3830.0, 564.0, tex.angler_c.clone(), "Angler C", "anglers").anim("angler_c"));
+                self.actors.push(Actor::new(3350.0, 565.0, tex.towtou.clone(), "Tow-Tou", "towtou").anim("towtou"));
+                self.actors.push(Actor::new(3610.0, 562.0, tex.angler_a.clone(), "Angler Trio", "anglers").anim("angler_a"));
+                self.actors.push(Actor::new(3700.0, 568.0, tex.angler_b.clone(), "Angler B", "anglers").anim("angler_b"));
+                self.actors.push(Actor::new(3790.0, 562.0, tex.angler_c.clone(), "Angler C", "anglers").anim("angler_c"));
 
-                // Houses & City Landmarks
-                self.props.push(Prop { id: "coral_house_0", x: 300.0, y: 556.0, w: 186.0, h: 168.0, label: "", action: "" });
-                self.props.push(Prop { id: "riddle", x: 1180.0, y: 560.0, w: 84.0, h: 114.0, label: "Coral Tablet I", action: "riddle_3" });
-                self.props.push(Prop { id: "item_0", x: 1360.0, y: 562.0, w: 72.0, h: 72.0, label: "Blue Seashroom", action: "item_0" });
-                self.props.push(Prop { id: "coral_house_1", x: 1660.0, y: 556.0, w: 186.0, h: 168.0, label: "", action: "" });
-                self.props.push(Prop { id: "decoy", x: 1750.0, y: 562.0, w: 72.0, h: 72.0, label: "Bright Reef Berry", action: "decoy_berry" });
-                self.props.push(Prop { id: "market_stall", x: 1860.0, y: 556.0, w: 150.0, h: 132.0, label: "", action: "" });
-                self.props.push(Prop { id: "item_1", x: 2120.0, y: 562.0, w: 72.0, h: 72.0, label: "Tentacle Anemone", action: "item_1" });
-                self.props.push(Prop { id: "riddle", x: 2290.0, y: 560.0, w: 84.0, h: 114.0, label: "Coral Tablet II", action: "riddle_4" });
-                self.props.push(Prop { id: "neptune_statue", x: 2230.0, y: 558.0, w: 88.0, h: 214.0, label: "", action: "" });
-                self.props.push(Prop { id: "ruin_hall", x: 2450.0, y: 556.0, w: 240.0, h: 190.0, label: "", action: "" });
-                self.props.push(Prop { id: "neptune", x: 2630.0, y: 558.0, w: 96.0, h: 220.0, label: "Statue of Neptune", action: "clue_neptune" });
-                self.props.push(Prop { id: "item_2", x: 2790.0, y: 562.0, w: 76.0, h: 76.0, label: "Glowing Kelp Bush", action: "item_2" });
-                self.props.push(Prop { id: "riddle", x: 3020.0, y: 560.0, w: 84.0, h: 114.0, label: "Coral Tablet III", action: "riddle_5" });
-                self.props.push(Prop { id: "towtou_garage", x: 3240.0, y: 556.0, w: 204.0, h: 176.0, label: "", action: "" });
-                self.props.push(Prop { id: "cave", x: 4000.0, y: 558.0, w: 210.0, h: 205.0, label: "Grave Cave Maze", action: "maze" });
+                // Houses & City Landmarks planted on the sand plane behind actors (y=559)
+                self.props.push(Prop { id: "coral_house_0", x: 300.0, y: 559.0, w: 186.0, h: 168.0, label: "", action: "" });
+                self.props.push(Prop { id: "riddle", x: 1180.0, y: 562.0, w: 84.0, h: 114.0, label: "Coral Tablet I", action: "riddle_3" });
+                self.props.push(Prop { id: "item_0", x: 1360.0, y: 563.0, w: 72.0, h: 72.0, label: "Blue Seashroom", action: "item_0" });
+                self.props.push(Prop { id: "coral_house_1", x: 1660.0, y: 559.0, w: 186.0, h: 168.0, label: "", action: "" });
+                self.props.push(Prop { id: "decoy", x: 1750.0, y: 563.0, w: 72.0, h: 72.0, label: "Bright Reef Berry", action: "decoy_berry" });
+                self.props.push(Prop { id: "market_stall", x: 1860.0, y: 559.0, w: 150.0, h: 132.0, label: "", action: "" });
+                self.props.push(Prop { id: "item_1", x: 2120.0, y: 563.0, w: 72.0, h: 72.0, label: "Tentacle Anemone", action: "item_1" });
+                self.props.push(Prop { id: "riddle", x: 2290.0, y: 562.0, w: 84.0, h: 114.0, label: "Coral Tablet II", action: "riddle_4" });
+                self.props.push(Prop { id: "neptune_statue", x: 2230.0, y: 559.0, w: 88.0, h: 214.0, label: "", action: "" });
+                self.props.push(Prop { id: "ruin_hall", x: 2450.0, y: 559.0, w: 240.0, h: 190.0, label: "", action: "" });
+                self.props.push(Prop { id: "neptune", x: 2630.0, y: 559.0, w: 96.0, h: 220.0, label: "Statue of Neptune", action: "clue_neptune" });
+                self.props.push(Prop { id: "item_2", x: 2790.0, y: 563.0, w: 76.0, h: 76.0, label: "Glowing Kelp Bush", action: "item_2" });
+                self.props.push(Prop { id: "riddle", x: 3020.0, y: 562.0, w: 84.0, h: 114.0, label: "Coral Tablet III", action: "riddle_5" });
+                self.props.push(Prop { id: "towtou_garage", x: 3240.0, y: 559.0, w: 204.0, h: 176.0, label: "", action: "" });
+                self.props.push(Prop { id: "cave", x: 4000.0, y: 559.0, w: 210.0, h: 205.0, label: "Grave Cave Maze", action: "maze" });
             }
             Biome::Slums => {
                 self.length = 3800.0;
-                self.player = (180.0, 562.0);
+                self.player = (180.0, 568.0);
                 self.actors.push(Actor::new(1320.0, 566.0, tex.thaumiel.clone(), "Thaumiel", "thaumiel").anim("thaumiel"));
-                self.actors.push(Actor::new(1460.0, 562.0, tex.tenebris.clone(), "Tenebris", "tenebris").anim("tenebris"));
-                self.actors.push(Actor::new(3520.0, 560.0, tex.genie.clone(), "Magic Fire Genie", "rainbow").anim("genie"));
+                self.actors.push(Actor::new(1460.0, 563.0, tex.tenebris.clone(), "Tenebris", "tenebris").anim("tenebris"));
+                self.actors.push(Actor::new(3520.0, 563.0, tex.genie.clone(), "Magic Fire Genie", "rainbow").anim("genie"));
 
-                self.props.push(Prop { id: "shipwreck", x: 380.0, y: 558.0, w: 220.0, h: 150.0, label: "", action: "" });
-                self.props.push(Prop { id: "slum_shack", x: 740.0, y: 556.0, w: 180.0, h: 156.0, label: "", action: "" });
-                self.props.push(Prop { id: "whale", x: 1140.0, y: 560.0, w: 260.0, h: 110.0, label: "", action: "" });
-                self.props.push(Prop { id: "riddle", x: 1690.0, y: 560.0, w: 84.0, h: 114.0, label: "Abyss Stone I", action: "riddle_6" });
-                self.props.push(Prop { id: "riddle", x: 1960.0, y: 560.0, w: 84.0, h: 114.0, label: "Abyss Stone II", action: "riddle_7" });
-                self.props.push(Prop { id: "algae_temple", x: 2440.0, y: 556.0, w: 240.0, h: 210.0, label: "Figurate Algae Temple", action: "algae_temple" });
-                self.props.push(Prop { id: "torch", x: 2940.0, y: 560.0, w: 66.0, h: 120.0, label: "", action: "" });
-                self.props.push(Prop { id: "torch", x: 3140.0, y: 560.0, w: 66.0, h: 120.0, label: "", action: "" });
-                self.props.push(Prop { id: "torch", x: 3340.0, y: 560.0, w: 66.0, h: 120.0, label: "", action: "" });
+                self.props.push(Prop { id: "shipwreck", x: 380.0, y: 559.0, w: 220.0, h: 150.0, label: "", action: "" });
+                self.props.push(Prop { id: "slum_shack", x: 740.0, y: 559.0, w: 180.0, h: 156.0, label: "", action: "" });
+                self.props.push(Prop { id: "whale", x: 1140.0, y: 559.0, w: 260.0, h: 110.0, label: "", action: "" });
+                self.props.push(Prop { id: "riddle", x: 1690.0, y: 562.0, w: 84.0, h: 114.0, label: "Abyss Stone I", action: "riddle_6" });
+                self.props.push(Prop { id: "riddle", x: 1960.0, y: 562.0, w: 84.0, h: 114.0, label: "Abyss Stone II", action: "riddle_7" });
+                self.props.push(Prop { id: "algae_temple", x: 2440.0, y: 559.0, w: 240.0, h: 210.0, label: "Figurate Algae Temple", action: "algae_temple" });
+                self.props.push(Prop { id: "torch", x: 2940.0, y: 562.0, w: 66.0, h: 120.0, label: "", action: "" });
+                self.props.push(Prop { id: "torch", x: 3140.0, y: 562.0, w: 66.0, h: 120.0, label: "", action: "" });
+                self.props.push(Prop { id: "torch", x: 3340.0, y: 562.0, w: 66.0, h: 120.0, label: "", action: "" });
             }
             Biome::Home => {
                 self.length = 1140.0;
-                self.player = (200.0, 560.0);
+                self.player = (200.0, 564.0);
                 self.actors.push(Actor::new(560.0, 558.0, tex.grandparent.clone(), "Grandparent", "grandparent").anim("grandparent"));
                 self.actors.push(Actor::new(720.0, 562.0, tex.mark.clone(), "Mark", "mark").anim("mark"));
                 self.actors.push(Actor::new(910.0, 560.0, tex.nadia.clone(), "Nadia", "nadia").anim("nadia"));
@@ -420,7 +420,8 @@ impl World {
         self.afterimages.retain(|a| a.3 > 0.0);
 
         self.player.0 = (self.player.0 + eff_dx * move_spd * dt).clamp(40.0, self.length - 40.0);
-        self.player.1 = (self.player.1 + dy.clamp(-1.0, 1.0) * (spd * 0.55) * dt).clamp(538.0, 588.0);
+        let y_min = if self.biome == Biome::Home { 544.0 } else { 561.0 };
+        self.player.1 = (self.player.1 + dy.clamp(-1.0, 1.0) * (spd * 0.55) * dt).clamp(y_min, 586.0);
 
         // Soul Knight style squash/stretch & turn puffs
         if self.moving && !self.was_moving {
@@ -802,8 +803,10 @@ impl World {
                     });
                 }
             }
-            // Hardwood planks below ground_y - 24
+            // Hardwood planks below ground_y - 24 with warm baseboard highlight
             let floor_top = ground_y - 24.0;
+            draw_rectangle(0.0, floor_top - 4.0, sw, 4.0, c(162, 110, 74, 255));
+            draw_rectangle(0.0, floor_top - 1.0, sw, 2.0, c(68, 42, 28, 255));
             let f_rows = ((sh - floor_top) / step) as i32 + 2;
             for c_idx in -1..cols {
                 let wx = c_idx as f32 * step - off_x;
@@ -811,14 +814,16 @@ impl World {
                     draw_tile(&tp.planks, wx, floor_top + r as f32 * step, step);
                 }
             }
-            // Woven rug down the main room
+            // Side-view woven runner strip along the main floor
             for c_idx in 6..18 {
                 let wx = c_idx as f32 * step - cam;
                 if wx < -step || wx > sw + step {
                     continue;
                 }
-                draw_tile(&tp.rug, wx, floor_top + step, step);
-                draw_tile(&tp.rug, wx, floor_top + step * 2.0, step);
+                draw_texture_ex(&tp.rug, wx, floor_top + 18.0, WHITE, DrawTextureParams {
+                    dest_size: Some(vec2(step, 26.0)),
+                    ..Default::default()
+                });
             }
             return;
         }
@@ -834,28 +839,28 @@ impl World {
                 let ry = ground_y + r as f32 * step;
                 let tile = match self.biome {
                     Biome::Kelp => {
-                        if r == 1 {
+                        if c_idx >= 64 {
+                            if r == 0 { &tp.stone } else { &tp.stone_alt }
+                        } else if r >= 1 {
                             &tp.dirt
-                        } else if c_idx >= 64 {
-                            if (c_idx + r) % 2 == 0 { &tp.stone } else { &tp.stone_alt }
-                        } else if (c_idx * 7 + r) % 5 == 0 {
+                        } else if c_idx.rem_euclid(5) == 0 {
                             &tp.ground_speck
-                        } else if (c_idx + r) % 2 == 0 {
+                        } else if c_idx.rem_euclid(2) == 0 {
                             &tp.ground
                         } else {
                             &tp.ground_alt
                         }
                     }
                     Biome::Coral => {
-                        if r == 0 || r == 1 {
-                            &tp.coral_sand
-                        } else {
-                            &tp.dirt
-                        }
+                        if r == 0 { &tp.coral_sand } else { &tp.dirt }
                     }
                     Biome::Slums => {
-                        let idx = ((c_idx.rem_euclid(3)) as usize) % tex.cosma.floor.len();
-                        &tex.cosma.floor[idx]
+                        if r == 0 {
+                            &tex.cosma.floor[0]
+                        } else {
+                            let idx = 1 + ((c_idx + r).rem_euclid(2) as usize);
+                            &tex.cosma.floor[idx.min(tex.cosma.floor.len() - 1)]
+                        }
                     }
                     Biome::Home => &tp.planks,
                 };
@@ -879,23 +884,27 @@ impl World {
         let sw = screen_width();
         match self.biome {
             Biome::Kelp => {
-                // Swaying dense kelp stalks pivoted from root & Ansimuz reef foliage along the background strip
+                // Organic swaying kelp groves (skip landmarks so stalks frame doorways instead of slicing roofs)
                 for i in 0..22 {
-                    let wx = 120.0 + i as f32 * 155.0 + ((i * 53) % 40) as f32;
+                    let wx = 110.0 + i as f32 * 165.0 + ((i * 53) % 46) as f32;
+                    if (wx - 780.0).abs() < 110.0 || (wx - 1890.0).abs() < 115.0 || (wx - 3560.0).abs() < 180.0 {
+                        continue;
+                    }
                     let sx = wx - cam;
                     if sx < -90.0 || sx > sw + 90.0 {
                         continue;
                     }
                     let stalk = &tex.props.kelp[i % 3];
+                    let kh = 176.0 + ((i * 29) % 52) as f32;
                     let sway = (t * 1.45 + i as f32 * 0.85).sin() * 0.055;
-                    draw_texture_ex(stalk, sx - 36.0, ground_y - 210.0, WHITE, DrawTextureParams {
-                        dest_size: Some(vec2(72.0, 216.0)),
+                    draw_texture_ex(stalk, sx - 32.0, ground_y - kh + 5.0, WHITE, DrawTextureParams {
+                        dest_size: Some(vec2(64.0, kh)),
                         rotation: sway,
-                        pivot: Some(vec2(sx, ground_y + 4.0)),
+                        pivot: Some(vec2(sx, ground_y + 5.0)),
                         ..Default::default()
                     });
                     if i % 3 == 0 {
-                        draw_texture_ex(&tex.aqua.sea_bush, sx + 18.0, ground_y - 68.0, WHITE, DrawTextureParams {
+                        draw_texture_ex(&tex.aqua.sea_bush, sx + 18.0, ground_y - 68.0 + 4.0, WHITE, DrawTextureParams {
                             dest_size: Some(vec2(64.0, 72.0)),
                             ..Default::default()
                         });
@@ -944,17 +953,7 @@ impl World {
                         ..Default::default()
                     });
                 }
-                // Ansimuz seabed ledge trim across sandy floor seam
-                let lw = 144.0;
-                let lx0 = (cam / lw).floor() as i32 - 1;
-                let ln = (sw / lw).ceil() as i32 + 3;
-                for lc in lx0..lx0 + ln {
-                    draw_texture_ex(&tex.aqua.seabed_ledge, lc as f32 * lw - cam, ground_y - 14.0, WHITE, DrawTextureParams {
-                        dest_size: Some(vec2(lw + 1.0, 22.0)),
-                        ..Default::default()
-                    });
-                }
-                // Red & green reef coral tufts anchored behind sand line
+                // Red & green reef coral tufts anchored behind the unified side-view sand cap
                 for i in 0..16 {
                     let wx = 200.0 + i as f32 * 250.0;
                     let sx = wx - cam;
@@ -962,8 +961,8 @@ impl World {
                         continue;
                     }
                     let spr = if i % 2 == 0 { &tex.aqua.coral_red } else { &tex.aqua.sea_bush };
-                    draw_texture_ex(spr, sx - 28.0, ground_y - 72.0, WHITE, DrawTextureParams {
-                        dest_size: Some(vec2(68.0, 76.0)),
+                    draw_texture_ex(spr, sx - 28.0, ground_y - 68.0, WHITE, DrawTextureParams {
+                        dest_size: Some(vec2(68.0, 72.0)),
                         ..Default::default()
                     });
                 }
@@ -1185,7 +1184,8 @@ impl World {
         let sx = self.player.0 - cam;
         let feet_y = self.player.1;
         let swimming = self.biome == Biome::Kelp || self.biome == Biome::Coral;
-        let spr = if swimming && self.moving {
+        let dashing = self.dash_t > 0.0;
+        let spr = if swimming && dashing {
             let idx = (self.bob_t * 0.65) as usize % 4;
             &tex.river_swim[idx]
         } else if self.moving {
@@ -1216,13 +1216,11 @@ impl World {
             );
         }
 
-        let stride_bounce = if self.moving && !swimming { (self.bob_t.sin().abs()) * 0.035 } else { 0.0 };
+        let stride_bounce = if self.moving && !dashing { (self.bob_t.sin().abs()) * 0.035 } else { 0.0 };
         let dw = spr.width() * 3.0 * (self.scale_x + stride_bounce * 0.5);
         let dh = spr.height() * 3.0 * (self.scale_y - stride_bounce);
-        let float_off = if swimming && self.moving {
+        let float_off = if swimming && dashing {
             -12.0 + (t * 5.5).sin() * 4.5
-        } else if swimming {
-            -4.0 + (t * 2.4).sin() * 3.0
         } else {
             -(self.bob_t.sin().abs()) * 3.0
         };
