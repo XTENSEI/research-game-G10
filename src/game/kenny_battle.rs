@@ -8,32 +8,32 @@ pub struct KennyQ {
     pub correct: usize,
 }
 
-/// Full 3-question round for first duel; retries trim to first 2 questions per p. 2.
+/// Full 3-question round combining conversation recall & grammar; retries trim to first 2.
 pub const KENNY_QUESTIONS: &[KennyQ] = &[
     KennyQ {
-        prompt: "Kenny snaps: \"Alright land-kid, quick strike! Which word completes this sentence in PAST TENSE?\"\n\"Earlier today, River ___ beside the glowing book.\"",
+        prompt: "Kenny snaps: \"First check, were you paying attention?! Why does everyone out here settle duels with riddles instead of fists?\"",
         choices: [
-            "a) sleep",
-            "b) slept",
-            "c) sleeping",
+            "a) Nobody knows how to craft spears underwater",
+            "b) The King prohibited weapons and fighting in duels",
+            "c) Only Queen Crab is allowed to carry weapons",
         ],
         correct: 1,
     },
     KennyQ {
-        prompt: "Kenny grins: \"Nice block! Now identify the ADVERB in:\n'Kenny scuttled swiftly past the tall kelp.'\"",
+        prompt: "Kenny leans in: \"Nice! Now pick the clean PAST TENSE verb:\n'Earlier tonight, River ___ beside the glowing book.'\"",
         choices: [
-            "a) scuttled",
-            "b) tall",
-            "c) swiftly",
+            "a) sleep",
+            "b) sleeping",
+            "c) slept",
         ],
         correct: 2,
     },
     KennyQ {
-        prompt: "Kenny's final test: \"What does the context word *prohibited* mean in:\n'Our King *prohibited* all weapons and fist fights across the realm'?\"",
+        prompt: "Kenny's final test: \"What word acts as the ADVERB in:\n'Kenny scuttled swiftly past the tall kelp.'\"",
         choices: [
-            "a) Officially forbade by law",
-            "b) Sold in market stalls",
-            "c) Polished until shiny",
+            "a) swiftly",
+            "b) tall",
+            "c) scuttled",
         ],
         correct: 0,
     },

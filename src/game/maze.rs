@@ -1,6 +1,7 @@
 //! Aquarius Puzzle: The Grave Cave Maze of Craze (SCRIPT RES.pdf pp. 16-17).
-//! Cardinal N/E/S/W randomized chambers. Right answers advance depth toward exit;
-//! wrong answers silently return the traveler one step back with NO visual cue.
+//! Cardinal N/E/S/W randomized chambers & shuffled direction choices.
+//! Right answers advance depth toward the Somber Slums; wrong answers silently
+//! step you back one chamber with ZERO visual cue.
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Dir {
@@ -13,10 +14,10 @@ pub enum Dir {
 impl Dir {
     pub fn label(self) -> &'static str {
         match self {
-            Dir::North => "NORTH",
-            Dir::East => "EAST",
-            Dir::South => "SOUTH",
-            Dir::West => "WEST",
+            Dir::North => "North",
+            Dir::East => "East",
+            Dir::South => "South",
+            Dir::West => "West",
         }
     }
 }
@@ -25,107 +26,68 @@ impl Dir {
 pub struct MazeQuestion {
     pub dir: Dir,
     pub prompt: &'static str,
-    pub choices: [&'static str; 4],
-    pub correct: usize,
 }
 
-/// Verbatim 8-question cardinal bank from SCRIPT RES.pdf pp. 16-17.
+/// All 8 cardinal direction & NPC-clue riddles from SCRIPT RES.pdf pp. 16-17.
 pub const QUESTIONS: &[MazeQuestion] = &[
     // North
     MazeQuestion {
         dir: Dir::North,
-        prompt: "Which sentence demonstrates correct subject-verb agreement?",
-        choices: [
-            "The reef dolphins swims beside Tow-Tou.",
-            "Neither Gillbert nor the guards was late.",
-            "A school of glowing lanterns drifts above the trench.",
-            "The twin pearls on the pedestal sparkles loudly.",
-        ],
-        correct: 2,
+        prompt: "Chamber Inscription:\n\"I am a red needle pointing the way you must walk.\"",
     },
     MazeQuestion {
         dir: Dir::North,
-        prompt: "What tense is the verb in: \"The cat sits on the mat\"?",
-        choices: [
-            "Past simple",
-            "Present simple",
-            "Future progressive",
-            "Present perfect",
-        ],
-        correct: 1,
+        prompt: "Market Memory:\n\"Take the path where real, sweet True Seaberries actually grow.\"",
     },
     // East
     MazeQuestion {
         dir: Dir::East,
-        prompt: "\"This is the most delicious meal I have ever tasted.\"\nWhat degree of comparison is 'most delicious'?",
-        choices: [
-            "Positive degree",
-            "Comparative degree",
-            "Superlative degree",
-            "Participial modifier",
-        ],
-        correct: 2,
+        prompt: "Ancient Pun:\n\"It wouldn't be an occident to orient yourself toward me.\"",
     },
     MazeQuestion {
         dir: Dir::East,
-        prompt: "\"In order to succeed, you must study hard every day.\"\nWhat role does 'In order to succeed' play?",
-        choices: [
-            "Independent main clause",
-            "Infinitive phrase of purpose",
-            "Appositive noun phrase",
-            "Coordinating conjunction",
-        ],
-        correct: 1,
+        prompt: "Harbor Memory:\n\"Walk the direction that Neptune's Statue at City Hall faces.\"",
     },
     // South
     MazeQuestion {
         dir: Dir::South,
-        prompt: "\"While she was cooking dinner, the lantern flickered.\"\nWhat type of clause is 'While she was cooking dinner'?",
-        choices: [
-            "Dependent adverbial clause",
-            "Independent sentence",
-            "Relative adjective clause",
-            "Prepositional fragment",
-        ],
-        correct: 0,
+        prompt: "Abyss Proverb:\n\"Things go wrong... things go ___.\"",
     },
     MazeQuestion {
         dir: Dir::South,
-        prompt: "Fill in the blank for logical cause and effect:\n\"She was tired, ____ she went to bed early.\"",
-        choices: [
-            "yet",
-            "so",
-            "unless",
-            "nor",
-        ],
-        correct: 1,
+        prompt: "Phonetic Riddle:\n\"I sound like a soft 'down', yet I am only a compass direction.\"",
     },
     // West
     MazeQuestion {
         dir: Dir::West,
-        prompt: "\"Although it was raining, the travelers pressed onward.\"\nWhat grammatical function does 'Although' serve?",
-        choices: [
-            "Subordinating conjunction showing contrast",
-            "Modal auxiliary verb",
-            "Possessive determiner",
-            "Correlative pronoun",
-        ],
-        correct: 0,
+        prompt: "Town Rumor:\n\"Follow where Scalleon and the market locals first claimed sea berries grew.\"",
     },
     MazeQuestion {
         dir: Dir::West,
-        prompt: "Choose the proper subjunctive mood:\n\"If I ___ you, I would bring Tow-Tou's spare wrench.\"",
-        choices: [
-            "was",
-            "am",
-            "were",
-            "will be",
-        ],
-        correct: 2,
+        prompt: "Twilight Verse:\n\"I am the nest where light rests; I am where daylight leaves at night.\"",
     },
 ];
 
 pub const MAZE_TARGET_DEPTH: u8 = 4;
+
+/// Generates a shuffled 8-question cycle plus a shuffled [N/E/S/W] layout.
+pub fn shuffled_cycle() -> ([usize; 8], [Dir; 4]) {
+    let mut order = [0usize, 1, 2, 3, 4, 5, 6, 7];
+    for i in (1..8).rev() {
+        let j = macroquad::rand::gen_range(0, i + 1);
+        order.swap(i, j);
+    }
+    (order, shuffled_dirs())
+}
+
+pub fn shuffled_dirs() -> [Dir; 4] {
+    let mut dirs = [Dir::North, Dir::East, Dir::South, Dir::West];
+    for i in (1..4).rev() {
+        let j = macroquad::rand::gen_range(0, i + 1);
+        dirs.swap(i, j);
+    }
+    dirs
+}
 
 #[cfg(test)]
 mod tests {
@@ -136,5 +98,11 @@ mod tests {
         for d in [Dir::North, Dir::East, Dir::South, Dir::West] {
             assert_eq!(QUESTIONS.iter().filter(|q| q.dir == d).count(), 2);
         }
+        let (order, dirs) = shuffled_cycle();
+        let mut sorted = order;
+        sorted.sort();
+        assert_eq!(sorted, [0, 1, 2, 3, 4, 5, 6, 7]);
+        assert!(dirs.contains(&Dir::North) && dirs.contains(&Dir::South));
+        assert!(dirs.contains(&Dir::East) && dirs.contains(&Dir::West));
     }
 }

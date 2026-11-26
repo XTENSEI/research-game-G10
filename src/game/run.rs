@@ -95,6 +95,7 @@ enum Phase {
         sel: usize,
         pool_pos: usize,
         order: [usize; 8],
+        dir_order: [maze::Dir; 4],
     },
     AlgaeTemple {
         stage: usize,
@@ -341,12 +342,14 @@ impl Game {
             }
             "maze" => {
                 self.enter_biome(Biome::Coral, false);
+                let (order, dir_order) = maze::shuffled_cycle();
                 self.phase = Phase::Maze {
                     depth: 1,
                     q_idx: 0,
                     sel: 0,
                     pool_pos: 1,
-                    order: [0, 2, 4, 6, 1, 3, 5, 7],
+                    order,
+                    dir_order,
                 };
                 self.audio.ensure_music(MusicTrack::Cave);
             }
@@ -976,7 +979,7 @@ impl Game {
                 }
                 self.phase = Phase::RapBattle { bar, beat_t, score, notes, sel, feedback };
             }
-            Phase::Maze { mut depth, mut q_idx, mut sel, mut pool_pos, order } => {
+            Phase::Maze { mut depth, mut q_idx, mut sel, mut pool_pos, mut order, mut dir_order } => {
                 if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) { sel = sel.saturating_sub(1); }
                 if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) { sel = (sel + 1).min(3); }
                 for (k, key) in [KeyCode::Key1, KeyCode::Key2, KeyCode::Key3, KeyCode::Key4].iter().enumerate() {
@@ -984,7 +987,7 @@ impl Game {
                 }
                 if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Z) || is_key_pressed(KeyCode::Space) {
                     let q = &maze::QUESTIONS[order[q_idx % 8]];
-                    if sel == q.correct {
+                    if dir_order[sel] == q.dir {
                         depth += 1;
                         self.audio.play_sfx(&self.audio.sfx.click, 0.45);
                         if depth >= maze::MAZE_TARGET_DEPTH {
@@ -999,10 +1002,14 @@ impl Game {
                         depth = depth.saturating_sub(1);
                     }
                     pool_pos = (pool_pos + 1) % 8;
+                    if pool_pos == 0 {
+                        order = maze::shuffled_cycle().0;
+                    }
                     q_idx = pool_pos;
+                    dir_order = maze::shuffled_dirs();
                     sel = 0;
                 }
-                self.phase = Phase::Maze { depth, q_idx, sel, pool_pos, order };
+                self.phase = Phase::Maze { depth, q_idx, sel, pool_pos, order, dir_order };
             }
             Phase::AlgaeTemple { mut stage, mut sel, mut feedback } => {
                 if let Some((good, msg, mut ft)) = feedback {
@@ -1240,8 +1247,14 @@ impl Game {
                         self.phase = Phase::CrabQte { timer: 6.5, prog: 0.15 };
                     }
                     AfterDialogue::StartKennyTree => {
-                        self.queue_lines(script::KENNY_INTRO, AfterDialogue::None);
-                        self.phase = Phase::KennyTree { step: 0 };
+                        self.dlg.ask_expr(
+                            "Kenny",
+                            "normal",
+                            "Catch your breath! What did you just try asking?",
+                            &[("Where am I?", "w1"), ("Where are we?", "w2"), ("No, stay back!", "w3")],
+                            &self.tex,
+                        );
+                        self.phase = Phase::KennyTree { step: 1 };
                     }
                     AfterDialogue::AskKennyWeapons => {
                         self.dlg.ask_expr(
@@ -1282,7 +1295,11 @@ impl Game {
                         };
                     }
                     AfterDialogue::LaunchQueenTrap => {
-                        let first = if res == "sucked" { script::QUEEN_SUCK_REPLY } else { script::QUEEN_PASS_REPLY };
+                        let first = match res.as_str() {
+                            "sucked" => script::QUEEN_SUCK_REPLY,
+                            "easy" => script::QUEEN_EASY_REPLY,
+                            _ => script::QUEEN_GREAT_REPLY,
+                        };
                         let mut q: VecDeque<Line> = first.iter().copied().collect();
                         q.extend(script::QUEEN_DROP.iter().copied());
                         if let Some(head) = q.pop_front() {
@@ -1309,12 +1326,14 @@ impl Game {
                     AfterDialogue::StartRapBattle => self.start_rap_battle(),
                     AfterDialogue::StartMaze => {
                         self.audio.ensure_music(MusicTrack::Cave);
+                        let (order, dir_order) = maze::shuffled_cycle();
                         self.phase = Phase::Maze {
                             depth: 0,
                             q_idx: 0,
                             sel: 0,
                             pool_pos: 0,
-                            order: [0, 3, 5, 6, 1, 2, 4, 7],
+                            order,
+                            dir_order,
                         };
                     }
                     AfterDialogue::StartAlgaeTemple => {
@@ -1360,20 +1379,49 @@ impl Game {
                         self.phase = Phase::KennyTree { step: 1 };
                     }
                     1 => {
+                        let prompt = match res.as_str() {
+                            "w1" => "Where am I? We're in the *Ocean* *Plains*! Wait... Coral City, I presume?",
+                            "w2" => "Where are *we*? Right in the *Ocean* *Plains*! So... Coral City, I presume?",
+                            _ => "Whoa, hold your bubbles! We're just in the *Ocean* *Plains*. Coral City, I presume?",
+                        };
                         self.dlg.ask_expr(
                             "Kenny",
                             "normal",
-                            script::KENNY_HOME_Q,
+                            prompt,
                             &[("Yes?", "y"), ("No.", "n"), ("We're going back to my actual home.", "h")],
                             &self.tex,
                         );
                         self.phase = Phase::KennyTree { step: 2 };
                     }
                     2 => {
-                        self.queue_lines(script::KENNY_WORLD_EXPLAIN, AfterDialogue::AskKennyWeapons);
+                        let opener = match res.as_str() {
+                            "y" => Line::expr("Kenny", "happy", "Ooh, a fancy reef resident! Look sharp out here though..."),
+                            "h" => Line::expr("Kenny", "worried", "Your... actual home? Above the tide?! Wait, listen up..."),
+                            _ => Line::expr("Kenny", "normal", script::KENNY_HOME_Q),
+                        };
+                        let mut q: VecDeque<Line> = VecDeque::new();
+                        if res != "n" {
+                            q.push_back(opener);
+                        }
+                        q.extend(script::KENNY_WORLD_EXPLAIN.iter().copied());
+                        if let Some(head) = q.pop_front() {
+                            self.dlg.say_expr(head.who, head.expr, head.text, &self.tex);
+                            self.phase = Phase::Dialogue { queue: q, after: AfterDialogue::AskKennyWeapons };
+                        }
                     }
                     _ => {
-                        self.queue_lines(script::KENNY_PRE_DUEL, AfterDialogue::StartKennyBattle(false));
+                        let opener = match res.as_str() {
+                            "r" => Line::expr("Kenny", "normal", "Risk makes things spicy, sure, but we settle disputes purely with *words*!"),
+                            "d" => Line::expr("Kenny", "happy", "Bingo!! Riddles, grammar, and razor-sharp wit!"),
+                            _ => Line::expr("Kenny", "happy", "Yes! Questions and sharp literacy!"),
+                        };
+                        let mut q: VecDeque<Line> = VecDeque::new();
+                        q.push_back(opener);
+                        q.extend(script::KENNY_PRE_DUEL.iter().copied());
+                        if let Some(head) = q.pop_front() {
+                            self.dlg.say_expr(head.who, head.expr, head.text, &self.tex);
+                            self.phase = Phase::Dialogue { queue: q, after: AfterDialogue::StartKennyBattle(false) };
+                        }
                     }
                 }
             }
@@ -1627,8 +1675,8 @@ impl Game {
             Phase::RapBattle { bar, beat_t, score, notes, sel, feedback } => {
                 ui_pick = self.draw_rap_battle(*bar, *beat_t, *score, notes, *sel, feedback.as_ref().map(|x| x.0), &skin);
             }
-            Phase::Maze { q_idx, sel, order, .. } => {
-                ui_pick = self.draw_maze(order[*q_idx % 8], *sel, &skin);
+            Phase::Maze { depth, q_idx, sel, order, dir_order, .. } => {
+                ui_pick = self.draw_maze(*depth, order[*q_idx % 8], *sel, *dir_order, &skin);
             }
             Phase::AlgaeTemple { stage, sel, feedback } => {
                 ui_pick = self.draw_algae_temple(*stage, *sel, feedback.as_ref().map(|x| (x.0, x.1)), &skin);
@@ -1900,12 +1948,17 @@ impl Game {
         let w = screen_width();
         let mut hit = None;
 
-        // Top arena header & boss portrait
+        // Top arena header & boss portrait with impact shake on direct hit
+        let t = get_time() as f32;
+        let kenny_hit = feedback.map(|(good, _)| good).unwrap_or(false);
         draw_panel(&self.tex, (w - 760.0) * 0.5, 24.0, 760.0, 200.0, skin);
-        let kenny_p = self.tex.portrait_expr("Kenny", if boss_hp <= 1 { "worried" } else { "normal" });
+        let kenny_p = self.tex.portrait_expr("Kenny", if boss_hp <= 1 || kenny_hit { "worried" } else { "normal" });
         if let Some(p) = kenny_p {
-            draw_nine_slice(&self.tex, 154.0, 48.0, 144.0, 144.0, skin.chip, skin.accent);
-            draw_texture_ex(p, 162.0, 56.0, WHITE, DrawTextureParams { dest_size: Some(vec2(128.0, 128.0)), ..Default::default() });
+            let jx = if kenny_hit { (t * 52.0).sin() * 6.0 } else { 0.0 };
+            let jy = if kenny_hit { (t * 38.0).cos() * 3.0 } else { (t * 3.4).sin() * 2.5 };
+            let tint = if kenny_hit && (t * 28.0).sin() > 0.0 { c(255, 165, 165, 255) } else { WHITE };
+            draw_nine_slice(&self.tex, 154.0 + jx, 48.0 + jy, 144.0, 144.0, skin.chip, skin.accent);
+            draw_texture_ex(p, 162.0 + jx, 56.0 + jy, tint, DrawTextureParams { dest_size: Some(vec2(128.0, 128.0)), ..Default::default() });
         }
 
         draw_tag_shadow("KELP DUEL: KENNY THE CRAB", 322.0, 68.0, 14, skin.accent);
@@ -1925,10 +1978,16 @@ impl Game {
         if round_dodge {
             draw_panel(&self.tex, 296.0, 324.0, 432.0, 224.0, skin);
             draw_tag_shadow(&format!("DODGE KENNY'S BUBBLE SHELLS!  {:.1}s", timer), 312.0, 304.0, 12, skin.accent);
-            for (bx, by, _, _) in bullets {
-                draw_texture_ex(&self.tex.ui.gem, bx - 14.0, by - 14.0, c(120, 246, 220, 255), DrawTextureParams { dest_size: Some(vec2(28.0, 28.0)), ..Default::default() });
+            for (i, &(bx, by, _, _)) in bullets.iter().enumerate() {
+                draw_texture_ex(&self.tex.ui.gem, bx - 14.0, by - 14.0, c(120, 246, 220, 255), DrawTextureParams {
+                    dest_size: Some(vec2(28.0, 28.0)),
+                    rotation: t * 4.5 + i as f32,
+                    pivot: Some(vec2(bx, by)),
+                    ..Default::default()
+                });
             }
-            draw_texture_ex(&self.tex.ui.heart_full, heart.0 - 14.0, heart.1 - 14.0, WHITE, DrawTextureParams { dest_size: Some(vec2(28.0, 28.0)), ..Default::default() });
+            let h_scale = 28.0 * (1.0 + (t * 8.0).sin() * 0.07);
+            draw_texture_ex(&self.tex.ui.heart_full, heart.0 - h_scale * 0.5, heart.1 - h_scale * 0.5, WHITE, DrawTextureParams { dest_size: Some(vec2(h_scale, h_scale)), ..Default::default() });
         } else {
             let qs = kenny_battle::questions_for(fewer);
             let q = &qs[q_idx.min(qs.len() - 1)];
@@ -2153,21 +2212,29 @@ impl Game {
         hit
     }
 
-    fn draw_maze(&self, q_idx: usize, sel: usize, skin: &Skin) -> Option<usize> {
+    fn draw_maze(&self, depth: u8, q_idx: usize, sel: usize, dir_order: [maze::Dir; 4], skin: &Skin) -> Option<usize> {
         let w = screen_width();
         let q = &maze::QUESTIONS[q_idx];
         let mut hit = None;
         draw_panel(&self.tex, (w - 820.0) * 0.5, 48.0, 820.0, 610.0, skin);
         quiz_header_skinned(&self.tex, "THE GRAVE CAVE MAZE OF CRAZE", 132.0, 74.0, 760.0, skin);
 
-        draw_tag_shadow(&format!("CHAMBER PATH: {} ARCHWAY", q.dir.label()), 132.0, 146.0, 13, skin.accent);
+        draw_tag_shadow(
+            &format!("TUNNEL DEPTH {}/{}   CHOOSE PASSAGE BY RIDDLE & NPC CLUES", depth, maze::MAZE_TARGET_DEPTH),
+            132.0,
+            146.0,
+            13,
+            skin.accent,
+        );
         draw_wrapped_rich(q.prompt, 132.0, 198.0, 760.0, 26, 28.0, skin.ink, skin.accent);
-        for (i, ch) in q.choices.iter().enumerate() {
-            if draw_option_row_skinned(&self.tex, 132.0, 316.0 + i as f32 * 70.0, 760.0, 58.0, ch, sel == i, skin) {
+        const TAGS: [&str; 4] = ["a)", "b)", "c)", "d)"];
+        for (i, d) in dir_order.iter().enumerate() {
+            let opt = format!("{} {} Tunnel", TAGS[i], d.label());
+            if draw_option_row_skinned(&self.tex, 132.0, 316.0 + i as f32 * 70.0, 760.0, 58.0, &opt, sel == i, skin) {
                 hit = Some(i);
             }
         }
-        draw_tag_shadow("Keys [1-4], [Enter], or Click carefully!", 132.0, 622.0, 11, skin.muted);
+        draw_tag_shadow("Keys [1-4], [Enter], or Click carefully! Wrong turns push back silently.", 132.0, 622.0, 11, skin.muted);
         hit
     }
 
@@ -2335,9 +2402,9 @@ impl Game {
                     self.phase = Phase::RapBattle { bar, beat_t, score, notes, sel: pick, feedback: Some(("Off-rhythm bar! Match the end rhyme!", 0.9)) };
                 }
             }
-            Phase::Maze { mut depth, mut q_idx, mut pool_pos, order, .. } => {
+            Phase::Maze { mut depth, mut q_idx, mut pool_pos, mut order, mut dir_order, .. } => {
                 let q = &maze::QUESTIONS[order[q_idx % 8]];
-                if pick == q.correct {
+                if dir_order[pick] == q.dir {
                     depth += 1;
                     self.audio.play_sfx(&self.audio.sfx.click, 0.45);
                     if depth >= maze::MAZE_TARGET_DEPTH {
@@ -2351,8 +2418,12 @@ impl Game {
                     depth = depth.saturating_sub(1);
                 }
                 pool_pos = (pool_pos + 1) % 8;
+                if pool_pos == 0 {
+                    order = maze::shuffled_cycle().0;
+                }
                 q_idx = pool_pos;
-                self.phase = Phase::Maze { depth, q_idx, sel: 0, pool_pos, order };
+                dir_order = maze::shuffled_dirs();
+                self.phase = Phase::Maze { depth, q_idx, sel: 0, pool_pos, order, dir_order };
             }
             Phase::AlgaeTemple { stage, .. } => {
                 let tr = &cosma::ALGAE_TRIALS[stage];

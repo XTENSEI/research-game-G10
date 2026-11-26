@@ -84,70 +84,78 @@ pub const KELP_ARRIVE: &[Line] = &[
 pub const KENNY_QTE_PASS: &[Line] = &[
     Line::new("River", "Phew... *that* *was* *close...* Looks like I outswam whatever that thing was."),
     Line::expr("Kenny", "worried", "*panting* Hey! Wait up! Stop swimming like a torpedo!"),
-    Line::expr("River", "shocked", "Gah!! Wait, didn't I leave you back at the kelp bend?!"),
+    Line::expr("River", "shocked", "Gah!! Wait, didn't I leave you back at the kelp bend?! What do you want?!"),
+    Line::expr("Kenny", "worried", "Look friend, I'm just tryna help you! You looked like you were having a panic attack."),
 ];
 
 pub const KENNY_QTE_FAIL: &[Line] = &[
     Line::new("River", "Aw *shucks*, my boots got tangled in the sea-grass!!"),
     Line::expr("Kenny", "happy", "Gotcha! Tap, tap. Relax, kid! I wasn't chasing you to pinch you!"),
+    Line::expr("Kenny", "worried", "You looked like you were having a panic attack. I'm just tryna help you!"),
 ];
 
 pub const KENNY_INTRO: &[Line] = &[
-    Line::expr("Kenny", "worried", "Look, friend, I'm just trying to help you. Stop running away like I'm some sea monster!"),
+    Line::expr("Kenny", "normal", "You ready to chat cleanly now, surface-kid?"),
 ];
 
-pub const KENNY_HOME_Q: &str = "You know? *Home*. Coral City, I presume?";
+pub const KENNY_HOME_Q: &str = "Coral City, I presume?";
 
 pub const KENNY_WORLD_EXPLAIN: &[Line] = &[
-    Line::expr("Kenny", "normal", "Either way, you'd better learn how fighting works down here before you wander off!"),
-    Line::expr("Kenny", "normal", "In this realm, *the* *King* *prohibited* *all* *weapons* and physical brawling across every reef and ruin."),
+    Line::expr("Kenny", "normal", "Well regardless... I gotta warn you about some of the people out here before you wander off!"),
+    Line::expr("Kenny", "normal", "Everyone hits you with riddles and questions just to prove something. *The* *King* *prohibited* *all* *weapons* and physical brawling a while back!"),
+    Line::expr("Kenny", "worried", "Honestly, coming over here was a *risk*! You could've been tricking me!"),
 ];
 
 pub const KENNY_PRE_DUEL: &[Line] = &[
-    Line::expr("Kenny", "happy", "Yes, yes, *questions*! Riddles, grammar, and quick reading settle every duel!"),
-    Line::expr("Kenny", "normal", "Name's *Kenny*, by the way. Let's see what you've got!"),
+    Line::expr("Kenny", "normal", "You really aren't from here. Like at all. Let me demonstrate!"),
 ];
 
-pub const KENNY_RETRY_PROMPT: &str = "Aw shucks... Maybe you're not ready for the Castle yet. Want another shot with fewer waves?";
+pub const KENNY_RETRY_PROMPT: &str = "Aw shucks, looks like you don't got what it takes yet. Want to try again with fewer questions?";
 
 pub const KENNY_FLAWLESS_WIN: &[Line] = &[
-    Line::expr("Kenny", "happy", "Whoa, flawless!! Not a single scratch AND every question nailed!"),
-    Line::expr("Kenny", "happy", "Come visit my house by the kelp grove anytime. Here, take this *Swift* *Current* *charm* and this old storybook!"),
-    Line::new("River", "Hey, this storybook has the exact same crest as the one on the beach! I can swim way faster now!"),
+    Line::expr("Kenny", "happy", "Whoa! You are a natural! Not a single scratch AND every question nailed!"),
+    Line::expr("Kenny", "happy", "I don't carry spare shells on me, so welcome to my humble abode by the grove! Here, take this *Swift* *Current* charm and keep that old storybook close!"),
+    Line::new("River", "Hey, that ledger outside has the exact crest from the beach! I can dash right through kelp currents now!"),
 ];
 
 pub const KENNY_EVEN_WIN: &[Line] = &[
     Line::expr("Kenny", "normal", "Okay! Now that we're even, you'd better head along toward the plains. It's getting pretty late."),
-    Line::new("River", "Wait, look on that stone ledger! That's the magic book from the beach. Time to find the Queen's elixir!"),
+    Line::new("River", "Look on that stone ledger! The glowing book! Time to find the Queen's elixir."),
 ];
 
 pub const GUARDS_SCENE: &[Line] = &[
-    Line::new("Guard 1", "Halt! None pass the Crimson Causeway without answering the Royal Trio... er, Pair!"),
-    Line::new("Guard 2", "One of us *only* *speaks* *truth*, and the other *only* *speaks* *lies*!"),
-    Line::new("Guard 1", "Wait, no, Carl, YOU took *my* line from page two of the decree!"),
-    Line::new("Guard 2", "Did not! I practiced in the barracks mirror all morning! Besides, nobody knows who asks the riddle!"),
-    Line::new("Guard 1", "Ugh, come over to the torch post while we sort out our script..."),
-    Line::new("River", "...Did they seriously just walk off arguing over cue cards? I'll slip right through!"),
+    Line::new("Guard 1", "Halt! One of us only speaks truth, and the other..."),
+    Line::new("Guard 2", "You look weird. Are you from around here?"),
+    Line::new("Guard 2", "Oh, we're sticking to the decree script? My bad! Yes, whatever he said."),
+    Line::new("Guard 1", "You know what, I'm not even in the mood anymore, Carl. You ruined it!"),
+    Line::new("Guard 2", "No, we were literally supposed to do the knight riddle!!"),
+    Line::new("River", "...Did they really just wander off arguing over their own lines? I'll slip right through!"),
 ];
 
 pub const QUEEN_CRAB_INTRO: &[Line] = &[
-    Line::expr("Queen Crab", "normal", "WHO GOES THERE..? Who dares step upon the coral carpet of the Kelp Throne?!"),
-    Line::new("Sophie", "*Honk-jingle!* Hold on, Your Majesty, let me flip the candelabra switch!"),
-    Line::expr("Queen Crab", "normal", "Sophie, *who* *is* *this*? Some dry-land surface dweller?"),
-    Line::new("Sophie", "Beats me, Queenie! Kinda looks like a *mutated* *sea* *pickle* wearing blue flannel!"),
-    Line::expr("River", "shocked", "Hey! I'm River! And that glowing pearl around your neck... that's the first *Elixir* piece, isn't it?!"),
+    Line::expr("Queen Crab", "normal", "WHO GOES THERE..? Lights!!"),
+    Line::new("Sophie", "*Honk-jingle!* Hold on, Madame, flipping the candelabra switch now!"),
+    Line::expr("Queen Crab", "normal", "Sophie, *who* *is* *this*? Some dry-land surface dweller?!"),
+    Line::new("Sophie", "I am unaware, Madame! Whoever it is, they made it past the guards and trials... looking kinda like a *mutated* *sea* *pickle*."),
+    Line::expr("River", "shocked", "Hey!! I'm River! And that glowing pearl around your neck... that's an *Elixir* ingredient, isn't it?!"),
 ];
 
-pub const QUEEN_EVAL_Q: &str = "Hmph! Well, sea-pickle, before I decide your fate... what did you think of my guards and puzzles?";
+pub const QUEEN_EVAL_Q: &str = "Well that isn't very reassuring. Wait, what did you think of my guards and puzzles?";
+
+pub const QUEEN_GREAT_REPLY: &[Line] = &[
+    Line::expr("Queen Crab", "normal", "Why, thank you! Here is your royal reward..."),
+    Line::expr("Queen Crab", "normal", "A ONE-WAY TICKET DOWN THE *TRAPDOOR*!! SEIZE THE ELIXIR NEVERMORE!"),
+];
+
+pub const QUEEN_EASY_REPLY: &[Line] = &[
+    Line::expr("Queen Crab", "fuming", "OH REALLY?! I stayed up writing those *LONE* *STONE* clauses MYSELF!!"),
+    Line::expr("Queen Crab", "fuming", "ENJOY THE *TRAPDOOR*!!"),
+];
 
 pub const QUEEN_SUCK_REPLY: &[Line] = &[
-    Line::expr("Queen Crab", "fuming", "WHAT?! *YOU* *KNOW* *WHAT* *ELSE* *SUCKS?*"),
+    Line::expr("Queen Crab", "fuming", "NOW WERE THEY?! YOU KNOW WHAT *ELSE* SUCKS?!"),
     Line::expr("River", "shocked", "...No??"),
     Line::expr("Queen Crab", "fuming", "THE *TRAPDOOR* UNDER YOUR BOOTS!!"),
-];
-
-pub const QUEEN_PASS_REPLY: &[Line] = &[
-    Line::expr("Queen Crab", "normal", "Flattery won't spare you from my royal *trapdoor*, landlubber! DOWN YOU GO!!"),
 ];
 
 pub const QUEEN_DROP: &[Line] = &[
@@ -160,25 +168,23 @@ pub const QUEEN_DROP: &[Line] = &[
 
 pub const AQUA_WAKE: &[Line] = &[
     Line::new("River", "[...Pitch black. Dim aquarium lanterns slowly drift into focus...]"),
-    Line::expr("Jill", "shocked", "*Gasp!* Jack, the specimen's eyelids are twitching! They're waking up!!"),
-    Line::expr("Jack", "normal", "Fascinating... Someone fell three hundred fathoms through our roof and barely got bruised!"),
-    Line::expr("River", "shocked", "Ow... Where am I?! Wait, why am I tied to an operating chair by two swordfish in lab suits?!"),
-    Line::expr("Jill", "normal", "Well of all the *weird* *looking* *fish* to tumble through our ceiling skylight..."),
-    Line::expr("River", "normal", "A 'weird looking fish'? That's offensive! *You're* the weird-looking fish with a sword on your nose!"),
-    Line::expr("Jack", "normal", "Heh... sharp wit, aren't we? Let us call it *sarcasm*."),
-    Line::expr("Jill", "normal", "Wait Jack, didn't you mean... *sarcastic*?"),
-    Line::expr("Jack", "normal", "No, my dear Jill. Definitely *sarcanistic*."),
-    Line::expr("River", "normal", "Alright, alright, can you untie me? I need to brew an elixir to heal my little sister Nadia back home!"),
-    Line::expr("Jack", "normal", "An Elixir of Literacy! Hold on. Coral City's apothecary is short three *rare* *reef* *ingredients*."),
-    Line::expr("Jill", "normal", "Bring us a *Blue* *Seashroom*, a *Tentacle* *Anemone*, and the rare *True* *Seaberry* from the market!"),
-    Line::expr("Jack", "normal", "Watch out for fake berries: follow the Market clues carefully, then take our shortcut to Tow-Tou's garage!"),
+    Line::expr("Jack", "normal", "Hey buddy! Easy now, are you good? Fascinating, you fell three hundred fathoms and didn't crumble!"),
+    Line::expr("Jill", "shocked", "Hi!! Sorry for tying you up, we weren't sure if you were alive or not!"),
+    Line::expr("River", "shocked", "Ow... Where am I?! Two swordfish in lab suits?! Hey, can you guys untie me?!"),
+    Line::expr("Jill", "normal", "Woops! Right, why did we tie you up anyway? Jack?!"),
+    Line::expr("Jack", "normal", "What do you mean 'We'? Are you speaking French? YOU tied them up!"),
+    Line::expr("Jill", "normal", "Well of all the *weird* *looking* *fish*... I'm Jill and this is Jack. We're siblings, can you tell?"),
+    Line::expr("River", "normal", "Wow, I wouldn't have known if you hadn't told me."),
+    Line::expr("Jill", "shocked", "Wait a minute, are you messing with me?! Doing that... scar- thing? *Sarcanistic*?!"),
+    Line::expr("Jack", "normal", "It's called *sarcasm*, Jill. And stop correcting me! Look, our apothecary is short three *rare* *reef* *ingredients*."),
+    Line::expr("Jill", "normal", "Bring us a *Blue* *Seashroom*, a *Tentacle* *Anemone*, and a real *True* *Seaberry* from the market, and we'll get you a ride!"),
+    Line::expr("Jack", "normal", "Be careful with the berries: listen to Market clues first, then take our *shore* *cut* (pun intended) to Grandpa Tow-Tou's garage!"),
 ];
 
 pub const ALLEY_DUEL: &[Line] = &[
-    Line::new("AngelFish", "Preposterous! Your informal contractions undermine every tenet of Aquarius etiquette!"),
-    Line::new("StoneFish", "Chill out, fancy fins! Remember the King's decree: no swinging fists, only sharpest *words*!"),
-    Line::new("AngelFish", "Very well! Define *antithesis* before my powdered wig uncurls in dismay!"),
-    Line::new("River", "Whoa... even street arguments down here are vocabulary duels."),
+    Line::new("AngelFish", "If thy fields are as parched as thy coin purse, then state it!!"),
+    Line::new("StoneFish", "Thy argument is as penetrable as thy armor, fancy fins! Remember the King banned fists, only sharpest *words*!"),
+    Line::new("River", "Whoa... even alley arguments down here are medieval vocabulary duels."),
 ];
 
 pub const CLUE_GILL_SCAL: &[Line] = &[
@@ -216,10 +222,10 @@ pub const ANEMONE_PICK: &[Line] = &[
 ];
 
 pub const TOWTOU_GREET: &[Line] = &[
-    Line::new("Tow-Tou", "Well blow my barnacles! All three Aquarius ingredients packed neat in Jack & Jill's satchel!"),
-    Line::new("Tow-Tou", "Name's *Tow-Tou*, leatherback hauler, brass-finned mechanic, fastest shell-cart in Coral City!"),
-    Line::new("River", "Whoa, you've got a whole *cart* strapped right onto your shell! Can you drive me toward the mountain ridge?!"),
-    Line::new("Tow-Tou", "Hop in, kid! Hang onto your flannel! Next stop, the *Jevil* *Seamountain* *Range*!!"),
+    Line::new("Jill", "Graaamps!! Hey Graaaammmppsss!!"),
+    Line::new("Tow-Tou", "WHAAAAT?! I'm tryna sleep here! First you wander into my garage, now you demand rides?!"),
+    Line::new("Jack", "All three Aquarius reagents are packed neat! Plus Queen Crab insulted River for looking like a *mutated* *sea* *pickle*."),
+    Line::expr("Tow-Tou", "normal", "WHAT?! Okay, she's not wrong... STILL!! I won't stand for it! Hop in, kid! We shall free you from this ocean of stone!!"),
 ];
 
 pub const ANGLERS_AMBUSH: &[Line] = &[
@@ -374,15 +380,15 @@ pub const RIDDLES: &[Riddle] = &[
     Riddle {
         biome: Biome::Slums,
         title: "Abyss Bridge II: Elegy Imagery",
-        prompt: "Tenebris's Second Verse:\n\"Once you were here, now a memory in my hand.\nCarried by the breeze, scattered across the land.\nTears fall heavy, yet you are free at last.\nA final goodbye to the days that have passed.\"",
+        prompt: "Tenebris's Second Verse:\n\"Once you were here, now a memory in my hand.\nI stand by the water, ready to leave you as planned.\nI open my fingers and let the current take you free.\nYour fire burns bright, yet now part of the vast blue sea.\"",
         choices: [
-            "a) Dried autumn petals in a locket",
-            "b) Rippling lantern reflections",
+            "a) Letting a pet fish swim away",
+            "b) Dropping glass lanterns overboard",
             "c) Scattering a loved one's ashes",
             "d) Torn pages lost to sea foam",
         ],
         correct: 2,
-        explain: "Held in hand, carried on breeze, scattered across land, and final goodbye describe scattering ashes.",
+        explain: "Held in hand by the water and releasing ashes into the sea describes scattering a loved one's ashes.",
     },
 ];
 
