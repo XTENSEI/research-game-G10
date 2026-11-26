@@ -1,0 +1,156 @@
+name: CI Builder & Auto-Releaser
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Unit Tests & Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux audio and X11 dev libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev
+      - name: Run unit tests
+        run: cargo test
+      - name: Verify native and WebGL compilation
+        run: |
+          cargo check
+          cargo check --target wasm32-unknown-unknown
+
+  build-linux:
+    name: Build Standalone Linux x86_64
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev
+      - name: Build release binary (assets embedded inside binary)
+        run: cargo build --release
+      - name: Package portable Linux 1-click bundle
+        run: |
+          mkdir -p out/GiftOfEducation-linux
+          cp target/release/literacy-rpg out/GiftOfEducation-linux/GiftOfEducation
+          chmod +x out/GiftOfEducation-linux/GiftOfEducation
+          cp out/GiftOfEducation-linux/GiftOfEducation out/GiftOfEducation-linux-x86_64
+          tar -C out -czf out/GiftOfEducation-linux-x86_64.tar.gz GiftOfEducation-linux
+          rm -rf out/GiftOfEducation-linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: |
+            out/GiftOfEducation-linux-x86_64
+            out/GiftOfEducation-linux-x86_64.tar.gz
+
+  build-windows:
+    name: Build Standalone Windows x86_64
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build standalone Windows executable (static CRT, assets embedded)
+        env:
+          RUSTFLAGS: "-C target-feature=+crt-static"
+        run: cargo build --release
+      - name: Package portable Windows 1-click executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Copy-Item target\release\literacy-rpg.exe out\GiftOfEducation-windows-x86_64.exe
+          Compress-Archive -Path out\GiftOfEducation-windows-x86_64.exe -DestinationPath out\GiftOfEducation-windows-x86_64.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: |
+            out/GiftOfEducation-windows-x86_64.exe
+            out/GiftOfEducation-windows-x86_64.zip
+
+  build-web:
+    name: Build WebGL Bundle
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Build wasm32 release binary
+        run: |
+          cargo build --release --target wasm32-unknown-unknown
+          cp target/wasm32-unknown-unknown/release/literacy-rpg.wasm web/literacy-rpg.wasm
+      - name: Package WebGL archive
+        run: |
+          mkdir -p out/GiftOfEducation-web
+          cp play.html out/GiftOfEducation-web/
+          cp -r web assets out/GiftOfEducation-web/
+          rm -rf out/GiftOfEducation-web/assets/tools
+          (cd out && zip -r GiftOfEducation-web.zip GiftOfEducation-web)
+          rm -rf out/GiftOfEducation-web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webgl-bundle
+          path: out/GiftOfEducation-web.zip
+
+  release:
+    name: Publish GitHub Release
+    needs: [build-linux, build-windows, build-web]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Flatten release assets
+        run: |
+          mkdir -p release-files
+          find artifacts -type f -exec cp {} release-files/ \;
+          ls -lh release-files/
+      - name: Publish tagged release (v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          prerelease: false
+          files: release-files/*
+      - name: Publish automatic latest stable build (main)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest Build (${{ github.sha }})"
+          body: |
+            Automated standalone 1-click build from commit ${{ github.sha }} on `main`.
+            - **Windows**: Download `GiftOfEducation-windows-x86_64.exe` (or `.zip`) and double-click to play!
+            - **Linux**: Extract `GiftOfEducation-linux-x86_64.tar.gz` and double-click `GiftOfEducation` (all assets bundled inside; drop replacement files in an adjacent `assets/` folder anytime to override).
+            - **Browser**: Extract `GiftOfEducation-web.zip` and serve via HTTP (`play.html`).
+          prerelease: false
+          make_latest: true
+          files: release-files/*
