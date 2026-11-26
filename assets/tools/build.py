@@ -228,9 +228,9 @@ castle = Image.open(os.path.join(OGA_DIR, "castle-tileset.png")).convert("RGBA")
 neonode = Image.open(os.path.join(OGA_DIR, "neonode.png")).convert("RGBA")
 
 INDIGO = [
-    (0x8E, 0x7C, 0xD8), (0x7C, 0x6A, 0xC8), (0x6E, 0x5C, 0xB8),
-    (0x5C, 0x4A, 0xA0), (0x4A, 0x3A, 0x86), (0x37, 0x2A, 0x68),
-    (0x2C, 0x22, 0x55), (0x24, 0x1C, 0x46), (0x1A, 0x14, 0x34),
+    (0x64, 0x56, 0x9E), (0x54, 0x48, 0x8A), (0x46, 0x3C, 0x78),
+    (0x3A, 0x30, 0x66), (0x2F, 0x26, 0x56), (0x25, 0x1D, 0x46),
+    (0x1E, 0x17, 0x3A), (0x18, 0x12, 0x30), (0x12, 0x0E, 0x24),
 ]
 
 
@@ -371,23 +371,71 @@ load_pp(67).save(os.path.join(OUT_UI, "gem.png"))
 
 
 def make_star_sprite(dying):
-    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
-    px = im.load()
     if dying:
-        edge, body, core = (130, 28, 48, 255), (235, 62, 74, 255), (255, 174, 152, 255)
+        pal = {
+            ".": (0, 0, 0, 0),
+            "o": (52, 14, 30, 255),
+            "d": (146, 30, 56, 255),
+            "m": (222, 68, 78, 255),
+            "h": (255, 162, 134, 255),
+            "c": (255, 224, 198, 255),
+        }
+        grid = [
+            ".......oo.......",
+            "......oddo......",
+            "......ommo......",
+            ".....odhddo.....",
+            "....omhchcmo....",
+            ".ooodmhchmmdooo.",
+            "odmmhhccchhmmdo.",
+            "omhcchccchdmmo..",
+            "odmmhchcchhmmdo.",
+            ".ooodmmdhhmdooo.",
+            "....omdhhcmo....",
+            ".....omddmo.....",
+            "......ommo......",
+            "......oddo......",
+            ".......oo.......",
+            "................",
+        ]
     else:
-        edge, body, core = (214, 148, 44, 255), (255, 224, 96, 255), (255, 252, 232, 255)
-    for y in range(16):
-        for x in range(16):
-            dx = abs(x - 7.5)
-            dy = abs(y - 7.5)
-            d = (dx ** 0.72) + (dy ** 0.72)
-            if d <= 2.3:
-                px[x, y] = core
-            elif d <= 3.6:
-                px[x, y] = body
-            elif d <= 4.3:
-                px[x, y] = edge
+        pal = {
+            ".": (0, 0, 0, 0),
+            "o": (74, 42, 18, 255),
+            "d": (212, 142, 38, 255),
+            "m": (255, 208, 76, 255),
+            "h": (255, 242, 168, 255),
+            "c": (255, 255, 246, 255),
+        }
+        grid = [
+            ".......oo.......",
+            "......ohho......",
+            "......ommo......",
+            ".....ohchmo.....",
+            "....omhchhmo....",
+            ".oooomhchmmdooo.",
+            "ohmmmhccchmmmdo.",
+            "omhcccccccchmmo.",
+            "odmmmhccchmmdo..",
+            ".oooodmchmmdooo.",
+            "....omhcchmo....",
+            ".....omchmo.....",
+            "......ommo......",
+            "......oddo......",
+            ".......oo.......",
+            "................",
+        ]
+    return draw_pixel_grid(pal, grid)
+
+
+def draw_pixel_grid(pal, rows):
+    im = Image.new("RGBA", (len(rows[0]), len(rows)), (0, 0, 0, 0))
+    px = im.load()
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            col = pal.get(ch)
+            if col and col[3] > 0:
+                px[x, y] = col
     return im
 
 
@@ -401,53 +449,169 @@ for icon_name, (rc, rr) in (("scroll", (44, 15)), ("book", (50, 15)), ("quill", 
 
 
 def make_custom_ui_icons():
-    from PIL import ImageDraw
+    # Pixel-crisp 16x16 icons with dark outlines & 3-stop hue-shifted shading
+    pearl_pal = {
+        ".": (0, 0, 0, 0),
+        "o": (14, 24, 48, 255),
+        "d": (38, 128, 186, 255),
+        "m": (96, 206, 244, 255),
+        "h": (176, 246, 255, 255),
+        "c": (255, 255, 255, 255),
+    }
+    draw_pixel_grid(pearl_pal, [
+        ".....oooooo.....",
+        "...oommhhmmoo...",
+        "..omhhcchhhmmo..",
+        ".omhccchhhhhdmo.",
+        ".omhcchhhmmmddo.",
+        "omhhhhhmmmmmdddo",
+        "omhhmmmmmmmddddo",
+        "ommmmmmmdddddddo",
+        "ommmmmdddddddddo",
+        "odmmddddddddmdo.",
+        ".odddddddmmdddo.",
+        ".ooddddmmmddoo..",
+        "..oodddddddoo...",
+        "...ooooooooo....",
+        "................",
+        "................",
+    ]).save(os.path.join(OUT_UI, "pearl.png"))
 
-    # Luminous Pearl icon (16x16)
-    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    d.ellipse((2, 2, 13, 13), fill=(68, 178, 224, 255), outline=(14, 26, 48, 255))
-    d.ellipse((3, 3, 11, 11), fill=(154, 240, 255, 255))
-    d.rectangle((5, 5, 7, 7), fill=(255, 255, 255, 255))
-    im.save(os.path.join(OUT_UI, "pearl.png"))
+    note_pal = {
+        ".": (0, 0, 0, 0),
+        "o": (16, 20, 44, 255),
+        "d": (38, 134, 198, 255),
+        "m": (96, 232, 255, 255),
+        "c": (236, 254, 255, 255),
+        "p": (255, 118, 212, 255),
+        "q": (204, 56, 156, 255),
+    }
+    draw_pixel_grid(note_pal, [
+        "......oooooooo..",
+        ".....ompppppppo.",
+        ".....omppqqqqqo.",
+        ".....ompooooooo.",
+        ".....ompo.......",
+        ".....ommo.......",
+        ".....odmo.......",
+        ".....odmo.......",
+        "...ooodmo.......",
+        "..omcchmo.......",
+        ".omcchmmo.......",
+        ".ommhmmmo.......",
+        ".odmmmmmo.......",
+        "..oddddo........",
+        "...oooo.........",
+        "................",
+    ]).save(os.path.join(OUT_UI, "note.png"))
 
-    # Glowing Eighth-Note music icon for Anglers Cypher (16x16)
-    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    d.ellipse((2, 9, 8, 14), fill=(96, 232, 255, 255), outline=(14, 24, 44, 255))
-    d.rectangle((6, 2, 8, 12), fill=(96, 232, 255, 255), outline=(14, 24, 44, 255))
-    d.polygon([(7, 2), (14, 5), (14, 8), (7, 5)], fill=(255, 120, 210, 255))
-    d.rectangle((4, 10, 5, 11), fill=(255, 255, 255, 255))
-    im.save(os.path.join(OUT_UI, "note.png"))
+    shard_pal = {
+        ".": (0, 0, 0, 0),
+        "o": (22, 12, 36, 255),
+        "d": (122, 30, 88, 255),
+        "m": (204, 62, 142, 255),
+        "h": (255, 148, 208, 255),
+        "c": (255, 224, 246, 255),
+    }
+    draw_pixel_grid(shard_pal, [
+        ".......oo.......",
+        "......ohmo......",
+        ".....ochmdo.....",
+        "....oohcmmdo....",
+        "...oohcmmdddo...",
+        "..oohhhmdddddo..",
+        "..oohmmddddddo..",
+        "..oommmddddddo..",
+        "...ommmdddddo...",
+        "...ommmdddddo...",
+        "....ommddddo....",
+        "....ommdddo.....",
+        ".....omddo......",
+        ".....odddo......",
+        "......ooo.......",
+        "................",
+    ]).save(os.path.join(OUT_UI, "shard.png"))
 
-    # Jagged Void Crystal Shard for Dimension Crumble (16x16)
-    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    d.polygon([(8, 1), (13, 6), (11, 14), (5, 14), (3, 6)], fill=(186, 56, 128, 255), outline=(24, 12, 36, 255))
-    d.polygon([(8, 2), (11, 6), (9, 13), (7, 13)], fill=(255, 130, 196, 255))
-    im.save(os.path.join(OUT_UI, "shard.png"))
+    crown_pal = {
+        ".": (0, 0, 0, 0),
+        "o": (48, 26, 14, 255),
+        "d": (176, 116, 26, 255),
+        "m": (238, 186, 54, 255),
+        "h": (255, 234, 134, 255),
+        "r": (246, 52, 112, 255),
+        "e": (86, 232, 176, 255),
+    }
+    draw_pixel_grid(crown_pal, [
+        ".......oo.......",
+        "..oo..ohho..oo..",
+        ".ohmo.ommo.omho.",
+        ".ommooommooomdo.",
+        ".ommmohhhhomddo.",
+        ".ohmmomrrmomddo.",
+        ".ommmmmrrmmdddo.",
+        ".oemmmmmmmmdddo.",
+        ".ommmmmmmmmdddo.",
+        ".ohhhhhhhhhmddo.",
+        ".oddddddddddddo.",
+        ".oooooooooooooo.",
+        "................",
+        "................",
+        "................",
+        "................",
+    ]).save(os.path.join(OUT_UI, "crown.png"))
 
-    # Golden Crown for Chronicle Complete / Queen Crab (16x16)
-    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    d.polygon([(2, 12), (2, 5), (5, 8), (8, 3), (11, 8), (14, 5), (14, 12)], fill=(244, 198, 72, 255), outline=(58, 32, 18, 255))
-    d.rectangle((2, 12, 13, 13), fill=(196, 142, 42, 255))
-    d.rectangle((7, 8, 8, 9), fill=(255, 70, 140, 255))
-    im.save(os.path.join(OUT_UI, "crown.png"))
+    # Crisp pixel speaker ON / OFF icons (16x16)
+    snd_on_pal = {
+        ".": (0, 0, 0, 0),
+        "o": (14, 24, 48, 255),
+        "d": (46, 136, 178, 255),
+        "m": (118, 226, 246, 255),
+        "h": (222, 252, 255, 255),
+    }
+    draw_pixel_grid(snd_on_pal, [
+        "......oo........",
+        ".....ohmo...oo..",
+        "....ohmmo..o.mo.",
+        "..ooohmmo....mo.",
+        ".ohmmhmmo.oo.mo.",
+        ".ommhhmmo..mo.o.",
+        ".ommmmmmo..mo.o.",
+        ".odmmmmmo..mo.o.",
+        ".odddddmo..mo.o.",
+        "..oooddmo.oo.mo.",
+        "....oddmo....mo.",
+        ".....oddo..o.mo.",
+        "......oo....oo..",
+        "................",
+        "................",
+        "................",
+    ]).save(os.path.join(OUT_UI, "sound_on.png"))
 
-    # Speaker ON / OFF icons (16x16)
-    for muted_flag, name in ((False, "sound_on"), (True, "sound_off")):
-        im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
-        d = ImageDraw.Draw(im)
-        col = (242, 120, 138, 255) if muted_flag else (126, 232, 240, 255)
-        d.polygon([(2, 6), (5, 6), (9, 2), (9, 13), (5, 9), (2, 9)], fill=col, outline=(14, 24, 44, 255))
-        if muted_flag:
-            d.line((11, 5, 14, 10), fill=col, width=2)
-            d.line((14, 5, 11, 10), fill=col, width=2)
-        else:
-            d.arc((10, 4, 14, 11), 290, 70, fill=col, width=1)
-            d.arc((11, 2, 15, 13), 290, 70, fill=col, width=1)
-        im.save(os.path.join(OUT_UI, f"{name}.png"))
+    snd_off_pal = {
+        ".": (0, 0, 0, 0),
+        "o": (28, 14, 34, 255),
+        "d": (148, 46, 68, 255),
+        "m": (236, 108, 128, 255),
+        "h": (255, 194, 206, 255),
+    }
+    draw_pixel_grid(snd_off_pal, [
+        "......oo........",
+        ".....ohmo.......",
+        "....ohmmo.......",
+        "..ooohmmo.......",
+        ".ohmmhmmo.oo.oo.",
+        ".ommhhmmo.ohoho.",
+        ".ommmmmmo..oho..",
+        ".odmmmmmo.ohoho.",
+        ".odddddmo.oo.oo.",
+        "..oooddmo.......",
+        "....oddmo.......",
+        ".....oddo.......",
+        "......oo........",
+        "................",
+        "................",
+        "................",
+    ]).save(os.path.join(OUT_UI, "sound_off.png"))
 
 
 make_custom_ui_icons()

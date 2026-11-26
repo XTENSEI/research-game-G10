@@ -17,14 +17,20 @@ CLEAR = (0, 0, 0, 0)
 
 
 def shade(col, factor):
+    """Hue-shifted 3-stop shading: highlights warm toward cream/yellow, shadows cool toward violet."""
     r, g, b = col[:3]
     a = col[3] if len(col) > 3 else 255
-    return (
-        max(0, min(255, int(r * factor))),
-        max(0, min(255, int(g * factor))),
-        max(0, min(255, int(b * factor))),
-        a,
-    )
+    if factor >= 1.0:
+        t = min(0.45, (factor - 1.0) * 1.1)
+        nr = int(min(255, r * factor * (1.0 - t) + 255 * t))
+        ng = int(min(255, g * factor * (1.0 - t) + 242 * t))
+        nb = int(min(255, b * factor * (1.0 - t) + 196 * t))
+        return (nr, ng, nb, a)
+    t = min(0.45, (1.0 - factor) * 1.1)
+    nr = int(max(0, r * factor * (1.0 - t) + 24 * t))
+    ng = int(max(0, g * factor * (1.0 - t) + 18 * t))
+    nb = int(max(0, b * factor * (1.0 - t) + 52 * t))
+    return (nr, ng, nb, a)
 
 
 def outline_image(im, outline=OUTLINE_SEA):
@@ -574,71 +580,93 @@ def draw_genie(pose="stand"):
 # ---------------------------------------------------------------------------
 
 def draw_portrait(kind, expr="normal"):
-    """48x48 crisp pixel-art bust portrait for Undertale-style dialogue."""
-    c = Canvas(48, 48)
+    """48x48 hue-shifted & dark-outlined pixel bust portrait for Undertale-style dialogue."""
     bg_map = {
-        "river": (34, 48, 88), "nadia": (64, 40, 88), "grandparent": (78, 56, 46), "mark": (48, 56, 74),
-        "kenny": (24, 82, 86), "guard_a": (28, 72, 92), "guard_b": (32, 54, 104),
-        "queen_crab": (88, 22, 46), "sophie": (74, 34, 62),
-        "jack": (18, 48, 88), "jill": (28, 42, 86), "angelfish": (24, 58, 92), "stonefish": (30, 56, 70),
-        "gill": (18, 66, 86), "scal": (22, 52, 90), "lady": (34, 58, 86), "towtou": (20, 54, 66),
-        "angler": (26, 18, 52), "thaumiel": (18, 32, 48), "tenebris": (18, 16, 36), "genie": (48, 18, 28),
+        "river": (30, 44, 84), "nadia": (58, 36, 82), "grandparent": (72, 50, 42), "mark": (44, 52, 70),
+        "kenny": (20, 72, 78), "guard_a": (24, 64, 84), "guard_b": (28, 48, 96),
+        "queen_crab": (82, 20, 44), "sophie": (68, 30, 58),
+        "jack": (18, 44, 82), "jill": (26, 38, 80), "angelfish": (22, 52, 84), "stonefish": (28, 50, 64),
+        "gill": (18, 58, 78), "scal": (20, 46, 82), "lady": (32, 52, 78), "towtou": (20, 48, 60),
+        "angler": (24, 16, 48), "thaumiel": (16, 28, 44), "tenebris": (16, 14, 34), "genie": (46, 16, 26),
     }
-    bg = bg_map.get(kind, (36, 26, 58))
-    c.rect(0, 0, 48, 48, bg)
-    c.rect(2, 2, 44, 44, shade(bg, 1.18))
+    bg_color = bg_map.get(kind, (34, 24, 54))
+    bg = Canvas(48, 48)
+    bg.rect(0, 0, 48, 48, shade(bg_color, 0.78))
+    bg.rect(1, 1, 46, 46, bg_color)
+    bg.oval(24, 22, 19, 19, shade(bg_color, 1.15))
+    bg.oval(22, 18, 13, 13, shade(bg_color, 1.28))
 
-    # Helper to draw shoulders + neck + face
-    def bust(skin, shirt, hair, eye_col=(34, 24, 52), long_hair=False, specs=False, beard=False, crown=False, floral=False):
+    # Foreground bust layer drawn cleanly then outlined & composited over vignette
+    c = Canvas(48, 48)
+
+    def bust(skin, shirt, hair, eye_col=(34, 24, 52), long_hair=False, specs=False, beard=False, floral=False):
         c.poly([(8, 47), (14, 34), (34, 34), (40, 47)], shirt)
-        c.rect(16, 34, 16, 13, shade(shirt, 1.16))
+        c.poly([(16, 34), (32, 34), (35, 47), (13, 47)], shade(shirt, 1.14))
+        c.rect(14, 35, 5, 11, shade(shirt, 0.84))
+        c.line(18, 37, 19, 44, shade(shirt, 0.72))
+        c.line(30, 37, 29, 44, shade(shirt, 0.80))
         if floral:
-            c.px(20, 40, (255, 198, 92)); c.px(21, 41, (255, 120, 170))
-            c.px(27, 40, (140, 232, 160))
-        c.rect(20, 29, 8, 7, shade(skin, 0.85))
+            for fx, fy, fc in ((19, 40, (255, 206, 98)), (28, 39, (255, 136, 186)), (22, 43, (140, 236, 168))):
+                c.px(fx, fy, fc); c.px(fx + 1, fy, shade(fc, 1.2))
+        c.rect(20, 29, 8, 7, shade(skin, 0.80))
+        c.rect(21, 31, 6, 3, shade(skin, 0.72))
         if long_hair:
-            c.rect(10, 14, 28, 24, shade(hair, 0.78))
+            c.rect(10, 14, 28, 24, shade(hair, 0.76))
+            c.rect(11, 16, 3, 21, shade(hair, 0.96))
+            c.rect(34, 16, 3, 21, shade(hair, 0.70))
+        # Sculpted face with subtle jawline shadow & cheek blush
         c.oval(24, 21, 10, 10, skin)
+        c.oval(22, 18, 7, 6, shade(skin, 1.07))
+        c.rect(16, 26, 16, 4, shade(skin, 0.88))
+        c.rect(18, 28, 12, 3, shade(skin, 0.82))
+        c.px(23, 24, shade(skin, 0.82))  # nose bridge shadow
+        c.px(24, 24, shade(skin, 0.82))
+        c.rect(15, 23, 3, 2, (238, 152, 170))
+        c.rect(30, 23, 3, 2, (238, 152, 170))
+        # Layered hair dome & specular highlight streak
         c.oval(24, 12, 11, 5, hair)
-        c.rect(13, 12, 7, 4, shade(hair, 1.2))
-        c.rect(13, 14, 3, 7, shade(hair, 0.8))
-        c.rect(32, 14, 3, 7, hair)
-        # Eyes
+        c.rect(15, 10, 16, 3, shade(hair, 1.22))
+        c.rect(18, 11, 10, 1, shade(hair, 1.36))
+        c.rect(13, 12, 3, 9, shade(hair, 0.76))
+        c.rect(32, 12, 3, 9, shade(hair, 0.92))
+        for hx in (15, 19, 24, 29):
+            c.rect(hx, 15, 3, 2, hair)
         if expr == "sick":
-            c.rect(18, 21, 4, 1, (56, 38, 64))
-            c.rect(26, 21, 4, 1, (56, 38, 64))
-            c.rect(16, 24, 3, 2, (236, 150, 170))
-            c.rect(29, 24, 3, 2, (236, 150, 170))
+            c.rect(18, 21, 4, 1, (56, 38, 64)); c.px(19, 22, (74, 48, 84))
+            c.rect(26, 21, 4, 1, (56, 38, 64)); c.px(27, 22, (74, 48, 84))
+            c.rect(16, 24, 3, 2, (236, 146, 172))
+            c.rect(29, 24, 3, 2, (236, 146, 172))
         else:
-            for ex in (18, 26):
-                c.rect(ex, 19, 4, 4, (250, 252, 255))
-                c.rect(ex + 1, 20, 2, 3, eye_col)
+            for ex in (17, 26):
+                c.rect(ex, 19, 5, 4, (248, 252, 255))
+                c.rect(ex + 1, 20, 3, 3, eye_col)
+                c.px(ex + 2, 21, shade(eye_col, 0.65))
                 c.px(ex + 1, 20, (255, 255, 255))
             if expr == "shocked":
-                c.rect(18, 16, 4, 1, (48, 28, 52))
-                c.rect(26, 16, 4, 1, (48, 28, 52))
+                c.rect(17, 16, 5, 1, (48, 28, 52)); c.rect(26, 16, 5, 1, (48, 28, 52))
+            else:
+                c.rect(18, 17, 4, 1, shade(hair, 0.72)); c.rect(26, 17, 4, 1, shade(hair, 0.72))
         if specs:
-            c.rect(17, 18, 6, 6, (220, 240, 255, 110))
-            c.rect(25, 18, 6, 6, (220, 240, 255, 110))
-            c.rect(23, 20, 2, 1, (196, 160, 82))
+            c.rect(16, 18, 6, 6, (214, 242, 255, 115))
+            c.rect(25, 18, 6, 6, (214, 242, 255, 115))
+            c.rect(16, 18, 6, 1, (196, 160, 82)); c.rect(25, 18, 6, 1, (196, 160, 82))
+            c.rect(22, 20, 3, 1, (196, 160, 82))
         if beard:
             c.oval(24, 29, 8, 5, hair)
-        # Mouth
-        if expr == "cured" or expr == "happy":
+            c.oval(24, 28, 6, 3, shade(hair, 1.15))
+        if expr in ("cured", "happy"):
             c.line(21, 27, 24, 29, (110, 44, 58))
             c.line(24, 29, 27, 27, (110, 44, 58))
         elif expr == "shocked":
-            c.oval(24, 28, 2, 2, (110, 44, 58))
+            c.oval(24, 28, 2, 2, (98, 36, 50))
         elif expr == "sick":
             c.line(22, 28, 26, 28, (130, 68, 86))
         else:
-            c.line(21, 27, 27, 27, (110, 48, 58))
-        if crown:
-            c.rect(17, 6, 14, 4, (244, 198, 72))
+            c.rect(21, 27, 6, 1, (110, 48, 58))
 
     if kind == "river":
         bust((242, 196, 160), (46, 134, 232), (107, 68, 46))
-        c.rect(20, 34, 8, 2, (236, 242, 250))  # collar
+        c.poly([(19, 34), (24, 38), (29, 34)], (242, 246, 252))
     elif kind == "nadia":
         bust((246, 204, 174), (118, 58, 168), (242, 206, 98), long_hair=True, floral=True)
     elif kind == "grandparent":
@@ -646,55 +674,82 @@ def draw_portrait(kind, expr="normal"):
     elif kind == "mark":
         bust((232, 184, 150), (74, 92, 116), (62, 42, 34))
     elif kind == "kenny":
-        shell = (224, 84, 42)
-        c.oval(24, 30, 14, 12, shell)
-        c.oval(22, 25, 9, 6, (255, 138, 76))
-        c.line(12, 22, 36, 40, (74, 168, 92), width=4)  # kelp slingbag strap!
-        c.rect(16, 11, 3, 9, shell); c.rect(29, 11, 3, 9, shell)
-        for ex in (15, 28):
-            c.oval(ex + 1, 10, 3, 3, (252, 252, 255))
-            c.rect(ex + 1, 10, 2, 2, (32, 20, 40))
-        c.oval(9, 24, 5, 5, (255, 138, 76))
-        c.oval(39, 24, 5, 5, (255, 138, 76))
+        shell = (218, 78, 38)
+        shell_hi = shade(shell, 1.24)
+        shell_lo = shade(shell, 0.72)
+        c.oval(24, 31, 14, 12, shell_lo)
+        c.oval(24, 29, 13, 11, shell)
+        c.oval(22, 24, 9, 6, shell_hi)
+        c.oval(20, 22, 5, 3, shade(shell_hi, 1.15))
+        # Kelp slingbag woven strap + brass buckle
+        c.line(12, 23, 36, 41, (54, 136, 74), width=4)
+        c.line(13, 23, 35, 40, (92, 196, 108), width=2)
+        c.rect(22, 30, 4, 4, (238, 196, 86))
+        # Sculpted eyestalks & glossy crab eyes (no flat sticker dots!)
+        c.rect(17, 13, 3, 8, shell_lo); c.rect(17, 13, 2, 7, shell)
+        c.rect(28, 13, 3, 8, shell_lo); c.rect(28, 13, 2, 7, shell)
+        for ex in (16, 27):
+            c.rect(ex, 8, 5, 5, (242, 248, 255))
+            c.rect(ex + 1, 9, 3, 3, (28, 20, 42))
+            c.px(ex + 1, 9, (255, 255, 255))
+        # Framed claws on sides with lighter inner pinch edge
+        c.oval(8, 26, 5, 5, shell_lo); c.oval(7, 25, 4, 4, shell_hi)
+        c.oval(40, 26, 5, 5, shell_lo); c.oval(39, 25, 4, 4, shell_hi)
+        c.rect(6, 22, 2, 4, shade(bg_color, 1.0)); c.rect(40, 22, 2, 4, CLEAR)
+        c.px(6, 22, CLEAR); c.px(6, 23, CLEAR)
         if expr == "happy":
-            c.line(19, 31, 24, 34, (64, 20, 14)); c.line(24, 34, 29, 31, (64, 20, 14))
+            c.line(19, 30, 24, 33, (56, 16, 14)); c.line(24, 33, 29, 30, (56, 16, 14))
         elif expr == "worried":
-            c.line(19, 33, 29, 31, (64, 20, 14))
+            c.line(19, 32, 29, 30, (56, 16, 14))
         else:
-            c.line(19, 32, 29, 32, (64, 20, 14))
+            c.rect(20, 31, 8, 1, (56, 16, 14))
     elif kind in ("guard_a", "guard_b"):
         col = (76, 194, 168) if kind == "guard_a" else (92, 126, 232)
-        c.poly([(12, 47), (16, 30), (32, 30), (36, 47)], col)
+        c.poly([(11, 47), (16, 30), (32, 30), (37, 47)], shade(col, 0.85))
+        c.rect(21, 31, 6, 15, shade(col, 1.15))
         c.oval(24, 22, 9, 8, col)
-        c.rect(31, 21, 9, 4, shade(col, 1.15))
-        c.rect(15, 10, 18, 7, (218, 178, 86))
-        c.poly([(16, 10), (24, 4), (32, 10)], (216, 52, 88))
+        c.oval(22, 19, 6, 5, shade(col, 1.18))
+        c.rect(31, 21, 9, 4, shade(col, 1.12))
+        c.rect(15, 11, 18, 6, (218, 178, 86)); c.rect(16, 11, 16, 2, (246, 218, 128))
+        c.poly([(17, 11), (24, 4), (31, 11)], (216, 52, 88))
         c.rect(22, 19, 4, 4, (250, 252, 255)); c.rect(23, 20, 2, 2, (24, 24, 48))
+        c.px(23, 20, (255, 255, 255))
     elif kind == "queen_crab":
-        shell = (242, 62, 52) if expr == "fuming" else (214, 65, 40)
-        c.poly([(8, 47), (13, 31), (35, 31), (40, 47)], (118, 22, 56))
-        c.oval(24, 25, 14, 11, shell)
+        shell = (232, 54, 46) if expr == "fuming" else (206, 58, 38)
+        shell_hi = shade(shell, 1.24)
+        shell_lo = shade(shell, 0.72)
+        # Ermine velvet cape + collar fluff + ruby-pearl choker
+        c.poly([(7, 47), (12, 31), (36, 31), (41, 47)], (104, 18, 52))
+        c.poly([(12, 31), (36, 31), (39, 36), (9, 36)], (242, 234, 226))
+        for nx in range(13, 35, 5):
+            c.px(nx, 33, (46, 26, 40))
+        c.oval(24, 25, 14, 11, shell_lo)
+        c.oval(24, 24, 13, 10, shell)
+        c.oval(22, 19, 9, 5, shell_hi)
         for sx, sy in ((11, 18), (15, 13), (33, 13), (37, 18)):
-            c.poly([(sx - 2, sy + 2), (sx, sy - 4), (sx + 2, sy + 2)], (146, 30, 22))
-        c.rect(16, 7, 16, 5, (244, 198, 72))
-        for cx in (16, 23, 30):
-            c.rect(cx, 3, 2, 4, (244, 198, 72))
-        c.px(24, 9, (255, 60, 140))
-        # Glowing pearl necklace
+            c.poly([(sx - 2, sy + 2), (sx, sy - 4), (sx + 2, sy + 2)], shell_lo)
+            c.px(sx, sy - 2, shell_hi)
+        # Sculpted gold filigree crown
+        c.rect(15, 8, 18, 5, (218, 162, 46))
+        c.rect(16, 8, 16, 3, (246, 204, 82))
+        for cx in (15, 22, 30):
+            c.rect(cx, 3, 3, 5, (246, 204, 82))
+            c.px(cx + 1, 3, (255, 240, 152))
+        c.rect(23, 9, 2, 2, (255, 62, 132)); c.px(18, 10, (92, 236, 182)); c.px(29, 10, (92, 236, 182))
         for nx in range(16, 33, 3):
             c.rect(nx, 36, 2, 2, (248, 242, 215))
-        c.oval(24, 38, 3, 3, (110, 244, 255))
+        c.oval(24, 39, 3, 3, (96, 238, 255)); c.px(23, 38, (255, 255, 255))
         c.eyes(18, 27, 21, iris=(40, 12, 20), mood="angry" if expr == "fuming" else "normal")
         if expr == "fuming":
-            c.oval(9, 10, 3, 3, (255, 226, 234))
-            c.oval(39, 10, 3, 3, (255, 226, 234))
-            c.rect(20, 29, 8, 3, (64, 12, 18))
+            c.rect(8, 10, 3, 3, (255, 228, 234)); c.rect(37, 10, 3, 3, (255, 228, 234))
+            c.rect(20, 29, 8, 3, (56, 10, 16))
         else:
-            c.line(20, 29, 28, 29, (64, 12, 18))
+            c.rect(20, 29, 8, 1, (64, 12, 18))
     elif kind == "sophie":
-        c.poly([(10, 47), (15, 34), (33, 34), (38, 47)], (255, 122, 42))
+        c.poly([(9, 47), (15, 34), (33, 34), (39, 47)], (242, 112, 36))
         c.rect(20, 34, 8, 13, (250, 246, 240))
-        c.oval(24, 22, 10, 9, (255, 122, 42))
+        c.oval(24, 22, 10, 9, (255, 126, 46))
+        c.oval(22, 19, 6, 5, (255, 164, 84))
         c.rect(28, 15, 3, 14, (250, 246, 240))
         c.poly([(15, 15), (9, 5), (22, 12)], (216, 48, 86))
         c.poly([(33, 15), (39, 5), (26, 12)], (82, 194, 130))
@@ -706,53 +761,47 @@ def draw_portrait(kind, expr="normal"):
         c.poly([(9, 47), (15, 33), (33, 33), (39, 47)], suit)
         c.rect(20, 33, 8, 14, (242, 246, 252))
         c.rect(23, 34, 2, 12, (200, 62, 82) if kind == "jack" else (240, 198, 92))
-        # Tall sail crest + billfish face + rostrum
-        crest_y = 1 if expr == "shocked" else 3
+        crest_y = 2 if expr == "shocked" else 4
         c.poly([(15, 15), (23, crest_y), (28, 15)], (42, 84, 156))
-        c.oval(23, 23, 9, 9, col)
+        c.oval(23, 23, 9, 9, col); c.oval(21, 20, 5, 5, shade(col, 1.18))
         c.poly([(30, 22), (45, 25), (30, 27)], (188, 218, 244))
+        c.line(31, 23, 42, 25, (232, 246, 255))
         if expr == "shocked":
-            c.rect(16, 17, 5, 6, (252, 253, 255))
-            c.rect(24, 17, 5, 6, (252, 253, 255))
-            c.rect(18, 19, 2, 2, (20, 28, 54))
-            c.rect(26, 19, 2, 2, (20, 28, 54))
+            c.rect(16, 17, 5, 6, (252, 253, 255)); c.rect(24, 17, 5, 6, (252, 253, 255))
+            c.rect(18, 19, 2, 2, (20, 28, 54)); c.rect(26, 19, 2, 2, (20, 28, 54))
             c.oval(24, 29, 2, 2, (24, 22, 46))
-            c.rect(8, 10, 2, 6, (255, 224, 102))
-            c.rect(8, 18, 2, 2, (255, 224, 102))
+            c.rect(8, 10, 2, 6, (255, 224, 102)); c.rect(8, 18, 2, 2, (255, 224, 102))
         else:
             c.eyes(18, 25, 20, iris=(20, 28, 54), mood="normal")
-            c.line(21, 29, 27, 29, (24, 28, 52))
+            c.rect(21, 29, 6, 1, (24, 28, 52))
         if kind == "jack":
             c.rect(24, 19, 5, 5, (238, 202, 102))
             c.rect(25, 20, 3, 3, (176, 242, 255))
     elif kind == "towtou":
         c.poly([(8, 47), (14, 34), (34, 34), (40, 47)], (42, 74, 80))
-        c.oval(24, 23, 10, 9, (72, 118, 108))
-        c.oval(24, 31, 9, 6, (238, 240, 245))  # beard
-        c.oval(23, 14, 11, 4, (196, 44, 72))  # beret
+        c.oval(24, 23, 10, 9, (72, 118, 108)); c.oval(22, 19, 6, 4, (96, 150, 136))
+        c.oval(24, 31, 9, 6, (238, 240, 245))
+        c.oval(23, 14, 11, 4, (196, 44, 72))
         c.eyes(18, 26, 21, iris=(24, 24, 40))
-        c.line(17, 17, 22, 25, (198, 62, 76), width=2)  # scar
+        c.line(17, 17, 22, 25, (198, 62, 76), width=2)
     elif kind == "thaumiel":
         c.poly([(8, 47), (15, 32), (33, 32), (40, 47)], (64, 78, 62))
         c.oval(24, 23, 10, 9, (92, 116, 134))
-        c.line(23, 14, 30, 7, (56, 70, 96), width=2)
-        c.line(30, 7, 36, 15, (56, 70, 96), width=2)
-        c.oval(36, 17, 4, 4, (104, 244, 255))
-        c.oval(36, 17, 2, 2, (255, 255, 255))
+        c.line(23, 14, 30, 7, (56, 70, 96), width=2); c.line(30, 7, 36, 15, (56, 70, 96), width=2)
+        c.oval(36, 17, 4, 4, (104, 244, 255)); c.oval(36, 17, 2, 2, (255, 255, 255))
         c.eyes(18, 26, 21, iris=(110, 244, 255))
     elif kind == "tenebris":
         c.poly([(10, 47), (16, 35), (32, 35), (38, 47)], (28, 26, 42))
         c.oval(24, 26, 8, 7, (62, 68, 96))
-        c.rect(11, 18, 26, 3, (24, 22, 36))  # trenchcoat hat brim
+        c.rect(11, 18, 26, 3, (24, 22, 36))
         c.rect(16, 11, 16, 7, (34, 30, 50))
-        c.rect(18, 24, 4, 2, (110, 240, 255))
-        c.rect(26, 24, 4, 2, (110, 240, 255))
+        c.rect(18, 24, 4, 2, (110, 240, 255)); c.rect(26, 24, 4, 2, (110, 240, 255))
     elif kind == "genie":
-        c.poly([(10, 47), (16, 31), (32, 31), (38, 47)], (242, 92, 34))
-        c.oval(24, 22, 10, 9, (255, 168, 54))
+        c.poly([(10, 47), (16, 31), (32, 31), (38, 47)], (228, 78, 28))
+        c.poly([(15, 33), (33, 33), (35, 47), (13, 47)], (255, 138, 48))
+        c.oval(24, 22, 10, 9, (255, 168, 54)); c.oval(22, 19, 6, 5, (255, 222, 106))
         c.poly([(14, 16), (19, 5), (24, 13), (29, 4), (34, 16)], (255, 240, 142))
-        c.rect(18, 20, 4, 3, (255, 255, 245))
-        c.rect(26, 20, 4, 3, (255, 255, 245))
+        c.rect(18, 20, 4, 3, (255, 255, 245)); c.rect(26, 20, 4, 3, (255, 255, 245))
     elif kind in ("angelfish", "stonefish", "gill", "scal", "lady", "angler"):
         col_map = {
             "angelfish": ((230, 240, 250), (42, 54, 92)),
@@ -768,36 +817,33 @@ def draw_portrait(kind, expr="normal"):
             fc = (38, 134, 124) if kind == "gill" else ((96, 198, 190) if kind == "scal" else (196, 92, 110))
             c.poly([(14, 18), (7, 23), (14, 28)], fc)
             c.poly([(34, 18), (41, 23), (34, 28)], fc)
-        c.oval(24, 23, 10, 9, sk)
+        c.oval(24, 23, 10, 9, sk); c.oval(22, 20, 6, 5, shade(sk, 1.12))
         if kind == "angelfish":
             c.poly([(15, 15), (24, 3), (33, 15)], (245, 248, 255))
-            c.rect(12, 16, 4, 12, (240, 244, 252))
-            c.rect(32, 16, 4, 12, (220, 228, 242))
+            c.rect(12, 16, 4, 12, (240, 244, 252)); c.rect(32, 16, 4, 12, (220, 228, 242))
             c.rect(18, 34, 12, 6, (255, 255, 255))
         elif kind == "stonefish":
-            c.rect(15, 12, 18, 5, (190, 62, 74))  # backwards red cap
-            c.rect(10, 14, 7, 3, (150, 44, 56))
-            c.line(19, 27, 29, 27, (68, 54, 36))
+            c.rect(15, 12, 18, 5, (190, 62, 74)); c.rect(10, 14, 7, 3, (150, 44, 56))
+            c.rect(19, 27, 10, 1, (68, 54, 36))
         elif kind == "scal":
-            c.oval(24, 15, 9, 4, (124, 152, 186))
-            c.line(20, 28, 28, 28, (32, 54, 86))
+            c.oval(24, 15, 9, 4, (124, 152, 186)); c.rect(20, 28, 8, 1, (32, 54, 86))
         elif kind == "gill":
             c.poly([(19, 14), (24, 7), (29, 14)], (38, 134, 124))
-            c.line(19, 27, 24, 29, (22, 68, 72))
-            c.line(24, 29, 29, 27, (22, 68, 72))
+            c.line(19, 27, 24, 29, (22, 68, 72)); c.line(24, 29, 29, 27, (22, 68, 72))
         elif kind == "lady":
-            c.rect(12, 33, 24, 7, (244, 190, 162))  # cozy market shawl
-            c.oval(14, 16, 8, 4, (238, 242, 248))  # silver curls
-            c.oval(34, 16, 4, 4, (238, 242, 248))
-            c.line(20, 27, 24, 29, (124, 42, 62))
-            c.line(24, 29, 28, 27, (124, 42, 62))
+            c.rect(12, 33, 24, 7, (244, 190, 162))
+            c.oval(14, 16, 8, 4, (238, 242, 248)); c.oval(34, 16, 4, 4, (238, 242, 248))
+            c.line(20, 27, 24, 29, (124, 42, 62)); c.line(24, 29, 28, 27, (124, 42, 62))
         elif kind == "angler":
             c.line(24, 14, 33, 9, (56, 70, 96), width=2)
-            c.oval(35, 13, 3, 3, (255, 110, 210))
-            c.line(20, 28, 28, 27, (42, 22, 62))
+            c.oval(35, 13, 3, 3, (255, 110, 210)); c.line(20, 28, 28, 27, (42, 22, 62))
         c.eyes(18, 26, 21, iris=(24, 24, 48))
 
-    return outline_image(c.im, OUTLINE_ABYSS) if kind in ("thaumiel", "tenebris", "angler") else c.im
+    out_col = OUTLINE_ABYSS if kind in ("thaumiel", "tenebris", "angler") else (OUTLINE_WARM if kind in ("queen_crab", "kenny", "sophie", "genie", "nadia", "grandparent", "mark") else OUTLINE_SEA)
+    fg = outline_image(c.im, out_col)
+    res = bg.im.copy()
+    res.alpha_composite(fg)
+    return res
 
 
 # ---------------------------------------------------------------------------
@@ -932,161 +978,212 @@ def draw_props(out_dir):
                 c.oval(16 + ox + side * 6, y - 1, 3, 1, hi)
         c.finish(OUTLINE_SEA).save(os.path.join(out_dir, f"kelp_{vi}.png"))
 
-    # 2. Kenny's Cozy Kelp Hut (96x80)
+    # 2. Kenny's Cozy Kelp Hut (96x80) - shingled shell dome, chimney, plank walls & shuttered windows
     c = Canvas(96, 80)
-    c.oval(48, 40, 38, 26, (214, 108, 74))  # coral-shell dome
-    c.oval(46, 32, 28, 16, (242, 142, 98))
-    c.rect(12, 46, 72, 32, (164, 118, 78))
-    c.rect(14, 48, 68, 28, (194, 146, 98))
-    c.rect(38, 52, 20, 26, (92, 56, 40))  # arched wooden door
-    c.oval(48, 52, 10, 8, (92, 56, 40))
-    c.oval(24, 58, 7, 7, (255, 224, 130))  # warm porthole
-    c.oval(72, 58, 7, 7, (255, 224, 130))
-    # kelp shingle trim
-    for kx in range(14, 82, 8):
-        c.oval(kx, 46, 5, 4, (62, 158, 86))
+    roof = (212, 102, 68); roof_hi = shade(roof, 1.24); roof_lo = shade(roof, 0.72)
+    wall = (182, 132, 86); wall_lo = shade(wall, 0.78)
+    c.rect(62, 10, 12, 22, (132, 76, 72)); c.rect(60, 8, 16, 4, (164, 96, 88))
+    c.rect(65, 2, 4, 4, (216, 244, 250, 170))
+    c.oval(48, 38, 39, 26, roof_lo)
+    c.oval(48, 36, 38, 24, roof)
+    c.oval(42, 28, 26, 13, roof_hi)
+    # Layered scallop shell shingles across dome
+    for sy in (22, 30, 38):
+        for sx in range(20 + (sy % 8), 76, 10):
+            c.line(sx - 3, sy, sx + 3, sy, roof_lo)
+            c.px(sx, sy + 1, roof_hi)
+    # Timber wall planks & cast shadow beneath roof eave
+    c.rect(12, 46, 72, 32, wall)
+    c.rect(12, 46, 72, 5, wall_lo)
+    for vx in range(20, 80, 10):
+        c.line(vx, 49, vx, 77, wall_lo)
+    c.rect(12, 74, 72, 4, (108, 92, 92))
+    # Arched timber door + brass knob + glowing leaded glass windows
+    c.rect(37, 51, 22, 27, (84, 48, 34))
+    c.rect(39, 53, 18, 25, (108, 64, 44))
+    c.rect(52, 65, 2, 3, (242, 198, 86))
+    for wx in (20, 66):
+        c.rect(wx, 54, 11, 11, (78, 48, 36))
+        c.rect(wx + 1, 55, 9, 9, (255, 220, 124))
+        c.line(wx + 5, 55, wx + 5, 64, (78, 48, 36))
+        c.line(wx + 1, 59, wx + 10, 59, (78, 48, 36))
+    for kx in range(12, 84, 7):
+        c.rect(kx, 44, 6, 4, (54, 152, 82))
+        c.px(kx + 2, 44, (110, 212, 134))
     c.finish(OUTLINE_WARM).save(os.path.join(out_dir, "kenny_house.png"))
 
-    # 3. Riddle Stone Monolith (36x52) with carved glowing runes & sea moss
+    # 3. Riddle Stone Monolith (36x52) with beveled frame, cracks & inlaid sea moss
     c = Canvas(36, 52)
-    c.poly([(6, 50), (8, 12), (18, 4), (28, 12), (30, 50)], (82, 98, 124))
-    c.poly([(8, 48), (10, 13), (18, 7), (25, 13), (26, 48)], (122, 140, 168))
-    c.rect(12, 16, 12, 24, (52, 64, 88))
-    # Carved rune sigil & stone cracks & base moss
-    for ry, rx in ((20, 15), (24, 17), (28, 15), (32, 17)):
-        c.rect(rx, ry, 4, 2, (108, 244, 220))
-    c.rect(14, 21, 2, 12, (76, 206, 198))
-    c.line(8, 36, 14, 38, (64, 78, 102))
-    c.rect(8, 44, 6, 4, (54, 152, 92))
-    c.rect(21, 45, 7, 3, (46, 136, 82))
+    c.poly([(5, 50), (7, 12), (18, 4), (29, 12), (31, 50)], (76, 92, 118))
+    c.poly([(8, 48), (10, 13), (18, 6), (25, 13), (26, 48)], (124, 144, 174))
+    c.line(10, 13, 18, 6, (176, 202, 232))
+    c.rect(11, 15, 14, 25, (42, 54, 76))
+    c.rect(12, 16, 12, 23, (54, 68, 94))
+    for ry, rx in ((19, 15), (24, 17), (29, 14), (34, 16)):
+        c.rect(rx, ry, 5, 2, (114, 248, 224))
+    c.rect(14, 20, 2, 15, (72, 204, 196))
+    c.line(8, 36, 13, 39, (52, 66, 90))
+    c.rect(7, 44, 7, 4, (52, 150, 90)); c.rect(21, 45, 8, 3, (44, 134, 80))
     c.finish(OUTLINE_SEA).save(os.path.join(out_dir, "riddle_stone.png"))
 
     # 4. Throne Gate Archway (128x112) with masonry courses & glowing aqua runes
     c = Canvas(128, 112)
-    c.rect(14, 18, 100, 92, (68, 80, 106))
-    c.rect(18, 22, 92, 86, (102, 118, 148))
-    for by in range(28, 104, 14):
-        c.line(18, by, 110, by, (74, 88, 116))
-    c.poly([(10, 22), (64, 4), (118, 22)], (132, 148, 180))
-    c.poly([(20, 22), (64, 8), (108, 22)], (152, 170, 202))
-    c.rect(38, 42, 52, 68, (18, 22, 40))
-    c.oval(64, 44, 26, 20, (18, 22, 40))
-    c.rect(28, 26, 72, 6, (118, 232, 226))
+    c.rect(14, 18, 100, 92, (62, 74, 98))
+    c.rect(18, 22, 92, 86, (104, 120, 152))
+    for by in range(28, 104, 12):
+        c.line(18, by, 110, by, (70, 84, 112))
+        off = 8 if (by // 12) % 2 else 0
+        for bx in range(22 + off, 106, 16):
+            c.line(bx, by, bx, min(107, by + 11), (70, 84, 112))
+    c.poly([(10, 22), (64, 4), (118, 22)], (134, 150, 184))
+    c.poly([(22, 22), (64, 9), (106, 22)], (162, 180, 212))
+    c.rect(38, 42, 52, 68, (16, 20, 38))
+    c.oval(64, 44, 26, 20, (16, 20, 38))
+    c.rect(28, 26, 72, 5, (118, 232, 226))
     for px_col in (24, 98):
         for py_r in range(38, 96, 14):
             c.rect(px_col, py_r, 4, 6, (112, 236, 226))
     c.finish(OUTLINE_SEA).save(os.path.join(out_dir, "throne_gate.png"))
 
-    # 5. Crab Castle Silhouette Facade (180x140)
+    # 5. Crab Castle Silhouette Facade (180x140) with crenellations, banners & brick depth
     c = Canvas(180, 140)
-    wall = (146, 54, 72); wall_hi = (188, 78, 96); roof = (214, 62, 52)
+    wall = (146, 52, 70); wall_hi = shade(wall, 1.24); wall_lo = shade(wall, 0.72); roof = (212, 60, 50)
     c.rect(20, 48, 140, 90, wall)
     c.rect(24, 52, 132, 84, wall_hi)
-    # flanking towers + tall spiky center keep
-    for tx in (16, 134):
-        c.rect(tx, 26, 30, 112, wall)
-        c.poly([(tx - 4, 26), (tx + 15, 6), (tx + 34, 26)], roof)
+    for by in range(56, 134, 12):
+        c.line(24, by, 156, by, wall)
+    for mx in range(22, 156, 14):
+        c.rect(mx, 44, 8, 6, wall_hi)
+    for tx in (14, 134):
+        c.rect(tx, 26, 32, 112, wall)
+        c.rect(tx + 3, 28, 24, 108, wall_hi)
+        c.poly([(tx - 4, 26), (tx + 16, 6), (tx + 36, 26)], roof)
+        c.rect(tx + 13, 38, 6, 12, (34, 18, 32))
     c.rect(64, 18, 52, 120, wall)
+    c.rect(68, 20, 42, 116, wall_hi)
     c.poly([(60, 18), (90, 2), (120, 18)], roof)
-    # claw-shaped gate arch
-    c.rect(72, 86, 36, 52, (34, 18, 32))
-    c.oval(90, 88, 18, 16, (34, 18, 32))
+    c.rect(72, 84, 36, 54, (30, 16, 30))
+    c.oval(90, 86, 18, 15, (30, 16, 30))
+    c.rect(87, 36, 6, 18, (244, 198, 72))
     c.finish(OUTLINE_WARM).save(os.path.join(out_dir, "crab_castle.png"))
 
-    # 6. Shipwreck Hull & Anchor (96x64)
+    # 6. Shipwreck Hull & Anchor (96x64) with curved plank strakes & rigged sail
     c = Canvas(96, 64)
-    wood = (118, 78, 50); wood_lo = (78, 50, 34)
-    c.poly([(6, 46), (18, 62), (76, 62), (88, 36), (62, 44)], wood)
-    c.poly([(14, 48), (22, 59), (72, 59), (80, 42)], wood_lo)
-    c.rect(42, 8, 5, 50, wood)  # broken mast
+    wood = (118, 78, 50); wood_hi = shade(wood, 1.2); wood_lo = shade(wood, 0.68)
+    c.poly([(6, 44), (18, 62), (76, 62), (90, 34), (62, 42)], wood)
+    c.poly([(14, 47), (22, 59), (72, 59), (80, 41)], wood_lo)
+    for hy in (49, 54, 58):
+        c.line(16, hy, 76, hy - 3, wood_hi)
+    for px in (28, 48, 66):
+        c.rect(px, 50, 4, 4, (28, 34, 56))
+    c.rect(42, 8, 5, 50, wood); c.rect(43, 8, 2, 46, wood_hi)
     c.line(24, 18, 64, 26, wood_lo, width=3)
-    c.poly([(24, 20), (54, 26), (48, 40), (22, 34)], (210, 214, 198, 180))  # tattered sail
+    c.poly([(24, 20), (54, 26), (48, 40), (22, 34)], (214, 218, 204, 190))
+    c.line(22, 34, 42, 48, (150, 138, 116))
     c.finish(OUTLINE_SEA).save(os.path.join(out_dir, "shipwreck.png"))
 
-    # 7. Coral Houses & Market Stall (80x72)
-    for idx, col in enumerate(((236, 118, 148), (92, 192, 206))):
+    # 7. Coral Houses (80x72) & Market Stall (84x68)
+    for idx, col in enumerate(((230, 114, 144), (86, 186, 202))):
         c = Canvas(80, 72)
-        c.oval(40, 32, 30, 22, col)
-        c.oval(36, 24, 20, 12, shade(col, 1.18))
-        c.rect(14, 34, 52, 36, shade(col, 0.85))
-        c.rect(32, 46, 16, 24, (44, 32, 62))
-        c.oval(24, 46, 5, 5, (255, 228, 142))
-        c.oval(56, 46, 5, 5, (255, 228, 142))
+        hi = shade(col, 1.22); lo = shade(col, 0.78)
+        c.oval(40, 31, 31, 22, lo)
+        c.oval(40, 29, 30, 20, col)
+        c.oval(35, 22, 20, 11, hi)
+        for rx in (24, 34, 44, 54):
+            c.line(rx, 15, rx, 34, lo)
+        c.rect(14, 34, 52, 36, lo)
+        c.rect(16, 36, 48, 32, col)
+        c.rect(31, 45, 18, 25, (72, 46, 56))
+        c.rect(33, 47, 14, 23, (34, 24, 50))
+        for wx in (20, 53):
+            c.rect(wx, 44, 9, 9, (68, 42, 54))
+            c.rect(wx + 1, 45, 7, 7, (255, 226, 138))
         c.finish(OUTLINE_SEA).save(os.path.join(out_dir, f"coral_house_{idx}.png"))
 
     c = Canvas(84, 68)
-    c.rect(10, 26, 6, 40, (146, 98, 62)); c.rect(68, 26, 6, 40, (146, 98, 62))
-    c.rect(8, 44, 68, 22, (168, 118, 72))
+    c.rect(10, 26, 6, 40, (124, 82, 52)); c.rect(68, 26, 6, 40, (124, 82, 52))
+    c.rect(8, 44, 68, 22, (164, 112, 68)); c.rect(10, 46, 64, 4, (194, 142, 92))
+    for sy in (54, 60):
+        c.line(10, sy, 74, sy, (118, 76, 46))
     for i in range(6):
-        col = (242, 92, 134) if i % 2 == 0 else (250, 242, 224)
-        c.rect(6 + i * 12, 14, 12, 14, col)
-    # Market wares: blue seashroom, tentacle anemone, sea berries
-    c.oval(24, 42, 5, 4, (78, 178, 248)); c.oval(42, 42, 5, 4, (218, 96, 188))
-    c.oval(60, 42, 5, 4, (146, 228, 140))
+        col = (238, 86, 128) if i % 2 == 0 else (248, 240, 222)
+        c.rect(6 + i * 12, 13, 12, 15, col)
+        c.rect(6 + i * 12, 26, 12, 3, shade(col, 0.8))
+    c.rect(20, 37, 8, 7, (62, 166, 246)); c.rect(38, 36, 8, 8, (218, 92, 186)); c.rect(56, 37, 8, 7, (64, 196, 148))
     c.finish(OUTLINE_SEA).save(os.path.join(out_dir, "market_stall.png"))
 
     # 8. Tow-Tou's Scrapyard Garage (120x84)
     c = Canvas(120, 84)
-    c.rect(14, 16, 92, 66, (76, 86, 98))
-    c.rect(18, 20, 84, 58, (98, 112, 126))
-    for sx in range(16, 104, 8):
-        c.line(sx, 16, sx, 82, (62, 72, 82))
-    c.rect(32, 34, 56, 48, (30, 36, 46))  # open garage bay
-    for gy in range(36, 50, 4):
-        c.rect(34, gy, 52, 2, (124, 136, 148))
-    c.rect(42, 22, 36, 10, (214, 146, 68))  # rusted sign
+    c.rect(12, 16, 96, 66, (68, 78, 92))
+    c.rect(16, 20, 88, 58, (96, 110, 126))
+    for sx in range(18, 102, 7):
+        c.line(sx, 20, sx, 78, (64, 74, 88))
+    c.rect(32, 34, 56, 48, (22, 28, 38))
+    for gy in range(36, 52, 4):
+        c.rect(34, gy, 52, 2, (124, 136, 150))
+    c.rect(74, 56, 10, 8, (255, 212, 96))  # warm workbench glow inside bay
+    c.rect(38, 22, 44, 10, (214, 142, 62)); c.rect(40, 24, 40, 6, (238, 174, 88))
     c.finish(OUTLINE_SEA).save(os.path.join(out_dir, "towtou_garage.png"))
 
-    # 9. Whale Skeleton & Somber Slum Shack & Algae Temple
+    # 9. Whale Skeleton (144x68) - sculpted pixel skull + tooth pegs + ribbed vertebrae
     c = Canvas(144, 68)
-    bone = (212, 218, 226); bone_lo = (146, 156, 176)
-    c.oval(28, 42, 22, 16, bone)
-    c.oval(24, 38, 14, 10, shade(bone, 1.12))
-    c.oval(20, 40, 4, 4, (18, 20, 36))  # eye socket
-    c.rect(44, 34, 88, 5, bone_lo)
-    for rx in range(52, 126, 10):
-        c.poly([(rx, 36), (rx + 4, 36), (rx + 8, 62), (rx + 2, 62)], bone)
+    bone = (214, 220, 228); bone_hi = (242, 246, 252); bone_lo = (140, 150, 174)
+    c.poly([(8, 44), (16, 26), (38, 22), (46, 34), (44, 49), (12, 49)], bone_lo)
+    c.poly([(10, 42), (18, 28), (37, 25), (43, 35), (41, 46), (14, 46)], bone)
+    c.poly([(16, 30), (32, 27), (36, 33), (20, 36)], bone_hi)
+    c.oval(24, 36, 4, 4, (14, 16, 32))  # hollow eye socket
+    c.line(12, 46, 42, 46, (30, 28, 48))  # jaw seam
+    for tx in range(15, 39, 5):
+        c.rect(tx, 46, 2, 2, bone_hi)
+    # Tapered vertebrae spine + curving shaded rib arcs
+    for i, rx in enumerate(range(48, 132, 10)):
+        r_len = max(10, 26 - i * 2)
+        c.rect(rx, 33, 6, 6, bone_hi)
+        c.rect(rx + 6, 35, 4, 3, bone_lo)
+        c.poly([(rx + 1, 38), (rx + 5, 38), (rx + 7, 38 + r_len), (rx + 2, 38 + r_len)], bone)
+        c.line(rx + 2, 39, rx + 3, 37 + r_len, bone_hi)
     c.finish(OUTLINE_ABYSS).save(os.path.join(out_dir, "whale_skeleton.png"))
 
     c = Canvas(76, 68)
-    c.rect(10, 22, 56, 44, (46, 42, 64))
-    c.poly([(4, 24), (38, 6), (72, 24)], (62, 56, 84))
-    c.rect(28, 38, 16, 28, (26, 22, 38))
-    c.rect(48, 34, 12, 12, (110, 232, 246))  # bioluminescent window
+    c.rect(10, 22, 56, 44, (44, 40, 62))
+    for sy in (30, 38, 46, 54):
+        c.line(12, sy, 64, sy, (32, 28, 48))
+    c.poly([(4, 24), (38, 6), (72, 24)], (64, 58, 88))
+    c.poly([(10, 22), (38, 9), (66, 22)], (80, 72, 108))
+    c.rect(28, 38, 16, 28, (22, 18, 34))
+    c.rect(48, 34, 12, 12, (110, 232, 246))
+    c.rect(53, 34, 2, 12, (44, 40, 62)); c.rect(48, 39, 12, 2, (44, 40, 62))
     c.finish(OUTLINE_ABYSS).save(os.path.join(out_dir, "slum_shack.png"))
 
     c = Canvas(112, 96)
-    st = (54, 52, 88); st_hi = (90, 88, 138)
+    st = (54, 52, 88); st_hi = (92, 90, 142); st_lo = (34, 32, 58)
     c.poly([(8, 28), (56, 6), (104, 28)], st_hi)
-    c.poly([(22, 26), (56, 11), (90, 26)], (68, 66, 108))
-    c.rect(48, 16, 16, 8, (82, 246, 206))  # triangle capstone gem
+    c.poly([(22, 26), (56, 11), (90, 26)], st)
+    c.rect(48, 16, 16, 8, (82, 246, 206))
     c.rect(14, 28, 84, 66, st)
+    for by in range(38, 90, 12):
+        c.line(14, by, 98, by, st_lo)
     for px in (18, 40, 64, 86):
         c.rect(px, 28, 8, 66, st_hi)
-        c.rect(px + 2, 32, 2, 58, (112, 110, 168))
+        c.rect(px + 2, 32, 2, 58, (118, 116, 178))
     c.rect(42, 48, 28, 46, (14, 12, 28))
-    c.oval(56, 70, 9, 11, (82, 246, 206))
-    c.oval(56, 70, 4, 5, (216, 255, 246))
+    c.oval(56, 70, 9, 11, (82, 246, 206)); c.oval(56, 70, 4, 5, (216, 255, 246))
     c.finish(OUTLINE_ABYSS).save(os.path.join(out_dir, "algae_temple.png"))
 
     # 9b. Elixir Tome (36x44) & Coral City Bespoke Reagents (28x28)
     c = Canvas(36, 44)
-    c.rect(8, 5, 24, 35, (54, 22, 78))       # deep plum leather back
-    c.rect(10, 8, 21, 30, (248, 236, 208))   # parchment pages
+    c.rect(8, 5, 24, 35, (54, 22, 78))
+    c.rect(10, 8, 21, 30, (248, 236, 208))
     for py in range(11, 35, 4):
         c.line(12, py, 29, py, (206, 184, 146))
-    c.rect(5, 6, 22, 34, (90, 44, 128))      # front cover
-    c.rect(6, 7, 4, 32, (124, 68, 168))      # leather spine highlight
-    c.rect(11, 10, 13, 25, CLEAR)
+    c.rect(5, 6, 22, 34, (90, 44, 128))
+    c.rect(6, 7, 4, 32, (128, 72, 174))
     c.rect(11, 10, 13, 25, (76, 36, 112))
-    c.rect(11, 10, 13, 1, (238, 194, 96))    # gold trim frame
-    c.rect(11, 34, 13, 1, (238, 194, 96))
-    c.rect(11, 10, 1, 25, (238, 194, 96))
-    c.rect(23, 10, 1, 25, (238, 194, 96))
-    c.poly([(17, 15), (22, 22), (17, 29), (12, 22)], (242, 198, 96))  # crest
-    c.poly([(17, 18), (19, 22), (17, 26), (15, 22)], (104, 244, 255))  # cyan elixir gem
-    c.rect(25, 19, 4, 6, (242, 198, 96))     # golden clasp
-    c.rect(18, 37, 4, 5, (222, 68, 128))     # silk bookmark
+    c.rect(11, 10, 13, 1, (238, 194, 96)); c.rect(11, 34, 13, 1, (238, 194, 96))
+    c.rect(11, 10, 1, 25, (238, 194, 96)); c.rect(23, 10, 1, 25, (238, 194, 96))
+    c.poly([(17, 15), (22, 22), (17, 29), (12, 22)], (242, 198, 96))
+    c.poly([(17, 18), (19, 22), (17, 26), (15, 22)], (104, 244, 255))
+    c.rect(25, 19, 4, 6, (242, 198, 96)); c.rect(18, 37, 4, 5, (222, 68, 128))
     c.finish(OUTLINE_WARM).save(os.path.join(out_dir, "tome.png"))
 
     # Blue Seashroom (28x28)
