@@ -476,13 +476,11 @@ pub fn draw_wrapped_col(text: &str, x: f32, y: f32, max_w: f32, size: u16, line_
     draw_wrapped_inner(text, x, y, max_w, size, line_h, color, color);
 }
 
-fn strip_emph(w: &str) -> (&str, bool) {
-    if w.len() >= 2 && w.starts_with('*') && w.ends_with('*') {
-        (&w[1..w.len() - 1], true)
-    } else if w.starts_with('*') && w.len() > 1 {
-        (&w[1..], true)
+fn strip_emph(w: &str) -> (std::borrow::Cow<'_, str>, bool) {
+    if w.contains('*') {
+        (std::borrow::Cow::Owned(w.replace('*', "")), true)
     } else {
-        (w, false)
+        (std::borrow::Cow::Borrowed(w), false)
     }
 }
 
@@ -497,14 +495,14 @@ fn draw_wrapped_inner(text: &str, x0: f32, mut y: f32, max_w: f32, size: u16, li
         let mut x = x0;
         for raw_word in para.split_whitespace() {
             let (clean, emph) = strip_emph(raw_word);
-            let ww = ttext_w(clean, f, size);
+            let ww = ttext_w(&clean, f, size);
             if x > x0 && x + ww > x0 + max_w {
                 x = x0;
                 y += line_h;
             }
             let col = if emph { accent } else { base };
-            ttext(clean, x + 2.0, y + 2.0, f, size, Color::new(0.02, 0.02, 0.05, col.a * 0.85));
-            ttext(clean, x, y, f, size, col);
+            ttext(&clean, x + 2.0, y + 2.0, f, size, Color::new(0.02, 0.02, 0.05, col.a * 0.85));
+            ttext(&clean, x, y, f, size, col);
             x += ww + space;
         }
         y += line_h;
@@ -520,7 +518,7 @@ pub fn wrapped_line_count(text: &str, max_w: f32, size: u16) -> usize {
         let mut x = 0.0f32;
         for raw in para.split_whitespace() {
             let (clean, _) = strip_emph(raw);
-            let ww = ttext_w(clean, f, size);
+            let ww = ttext_w(&clean, f, size);
             if x > 0.0 && x + ww > max_w {
                 lines += 1;
                 x = ww + space;
