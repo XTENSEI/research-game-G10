@@ -7,7 +7,7 @@ natively and on wasm32 without Python at runtime.
 import os
 import random
 import shutil
-from PIL import Image
+from PIL import Image, ImageOps
 
 import pixel_cast
 
@@ -83,14 +83,77 @@ def ramp_tile(im, dark, mid, light):
     return out
 
 
-# Kelp Forest lush underwater moss/seabed turf + sandy path + castle stone
-kelp_turf_a = ramp_tile(load_tt(0), (36, 108, 86), (62, 168, 124), (116, 224, 164))
-kelp_turf_b = ramp_tile(load_tt(1), (36, 108, 86), (56, 158, 118), (110, 214, 156))
-kelp_flower = ramp_tile(load_tt(2), (38, 112, 92), (82, 186, 146), (255, 226, 146))
-kelp_sand = ramp_tile(load_td(49), (146, 132, 92), (196, 178, 124), (236, 220, 166))
-coral_sand = ramp_tile(load_td(49), (132, 122, 88), (184, 168, 120), (222, 206, 156))
-castle_stone = ramp_tile(load_td(14), (72, 46, 76), (118, 72, 112), (176, 116, 152))
-castle_stone_alt = ramp_tile(load_td(15), (66, 42, 70), (108, 64, 104), (162, 106, 140))
+def pp_clean(idx):
+    """Crop Kenney Pixel Platformer 18x18 padded cell down to seamless 16x16."""
+    return load_pp(idx).crop((1, 1, 17, 17))
+
+
+def dual_ramp_pp(im, cap_cols, soil_cols):
+    """Remap side-view cap & sub-soil separately so moss/sand never muddies earth."""
+    out = im.copy()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if a < 40:
+                continue
+            # Cap pixels in pp_0002/0022 are vivid green (g > r+30); in pp_0042 warm cream-gold (r > 230, g > 155)
+            is_outline = (r, g, b) == (67, 74, 95)
+            is_green_cap = g > r + 30
+            is_sand_cap = (r >= 230 and g >= 155 and b >= 90 and not (r == 244 and g == 172 and b == 102))
+            if is_outline:
+                px[x, y] = cap_cols[0] + (a,)
+            elif is_green_cap or is_sand_cap:
+                if r >= 240 or g >= 215:
+                    px[x, y] = cap_cols[2] + (a,)
+                else:
+                    px[x, y] = cap_cols[1] + (a,)
+            else:
+                # Sub-earth strata: highlight / base / pebble shadow
+                if (r, g, b) == (244, 172, 102):
+                    px[x, y] = soil_cols[2] + (a,)
+                elif (r, g, b) == (159, 90, 82):
+                    px[x, y] = soil_cols[0] + (a,)
+                else:
+                    px[x, y] = soil_cols[1] + (a,)
+    return out
+
+
+# Shared packed ocean-bedrock strata so Kelp moss & Coral sand blend smoothly into r>=1 sub-soil
+SUB_SOIL = ((40, 58, 66), (56, 76, 82), (74, 96, 100))
+
+kelp_turf_a = dual_ramp_pp(pp_clean(2), ((20, 62, 62), (48, 168, 122), (96, 224, 164)), SUB_SOIL)
+kelp_turf_b = dual_ramp_pp(pp_clean(22), ((20, 62, 62), (44, 156, 114), (88, 212, 154)), SUB_SOIL)
+kelp_flower = kelp_turf_b.copy()
+kf_px = kelp_flower.load()
+for bx, by in ((4, 1), (5, 1), (11, 2)):
+    kf_px[bx, by] = (248, 224, 134, 255)
+    kf_px[bx, by + 1] = (212, 176, 82, 255)
+
+# Seamless deep seabed sub-soil from pp_0122 without horizontal top-edge dash marks
+_pp_earth = pp_clean(122)
+_ep = _pp_earth.load()
+for _y in range(4):
+    for _x in range(16):
+        _ep[_x, _y] = _ep[_x, (_y + 6) % 16]
+for _y in range(16):
+    _ep[15, _y] = _ep[0, _y]
+kelp_sand = dual_ramp_pp(_pp_earth, SUB_SOIL, SUB_SOIL)
+
+coral_sand = dual_ramp_pp(pp_clean(42), ((68, 80, 84), (194, 174, 128), (238, 222, 172)), SUB_SOIL)
+
+# Side-view running-bond stone for Crab Gate approach (Kelp col >= 64)
+_cs_raw = Image.open(os.path.join(VENDOR, "oga/castle-tileset.png")).convert("RGBA")
+_cs_stone = _cs_raw.crop((0, 48, 16, 64))
+_cs_stone_dark = _cs_raw.crop((80, 48, 96, 64))
+castle_stone = ramp_tile(_cs_stone, (38, 48, 70), (74, 90, 118), (126, 146, 174))
+_cst_p = castle_stone.load()
+for _x in range(16):
+    _cst_p[_x, 0] = (26, 36, 54, 255)
+    _cst_p[_x, 1] = (146, 168, 194, 255)
+    _cst_p[_x, 2] = (106, 126, 152, 255)
+    _cst_p[_x, 3] = (32, 42, 62, 255)
+castle_stone_alt = ramp_tile(_cs_stone_dark, (28, 36, 54), (50, 62, 86), (82, 98, 124))
 
 kelp_turf_a.save(os.path.join(OUT_TILES, "ground.png"))
 kelp_turf_b.save(os.path.join(OUT_TILES, "ground_alt.png"))
@@ -184,8 +247,25 @@ UW_CROPS = {
 for name, box in UW_CROPS.items():
     PROPS_IMG.crop(box).save(os.path.join(OUT_AQUA, f"{name}.png"))
 
-# Ansimuz seamless ocean backdrop & mid reef
-shutil.copyfile(os.path.join(UW_PNG, "environment/background.png"), os.path.join(OUT_AQUA, "ansimuz_bg.png"))
+# Ansimuz ocean backdrop made seamlessly tileable + soft top mist fade (no hard horizon cut)
+_abg_src = Image.open(os.path.join(UW_PNG, "environment/background.png")).convert("RGBA")
+_abg_wide = Image.new("RGBA", (_abg_src.width * 2, _abg_src.height))
+_abg_wide.paste(_abg_src, (0, 0))
+_abg_wide.paste(ImageOps.mirror(_abg_src), (_abg_src.width, 0))
+_abg_p = _abg_wide.load()
+for _y in range(_abg_wide.height):
+    if _y < 64:
+        _t = _y / 64.0
+        _alpha = int(255 * (_t * _t))
+    elif _y >= _abg_wide.height - 18:
+        _t = (_abg_wide.height - 1 - _y) / 18.0
+        _alpha = int(170 + 85 * _t)
+    else:
+        continue
+    for _x in range(_abg_wide.width):
+        _r, _g, _b, _ = _abg_p[_x, _y]
+        _abg_p[_x, _y] = (_r, _g, _b, _alpha)
+_abg_wide.save(os.path.join(OUT_AQUA, "ansimuz_bg.png"))
 shutil.copyfile(os.path.join(UW_PNG, "environment/midground.png"), os.path.join(OUT_AQUA, "ansimuz_mid.png"))
 # Seabed edge tile strip from Ansimuz tiles.png
 TILES_IMG.crop((16, 144, 160, 192)).save(os.path.join(OUT_AQUA, "seabed_ledge.png"))
@@ -252,9 +332,29 @@ def castle_cell(cx, cy):
     return castle.crop((cx * 16, cy * 16, cx * 16 + 16, cy * 16 + 16))
 
 
-fa = remap_luma(castle_cell(0, 0), INDIGO)
-fb = remap_luma(castle_cell(1, 1), INDIGO)
-fc = remap_luma(castle_cell(4, 0), INDIGO)
+INDIGO_SUB = [
+    (0x46, 0x3C, 0x76), (0x3A, 0x31, 0x64), (0x2F, 0x26, 0x54),
+    (0x25, 0x1E, 0x46), (0x1E, 0x17, 0x3A), (0x18, 0x12, 0x30),
+    (0x14, 0x0F, 0x28), (0x10, 0x0B, 0x20), (0x0C, 0x09, 0x18),
+]
+
+
+def shift_x(im, dx):
+    out = Image.new("RGBA", im.size)
+    out.paste(im.crop((dx, 0, im.width, im.height)), (0, 0))
+    out.paste(im.crop((0, 0, dx, im.height)), (im.width - dx, 0))
+    return out
+
+
+fa = remap_luma(castle_cell(0, 3), INDIGO)
+_fap = fa.load()
+for _x in range(16):
+    _fap[_x, 0] = (0x16, 0x10, 0x2C, 255)
+    _fap[_x, 1] = (0x7E, 0x72, 0xBA, 255)
+    _fap[_x, 2] = (0x64, 0x56, 0x9E, 255)
+    _fap[_x, 3] = (0x18, 0x12, 0x30, 255)
+fb = shift_x(remap_luma(castle_cell(0, 3), INDIGO_SUB), 8)
+fc = remap_luma(castle_cell(5, 3), INDIGO_SUB)
 fa.save(os.path.join(OUT_COSMA, "floor_a.png"))
 fb.save(os.path.join(OUT_COSMA, "floor_b.png"))
 fc.save(os.path.join(OUT_COSMA, "floor_c.png"))

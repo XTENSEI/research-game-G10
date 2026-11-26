@@ -134,10 +134,10 @@ def make_shadow(sprite):
 # ---------------------------------------------------------------------------
 
 def draw_humanoid(cfg, pose="stand"):
-    """Draw detailed 32x38 humanoid sprite with 4-frame walk, idle blink, rim highlights, and sculpted hair."""
+    """Draw 32x38 humanoid in crisp 3/4 right-facing side-profile (mirrored cleanly on flip_x)."""
     W, H = 32, 38
     c = Canvas(W, H)
-    # Four-phase stride: w1 (left fwd), w2 (pass), w3 (right fwd), w4 (pass)
+    # Four-phase stride: w1 (near leg forward), w2 (pass/lift), w3 (far leg forward), w4 (pass)
     step = {"stand": 0, "idle": 0, "w1": 3, "w2": 0, "w3": -3, "w4": 0}.get(pose, 0)
     bob = {"stand": 0, "idle": 1, "w1": -1, "w2": 0, "w3": -1, "w4": 0}.get(pose, 0)
     short = cfg.get("short", 0)
@@ -157,200 +157,195 @@ def draw_humanoid(cfg, pose="stand"):
     shoes_hi = shade(shoes, 1.25)
 
     base_y = H - 2
-    # Sculpted stepping legs + boots with sole/highlight pixels
-    ly_l = base_y - 9 + (-1 if pose == "w1" else (1 if pose == "w3" else 0))
-    ly_r = base_y - 9 + (-1 if pose == "w3" else (1 if pose == "w1" else 0))
-    lx_l = 11 + step // 2
-    lx_r = 17 - step // 2
-    c.rect(lx_l, ly_l, 4, 5, pants)
-    c.rect(lx_l, ly_l, 2, 4, pants_hi)
-    c.rect(lx_l - 1, ly_l + 5, 5, 3, shoes)
-    c.px(lx_l, ly_l + 5, shoes_hi)
-    c.rect(lx_r, ly_r, 4, 5, pants_lo)
-    c.rect(lx_r, ly_r + 5, 5, 3, shade(shoes, 0.82))
-    c.px(lx_r + 1, ly_r + 5, shoes)
+    # 3/4 side stride: far leg & near leg swap clearly forward/back on w1 and w3
+    far_x = 15 if step == 0 else (10 if step > 0 else 17)
+    far_y = base_y - 9 + (-1 if pose == "w3" else 0)
+    c.rect(far_x, far_y, 4, 5, pants_lo)
+    c.rect(far_x, far_y + 5, 5, 3, shade(shoes, 0.78))
+    c.px(far_x + 3, far_y + 5, shoes)
 
-    # Torso with lapel/belt/fold shading
+    near_x = 11 if step == 0 else (16 if step > 0 else 10)
+    near_y = base_y - 9 + (-1 if pose == "w1" else (-1 if pose == "w2" else 0))
+    c.rect(near_x, near_y, 4, 5, pants)
+    c.rect(near_x, near_y, 2, 4, pants_hi)
+    c.rect(near_x, near_y + 5, 6, 3, shoes)
+    c.px(near_x + 2, near_y + 5, shoes_hi)
+
+    # Far arm tucked on the +X chest side behind torso (swings opposite near arm)
     ty = 16 + bob + short
+    arm_off = step
+    c.rect(19 - arm_off // 2, ty + 1 - arm_off // 2, 3, 7, shirt_lo)
+    c.rect(19 - arm_off // 2, ty + 7 - arm_off // 2, 3, 2, skin_lo)
+
+    # 3/4 right-angled torso with wrapped top-left rim & crisp waist belt
     if cfg.get("trenchcoat"):
         flap = 1 if step != 0 else 0
-        c.poly([(9, ty), (23, ty), (24 + flap, ty + 15 - short // 2), (8 - flap, ty + 15 - short // 2)], shirt)
-        c.rect(10, ty, 5, 14 - short // 2, shirt_hi)
-        c.rect(19, ty + 1, 4, 13 - short // 2, shirt_lo)
-        c.rect(11, ty + 6, 10, 2, cfg.get("trim", (96, 198, 220)))
-        c.px(15, ty + 6, (238, 206, 104))
+        c.poly([(9, ty), (21, ty), (22 + flap, ty + 15 - short // 2), (8 - flap, ty + 15 - short // 2)], shirt)
+        c.rect(9, ty, 4, 14 - short // 2, shirt_hi)
+        c.rect(19, ty + 2, 2, 12 - short // 2, shirt_lo)
+        c.rect(10, ty + 6, 11, 2, cfg.get("trim", (96, 198, 220)))
+        c.px(17, ty + 6, (238, 206, 104))
     else:
-        c.rect(10, ty, 12, 12 - short // 2, shirt)
-        c.rect(10, ty, 5, 9 - short // 2, shirt_hi)
-        c.rect(18, ty + 2, 4, 9 - short // 2, shirt_lo)
-        # Waistband + buckle highlight
-        c.rect(10, ty + 10 - short // 2, 12, 2, pants_lo)
-        c.rect(15, ty + 10 - short // 2, 2, 2, (214, 178, 92))
+        c.rect(10, ty, 11, 12 - short // 2, shirt)
+        c.rect(10, ty, 3, 8 - short // 2, shirt_hi)
+        c.rect(19, ty + 2, 2, 8 - short // 2, shirt_lo)
+        c.rect(10, ty + 10 - short // 2, 11, 2, pants_lo)
+        c.rect(16, ty + 10 - short // 2, 2, 2, (214, 178, 92))
         if cfg.get("collar"):
-            c.rect(12, ty, 8, 2, cfg["collar"])
-            c.px(15, ty + 2, cfg["collar"])
+            c.rect(14, ty, 6, 2, cfg["collar"])
+            c.px(16, ty + 2, cfg["collar"])
         if cfg.get("tie"):
-            c.rect(15, ty + 2, 2, 6, cfg["tie"])
+            c.rect(16, ty + 2, 2, 6, cfg["tie"])
         if cfg.get("floral"):
             c.px(12, ty + 4, (255, 196, 98))
-            c.px(13, ty + 5, (255, 120, 170))
+            c.px(14, ty + 5, (255, 120, 170))
             c.px(18, ty + 4, (136, 232, 160))
             c.rect(14, ty + 10 - short // 2, 5, 1, (220, 160, 240))
 
-    # Swinging arms + cuff detail
-    arm_off = step // 2
-    c.rect(7, ty + 1 - arm_off, 3, 7, shirt_lo)
-    c.rect(7, ty + 1 - arm_off, 1, 5, shirt)
-    c.rect(7, ty + 7 - arm_off, 3, 2, skin_lo)
-    c.rect(22, ty + 1 + arm_off, 3, 7, shirt)
-    c.rect(22, ty + 1 + arm_off, 2, 5, shirt_hi)
-    c.rect(22, ty + 7 + arm_off, 3, 2, skin)
+    # Near/front shoulder & swinging arm on the -X viewer side
+    c.rect(8 + arm_off // 2, ty + 1 + arm_off // 2, 4, 7, shirt)
+    c.rect(8 + arm_off // 2, ty + 1 + arm_off // 2, 2, 5, shirt_hi)
+    c.rect(9 + arm_off // 2, ty + 7 + arm_off // 2, 3, 2, skin)
 
-    # Head with temple, ears, chin shading, and blush
+    # Smooth rounded 3/4 head silhouette (clean cheek curve facing right, no pointy beak)
     hy = 4 + bob + short
-    c.rect(11, hy + 2, 10, 10, skin)
-    c.rect(10, hy + 4, 12, 6, skin)
+    c.rect(10, hy + 2, 11, 10, skin)
+    c.rect(11, hy + 4, 10, 7, skin)
     c.rect(12, hy + 11, 8, 2, skin_lo)
-    c.rect(12, hy + 2, 6, 2, skin_hi)
-    # Ears
-    c.rect(9, hy + 6, 1, 3, skin_lo)
-    c.rect(22, hy + 6, 1, 3, skin)
-    # Soft cheek warmth on humans
+    c.rect(11, hy + 2, 6, 2, skin_hi)
+    c.rect(9, hy + 6, 2, 3, skin_lo)
+    c.px(9, hy + 6, skin)
     if cfg.get("species", "human") == "human":
-        c.px(11, hy + 9, shade(skin, 0.92))
-        c.px(20, hy + 9, shade(skin, 0.92))
-        c.line(15, hy + 10, 17, hy + 10, (148, 86, 78))
+        c.px(13, hy + 9, shade(skin, 0.92))
+        c.line(16, hy + 10, 18, hy + 10, (148, 86, 78))
 
-    # Eyes (blink on idle pose)
+    # 3/4 forward eyes shifted +2px toward leading edge (iris naturally looks right)
     eye_col = cfg.get("eye", (40, 28, 60))
     eye_mood = "closed" if pose == "idle" else "normal"
     if cfg.get("sunglasses"):
-        c.rect(11, hy + 5, 4, 3, (18, 22, 40))
-        c.rect(17, hy + 5, 4, 3, (18, 22, 40))
-        c.rect(15, hy + 6, 2, 1, (100, 220, 255))
-        c.px(12, hy + 5, (110, 240, 255))
-        c.px(18, hy + 5, (110, 240, 255))
+        c.rect(13, hy + 5, 4, 3, (18, 22, 40))
+        c.rect(18, hy + 5, 4, 3, (18, 22, 40))
+        c.rect(17, hy + 6, 1, 1, (100, 220, 255))
+        c.px(14, hy + 5, (110, 240, 255))
+        c.px(19, hy + 5, (110, 240, 255))
     else:
-        c.eyes(12, 18, hy + 5, iris=eye_col, mood=eye_mood)
+        c.eyes(14, 19, hy + 5, iris=eye_col, mood=eye_mood)
 
-    # Species & hair silhouette
+    # Species & 3/4 swept hair silhouette
     species = cfg.get("species", "human")
     if species == "human":
         hair_bounce = -1 if abs(step) == 3 else 0
-        c.rect(10, hy + hair_bounce, 12, 4, hair)
-        c.rect(9, hy + 2 + hair_bounce, 14, 3, hair)
-        # Hair crown tufts & front bangs lock pixels
-        c.rect(11, hy - 1 + hair_bounce, 4, 2, hair_hi)
-        c.rect(16, hy + hair_bounce, 3, 2, hair_hi)
-        c.rect(12, hy + 3 + hair_bounce, 2, 2, hair)
-        c.rect(15, hy + 3 + hair_bounce, 3, 3, hair)
-        c.rect(19, hy + 3 + hair_bounce, 2, 2, hair_lo)
-        c.rect(9, hy + 4, 2, 4, hair_lo)
-        c.rect(21, hy + 4, 2, 4, hair_lo)
+        c.rect(9, hy + hair_bounce, 12, 4, hair)
+        c.rect(9, hy + 2 + hair_bounce, 13, 3, hair)
+        # Crown tufts & forward-swept bangs toward forehead right
+        c.rect(10, hy - 1 + hair_bounce, 5, 2, hair_hi)
+        c.rect(16, hy + hair_bounce, 4, 2, hair_hi)
+        c.rect(14, hy + 3 + hair_bounce, 3, 2, hair)
+        c.rect(18, hy + 3 + hair_bounce, 3, 2, hair_hi)
+        # Sideburn & back hair mass on left side only
+        c.rect(9, hy + 4, 3, 6, hair_lo)
+        c.rect(11, hy + 4, 2, 4, hair)
         if cfg.get("long_hair"):
-            c.rect(8, hy + 5, 3, 9, hair_lo)
-            c.rect(21, hy + 5, 3, 9, hair)
-            c.px(8, hy + 13, hair)
+            c.rect(7, hy + 4, 4, 11, hair_lo)
+            c.rect(8, hy + 5, 3, 9, hair)
+            c.px(7, hy + 14, hair)
         if cfg.get("beard"):
-            c.poly([(11, hy + 9), (21, hy + 9), (19, hy + 14), (13, hy + 14)], hair)
-            c.rect(13, hy + 10, 6, 2, hair_hi)
+            c.poly([(13, hy + 9), (22, hy + 9), (20, hy + 14), (15, hy + 14)], hair)
+            c.rect(15, hy + 10, 5, 2, hair_hi)
         if cfg.get("glasses"):
-            c.rect(11, hy + 5, 4, 2, (230, 240, 255))
-            c.rect(17, hy + 5, 4, 2, (230, 240, 255))
-            c.px(15, hy + 5, (196, 162, 82))
+            c.rect(13, hy + 5, 4, 2, (230, 240, 255))
+            c.rect(18, hy + 5, 4, 2, (230, 240, 255))
+            c.px(17, hy + 5, (196, 162, 82))
     elif species == "billfish":
         flare = 1 if pose in ("w1", "w3") else 0
-        c.poly([(11, hy + 2), (16, hy - 4 - flare), (20, hy + 2)], cfg["fin"])
-        c.poly([(13, hy + 1), (16, hy - 2 - flare), (18, hy + 1)], shade(cfg["fin"], 1.28))
-        c.poly([(21, hy + 6), (31, hy + 7), (21, hy + 9)], shade(skin, 1.18))
+        c.poly([(10, hy + 2), (14, hy - 4 - flare), (19, hy + 2)], cfg["fin"])
+        c.poly([(12, hy + 1), (14, hy - 2 - flare), (17, hy + 1)], shade(cfg["fin"], 1.28))
+        c.poly([(22, hy + 6), (31, hy + 7), (22, hy + 9)], shade(skin, 1.18))
         c.px(29, hy + 7, (235, 248, 255))
         if cfg.get("monocle"):
-            c.rect(17, hy + 4, 4, 4, (235, 210, 120))
-            c.rect(18, hy + 5, 2, 2, (160, 240, 255))
+            c.rect(18, hy + 4, 4, 4, (235, 210, 120))
+            c.rect(19, hy + 5, 2, 2, (160, 240, 255))
     elif species == "angelfish":
-        c.poly([(10, hy + 2), (16, hy - 4), (22, hy + 2)], (235, 244, 255))
-        c.rect(9, hy + 2, 3, 8, (244, 248, 255))
-        c.rect(20, hy + 2, 3, 8, (220, 228, 242))
-        c.rect(13, ty, 6, 4, (255, 255, 255))
+        c.poly([(9, hy + 2), (14, hy - 4), (20, hy + 2)], (235, 244, 255))
+        c.rect(8, hy + 2, 4, 9, (244, 248, 255))
+        c.rect(11, ty, 7, 4, (255, 255, 255))
     elif species == "stonefish":
-        c.rect(10, hy + 1, 12, 3, (190, 62, 74))
-        c.rect(11, hy, 9, 2, (226, 86, 98))
-        c.rect(6, hy + 2, 5, 2, (150, 44, 56))
-        c.px(13, hy + 8, (112, 92, 64))
-        c.px(19, hy + 9, (112, 92, 64))
+        c.rect(9, hy + 1, 12, 3, (190, 62, 74))
+        c.rect(8, hy, 10, 2, (226, 86, 98))
+        c.rect(6, hy + 2, 4, 3, (150, 44, 56))
+        c.px(15, hy + 8, (112, 92, 64))
+        c.px(20, hy + 9, (112, 92, 64))
     elif species == "angler":
         lure = cfg["lure"]
         lure_off = 1 if pose in ("w1", "w3") else (-1 if pose == "w2" else 0)
-        c.line(15, hy + 1, 19, hy - 3, (56, 70, 96))
-        c.line(19, hy - 3, 24 + lure_off, hy + 1, (56, 70, 96))
+        c.line(14, hy + 1, 19, hy - 3, (56, 70, 96))
+        c.line(19, hy - 3, 25 + lure_off, hy + 1, (56, 70, 96))
         if pose in ("w1", "w3"):
-            c.oval(24 + lure_off, hy + 2, 3, 3, shade(lure, 0.8))
-        c.oval(24 + lure_off, hy + 2, 2, 2, lure)
-        c.px(24 + lure_off, hy + 1, (255, 255, 255))
+            c.oval(25 + lure_off, hy + 2, 3, 3, shade(lure, 0.8))
+        c.oval(25 + lure_off, hy + 2, 2, 2, lure)
+        c.px(25 + lure_off, hy + 1, (255, 255, 255))
         if cfg.get("hat"):
-            c.rect(8, hy + 1, 16, 2, (22, 20, 34))
-            c.rect(11, hy - 2, 10, 3, (36, 32, 54))
-            c.rect(11, hy, 10, 1, (90, 44, 72))
+            c.rect(7, hy + 1, 16, 2, (22, 20, 34))
+            c.rect(10, hy - 2, 10, 3, (36, 32, 54))
+            c.rect(10, hy, 10, 1, (90, 44, 72))
         elif cfg.get("hood"):
-            c.oval(16, hy + 2, 7, 4, cfg["hood"])
-            c.rect(11, hy + 1, 6, 2, shade(cfg["hood"], 1.25))
+            c.oval(15, hy - 1, 7, 3, cfg["hood"])
+            c.rect(10, hy - 2, 6, 2, shade(cfg["hood"], 1.25))
     elif species == "reef":
         fin_fl = 1 if pose in ("w1", "w3") else 0
-        c.poly([(9, hy + 3), (5 - fin_fl, hy + 6), (9, hy + 9)], cfg["fin"])
-        c.poly([(22, hy + 3), (26 + fin_fl, hy + 6), (22, hy + 9)], cfg["fin"])
+        c.poly([(9, hy + 3), (4 - fin_fl, hy + 6), (9, hy + 9)], cfg["fin"])
         if cfg.get("helmet"):
-            c.oval(16, hy + 1, 6, 3, (124, 152, 186))
-            c.rect(13, hy, 5, 1, (186, 212, 240))
+            c.oval(15, hy + 1, 6, 3, (124, 152, 186))
+            c.rect(12, hy, 5, 1, (186, 212, 240))
         elif cfg.get("shawl"):
-            c.rect(9, ty, 14, 5, cfg["shawl"])
-            c.rect(22, ty + 5, 6, 5, (176, 126, 72))
-            c.px(24, ty + 4, (220, 74, 160))
-            c.px(26, ty + 4, (140, 210, 255))
+            c.rect(8, ty, 13, 5, cfg["shawl"])
+            c.rect(6, ty + 4, 6, 6, (176, 126, 72))  # backpack resting cleanly behind shoulders
+            c.px(8, ty + 3, (220, 74, 160))
+            c.px(10, ty + 3, (140, 210, 255))
 
     return c.finish(cfg.get("outline", OUTLINE_SEA))
 
 
 def draw_river_swim(pose="swim1"):
-    """River swimming horizontally in a 4-frame fluid freestyle kick cycle (38x32)."""
+    """River swimming horizontally in a 4-frame freestyle kick matching 3/4 River proportions (38x32)."""
     c = Canvas(38, 32)
-    # 4-phase swim kick + reaching arm stroke + flowing hair lock
     idx = {"swim1": 0, "swim2": 1, "swim3": 2, "swim4": 3}.get(pose, 0)
     kicks = [3, 1, -3, -1][idx]
     reach = [2, 0, -2, 0][idx]
     bob = [0, -1, 0, 1][idx]
 
-    # Trailing bubble wake pixel flecks behind feet
     if idx % 2 == 0:
-        c.px(1, 14 + bob, (190, 245, 255))
-        c.px(3, 21 + bob, (160, 232, 250))
+        c.px(1, 15 + bob, (190, 245, 255))
+        c.px(2, 22 + bob, (160, 232, 250))
 
-    # Scissor kicking legs & sneakers
-    c.rect(4, 13 + kicks // 2 + bob, 9, 4, (182, 137, 82))
-    c.rect(1, 13 + kicks // 2 + bob, 3, 4, (72, 48, 38))
-    c.rect(5, 18 - kicks // 2 + bob, 9, 4, (146, 108, 62))
-    c.rect(2, 18 - kicks // 2 + bob, 3, 4, (58, 38, 30))
+    # Scissor kicking khakis & dark boots
+    c.rect(4, 14 + kicks // 2 + bob, 9, 4, (194, 150, 96))
+    c.rect(1, 14 + kicks // 2 + bob, 3, 4, (72, 48, 38))
+    c.rect(5, 19 - kicks // 2 + bob, 9, 4, (152, 114, 68))
+    c.rect(2, 19 - kicks // 2 + bob, 3, 4, (58, 38, 30))
 
-    # Blue shirt torso with shoulder highlight
+    # Blue hoodie/shirt matching CAST["river"] palette + crisp white collar trim
     c.rect(12, 13 + bob, 11, 9, (46, 134, 232))
     c.rect(13, 13 + bob, 9, 3, (88, 174, 250))
-    c.rect(21, 14 + bob, 2, 5, (236, 242, 250))  # white collar rim
+    c.rect(21, 14 + bob, 2, 6, (236, 242, 250))
 
-    # Back trailing arm + Reaching stroke arm
-    c.rect(13 - reach, 20 + bob, 6, 3, (32, 94, 172))
-    c.rect(19 + reach, 17 + bob, 7, 3, (46, 134, 232))
-    c.rect(26 + reach, 17 + bob, 3, 3, (242, 196, 160))
+    # Far & near stroke arms
+    c.rect(12 - reach, 20 + bob, 7, 3, (32, 94, 172))
+    c.rect(18 + reach, 16 + bob, 7, 3, (46, 134, 232))
+    c.rect(25 + reach, 16 + bob, 3, 3, (242, 196, 160))
 
-    # Sculpted head + streaming brown hair + determined eyes
-    c.rect(24, 9 + bob, 9, 9, (242, 196, 160))
-    c.rect(23, 6 + bob, 10, 4, (107, 68, 46))
-    c.rect(20, 7 + bob + (1 if idx % 2 else 0), 4, 3, (82, 50, 32))  # streaming lock
-    c.rect(25, 6 + bob, 5, 2, (140, 92, 62))
+    # 3/4 Head turned right with tousled brown locks & clear eyes
+    c.rect(23, 8 + bob, 10, 10, (242, 196, 160))
+    c.px(33, 13 + bob, (242, 196, 160))
+    c.rect(22, 6 + bob, 11, 4, (107, 68, 46))
+    c.rect(19, 8 + bob + (1 if idx % 2 else 0), 4, 4, (82, 50, 32))
+    c.rect(24, 6 + bob, 5, 2, (140, 92, 62))
     c.eyes(26, 30, 12 + bob, iris=(40, 28, 60))
     return c.finish(OUTLINE_SEA)
 
 
 def draw_kenny(pose="stand"):
-    """Kenny: Red-orange Kelp Crab with shell speckles, kelp slingbag & snapping claws (38x36)."""
+    """Kenny: 3/4 side-facing Red Kelp Crab with kelp satchel & asymmetric claws (38x36)."""
     c = Canvas(38, 36)
     step = {"stand": 0, "idle": 0, "w1": 2, "w2": -2}.get(pose, 0)
     bob = {"stand": 0, "idle": 1, "w1": -1, "w2": 0}.get(pose, 0)
@@ -361,44 +356,50 @@ def draw_kenny(pose="stand"):
     kelp_hi = (120, 214, 128)
     kelp_lo = (44, 114, 62)
 
-    # 6 jointed crab legs alternating lift
-    for i, lx in enumerate((8, 12, 15, 22, 25, 29)):
-        off = step if (i % 2 == 0) else -step
-        c.rect(lx, 25 + off // 2, 2, 8, shell_lo)
-        c.rect(lx + (1 if lx > 18 else -1), 30 + off // 2, 2, 3, shell)
+    # Far-side legs (shaded darker behind carapace arc)
+    for i, lx in enumerate((19, 24, 28)):
+        off = -step if (i % 2 == 0) else step
+        c.rect(lx, 25 + off // 2, 2, 7, shell_lo)
+        c.rect(lx + 1, 30 + off // 2, 2, 3, shell)
 
-    # Layered carapace + speckled shell highlights + warm belly plate
+    # Angled 3/4 carapace + underside belly rim
     cy = 18 + bob
-    c.oval(19, cy, 11, 8, shell)
-    c.oval(17, cy - 3, 7, 4, shell_hi)
-    c.px(14, cy - 3, (255, 188, 128))
-    c.px(24, cy - 2, (255, 188, 128))
-    c.rect(11, cy + 4, 16, 4, shell_lo)
-    c.rect(14, cy + 5, 10, 2, (246, 198, 138))
+    c.oval(18, cy, 11, 8, shell)
+    c.oval(15, cy - 3, 7, 4, shell_hi)
+    c.px(12, cy - 3, (255, 188, 128))
+    c.px(22, cy - 2, (255, 188, 128))
+    c.rect(11, cy + 4, 15, 4, shell_lo)
+    c.rect(15, cy + 5, 10, 2, (246, 198, 138))
 
-    # Woven Kelp Slingbag + brass clasp + dangling kelp leaf
-    c.line(11, cy - 5, 26, cy + 5, kelp, width=3)
-    c.line(11, cy - 6, 25, cy + 4, kelp_hi, width=1)
-    c.rect(23, cy + 2, 6, 6, kelp_lo)
-    c.rect(24, cy + 2, 4, 3, kelp)
-    c.px(25, cy + 4, (240, 206, 98))
+    # Near-side legs drawn in front of lower carapace
+    for i, lx in enumerate((9, 13, 17)):
+        off = step if (i % 2 == 0) else -step
+        c.rect(lx, 26 + off // 2, 2, 7, shell)
+        c.rect(lx - 1, 31 + off // 2, 3, 2, shell_hi)
 
-    # Expressive claws: w1 opens wide/snaps up, w2 pinches shut!
-    snap_l = -2 if pose == "w1" else (1 if pose == "w2" else 0)
-    snap_r = -2 if pose == "w2" else (1 if pose == "w1" else 0)
-    c.oval(6, cy - 4 + snap_l, 4, 4, shell_hi)
-    if pose != "w2":
-        c.rect(5, cy - 8 + snap_l, 2, 3, CLEAR)
-    c.oval(32, cy - 4 + snap_r, 4, 4, shell_hi)
+    # Woven Kelp Satchel carried over near hip
+    c.line(10, cy - 4, 21, cy + 5, kelp, width=2)
+    c.line(10, cy - 5, 20, cy + 4, kelp_hi, width=1)
+    c.rect(12, cy + 1, 7, 6, kelp_lo)
+    c.rect(13, cy + 1, 5, 3, kelp)
+    c.px(16, cy + 4, (240, 206, 98))
+
+    # 3/4 Claws: far claw snaps high ahead (+X); near claw guards chest-left (-X)
+    snap_near = -2 if pose == "w1" else (1 if pose == "w2" else 0)
+    snap_far = -2 if pose == "w2" else (1 if pose == "w1" else 0)
+    c.oval(31, cy - 4 + snap_far, 4, 4, shell)
     if pose != "w1":
-        c.rect(31, cy - 8 + snap_r, 2, 3, CLEAR)
+        c.rect(31, cy - 8 + snap_far, 2, 3, CLEAR)
+    c.oval(8, cy - 1 + snap_near, 4, 4, shell_hi)
+    if pose != "w2":
+        c.rect(7, cy - 5 + snap_near, 2, 3, CLEAR)
 
-    # Eyestalks & blinking idle eyes + cheeky grin
-    c.rect(14, cy - 11, 2, 5, shell)
-    c.rect(22, cy - 11, 2, 5, shell)
+    # 3/4 shifted eyestalks & blinking eyes facing right
+    c.rect(17, cy - 11, 2, 5, shell)
+    c.rect(23, cy - 11, 2, 5, shell)
     eye_mood = "closed" if pose == "idle" else "normal"
-    c.eyes(14, 22, cy - 12, iris=(28, 20, 38), mood=eye_mood, wide=True)
-    c.line(16, cy + 1, 22, cy + 1, (70, 24, 16))
+    c.eyes(17, 23, cy - 12, iris=(28, 20, 38), mood=eye_mood, wide=True)
+    c.line(19, cy + 1, 25, cy + 1, (70, 24, 16))
     return c.finish(OUTLINE_WARM)
 
 
@@ -438,7 +439,7 @@ def draw_seahorse_guard(variant=0, pose="stand"):
 
 
 def draw_queen_crab(pose="stand"):
-    """Queen Crab: Spiky King Crab monarch in royal mantle, jewel crown, and snapping claws (46x42)."""
+    """Queen Crab: 3/4 angled King Crab monarch in trailing royal cape, jewel crown & claws (46x42)."""
     c = Canvas(46, 42)
     bob = 0 if pose == "stand" else (1 if pose == "w1" else -1)
     flare = 2 if pose == "w1" else 0
@@ -447,44 +448,42 @@ def draw_queen_crab(pose="stand"):
     shell_lo = (146, 30, 22)
     cape = (118, 22, 56)
 
-    # Billowing royal crimson cape
-    c.poly([(10, 16), (36, 16), (40 + flare, 39), (6 - flare, 39)], cape)
-    c.rect(8 - flare, 36, 30 + flare * 2, 3, (245, 238, 232))
-
-    # Spiky carapace & clawed legs
-    for lx in (10, 15, 31, 36):
-        c.rect(lx, 32 + bob, 3, 7, shell_lo)
-    c.oval(23, 21 + bob, 12, 10, shell)
-    c.oval(21, 17 + bob, 8, 5, shell_hi)
-    for sx, sy in ((11, 15), (14, 11), (32, 11), (35, 15), (10, 23), (36, 23)):
+    # Spiky 3/4 carapace & clawed legs tucked behind billowing royal crimson mantle
+    for lx in (12, 17, 27, 32):
+        c.rect(lx, 33 + bob, 3, 6, shell_lo)
+    c.poly([(10, 18), (29, 18), (31 + flare, 36), (5 - flare, 36)], cape)
+    c.rect(6 - flare, 33, 24 + flare * 2, 3, (245, 238, 232))
+    c.oval(22, 20 + bob, 12, 9, shell)
+    c.oval(19, 16 + bob, 8, 5, shell_hi)
+    for sx, sy in ((11, 15), (15, 11), (31, 12), (34, 16), (11, 22), (34, 23)):
         c.poly([(sx - 2, sy + 2), (sx, sy - 3), (sx + 2, sy + 2)], shell_lo)
 
-    # Royal pincers snapping asymmetrically
-    claw_l = -2 if pose == "w1" else 1
-    claw_r = 1 if pose == "w1" else -2
-    c.oval(6, 20 + claw_l, 5, 5, shell_hi)
-    c.oval(40, 20 + claw_r, 5, 5, shell_hi)
+    # Far raised pincer (+X) + foreground near claw (-X)
+    claw_near = -2 if pose == "w1" else 1
+    claw_far = 1 if pose == "w1" else -2
+    c.oval(39, 18 + claw_far, 5, 5, shell)
+    c.oval(8, 22 + claw_near, 5, 5, shell_hi)
 
-    # Glowing Elixir Pearl Necklace
-    for nx in range(16, 31, 3):
+    # Glowing Elixir Pearl Necklace + shifted jewel clasp
+    for nx in range(18, 32, 3):
         c.rect(nx, 28 + bob, 2, 2, (246, 240, 210))
-    c.oval(23, 30 + bob, 3, 3, (96, 232, 255))
-    c.px(22, 29 + bob, (255, 255, 255))
+    c.oval(25, 30 + bob, 3, 3, (96, 232, 255))
+    c.px(24, 29 + bob, (255, 255, 255))
 
-    # Golden Crown with ruby & emerald gems
-    c.rect(16, 6 + bob, 14, 5, (244, 198, 72))
-    for cx in (16, 22, 28):
+    # Golden Crown tilted 3/4 right
+    c.rect(18, 6 + bob, 14, 5, (244, 198, 72))
+    for cx in (18, 24, 30):
         c.rect(cx, 3 + bob, 2, 3, (244, 198, 72))
-    c.px(23, 8 + bob, (255, 70, 140))
-    c.px(19, 8 + bob, (92, 232, 176))
-    c.px(27, 8 + bob, (92, 232, 176))
+    c.px(25, 8 + bob, (255, 70, 140))
+    c.px(21, 8 + bob, (92, 232, 176))
+    c.px(29, 8 + bob, (92, 232, 176))
 
-    c.eyes(18, 26, 16 + bob, iris=(40, 12, 20), mood="angry")
+    c.eyes(21, 28, 16 + bob, iris=(40, 12, 20), mood="angry")
     return c.finish(OUTLINE_WARM)
 
 
 def draw_sophie(pose="stand"):
-    """Sophie: Clownfish Jester hopping with swinging cap bells (32x36)."""
+    """Sophie: 3/4 Clownfish Jester hopping with directional eyes & bouncing cap bells (32x36)."""
     c = Canvas(32, 36)
     bob = -2 if pose == "w1" else (0 if pose == "stand" else -1)
     bell_off = 1 if pose == "w1" else (-1 if pose == "w2" else 0)
@@ -492,20 +491,20 @@ def draw_sophie(pose="stand"):
     orange_lo = (204, 78, 20)
     white = (250, 246, 240)
 
-    c.rect(11, 26 + (bob // 2), 4, 8, (46, 36, 68))
-    c.rect(17, 26 - (bob // 2), 4, 8, (46, 36, 68))
-    c.rect(10, 15 + bob, 12, 12, orange)
-    c.rect(14, 15 + bob, 4, 12, white)
-    c.rect(8, 16 + bob + bell_off, 3, 7, orange_lo)
-    c.rect(21, 16 + bob - bell_off, 3, 7, orange)
-    c.rect(9, 14 + bob, 14, 3, (244, 212, 92))
+    c.rect(17, 26 - (bob // 2), 4, 8, (38, 30, 56))
+    c.rect(11, 26 + (bob // 2), 4, 8, (54, 42, 78))
+    c.rect(10, 15 + bob, 11, 12, orange)
+    c.rect(15, 15 + bob, 4, 12, white)
+    c.rect(20, 16 + bob - bell_off, 2, 6, orange_lo)
+    c.rect(8, 16 + bob + bell_off, 3, 7, orange)
+    c.rect(10, 14 + bob, 12, 3, (244, 212, 92))
     c.oval(16, 9 + bob, 6, 5, orange)
     c.rect(19, 6 + bob, 2, 7, white)
-    c.eyes(12, 18, 8 + bob, iris=(28, 22, 44))
-    c.poly([(11, 6 + bob), (6, 1 + bob + bell_off), (15, 4 + bob)], (216, 48, 86))
-    c.poly([(21, 6 + bob), (26, 1 + bob - bell_off), (17, 4 + bob)], (82, 194, 130))
-    c.rect(5, 1 + bob + bell_off, 2, 2, (250, 216, 86))
-    c.rect(25, 1 + bob - bell_off, 2, 2, (250, 216, 86))
+    c.eyes(14, 19, 8 + bob, iris=(28, 22, 44))
+    c.poly([(11, 6 + bob), (5, 1 + bob + bell_off), (15, 4 + bob)], (216, 48, 86))
+    c.poly([(20, 6 + bob), (25, 2 + bob - bell_off), (17, 4 + bob)], (82, 194, 130))
+    c.rect(4, 1 + bob + bell_off, 2, 2, (250, 216, 86))
+    c.rect(24, 2 + bob - bell_off, 2, 2, (250, 216, 86))
     return c.finish(OUTLINE_WARM)
 
 
@@ -850,108 +849,113 @@ def draw_portrait(kind, expr="normal"):
 # Intro Storybook Plates (240x120 -> displayed at 3x = 720x360)
 # ---------------------------------------------------------------------------
 
-def draw_intro_plates():
+def _stamp(canvas, sprite_im, x, y, mirror=False):
+    spr = sprite_im.transpose(Image.FLIP_LEFT_RIGHT) if mirror else sprite_im
+    canvas.im.alpha_composite(spr, (int(x), int(y)))
+
+
+def draw_intro_plates(cast_imgs=None, props_dir=None):
     plates = []
-    # Plate 0: Nadia sick in bed, blurred unreadable letters drifting off her book
+    river_spr = cast_imgs["river"] if cast_imgs else None
+    mark_spr = cast_imgs["mark"] if cast_imgs else None
+    tome_spr = None
+    if props_dir and os.path.exists(os.path.join(props_dir, "tome.png")):
+        tome_spr = Image.open(os.path.join(props_dir, "tome.png")).convert("RGBA")
+
+    # Plate 0: Nadia resting in candlelit room, glowing sickbed & drifting runes
     c = Canvas(240, 120)
     c.rect(0, 0, 240, 120, (44, 28, 56))
+    for wx in range(0, 240, 12):
+        c.line(wx, 0, wx, 86, (38, 24, 50))
     c.rect(0, 86, 240, 34, (74, 48, 62))
-    c.line(0, 86, 240, 86, (56, 36, 48))
-    # Window with crescent moon & stars
-    c.rect(24, 16, 44, 46, (20, 24, 56))
-    c.rect(22, 14, 48, 4, (118, 78, 56)); c.rect(22, 62, 48, 4, (118, 78, 56))
-    c.rect(45, 16, 2, 46, (118, 78, 56)); c.rect(24, 38, 44, 2, (118, 78, 56))
-    c.oval(36, 26, 5, 5, (250, 232, 162)); c.oval(38, 25, 4, 4, (20, 24, 56))
-    c.px(56, 24, (220, 236, 255)); c.px(32, 48, (220, 236, 255))
-    # Bed + Nadia (with hair locks, closed sick eyes, pink cheeks)
-    c.rect(94, 58, 92, 34, (114, 68, 54))
-    c.rect(90, 48, 8, 48, (92, 54, 42))
-    c.rect(100, 64, 84, 22, (148, 92, 186))
-    c.rect(100, 64, 84, 4, (186, 124, 224))
-    c.rect(98, 56, 22, 12, (246, 240, 230))
-    c.rect(105, 50, 16, 14, (246, 204, 174))
-    c.rect(104, 46, 18, 6, (242, 206, 98))
-    c.rect(104, 49, 4, 10, (208, 170, 74))
-    c.rect(120, 49, 4, 10, (242, 206, 98))
-    c.rect(109, 57, 3, 1, (54, 34, 62)); c.rect(115, 57, 3, 1, (54, 34, 62))
-    c.px(108, 59, (238, 146, 168)); c.px(119, 59, (238, 146, 168))
-    # Open book with drifting smudged glyphs
-    c.rect(144, 56, 24, 14, (246, 236, 214))
-    c.rect(155, 56, 2, 14, (176, 152, 128))
-    for gx, gy in ((148, 44), (158, 38), (166, 46), (152, 30), (162, 26)):
-        c.rect(gx, gy, 5, 2, (236, 152, 206, 190))
+    c.rect(0, 84, 240, 3, (124, 84, 58))
+    c.line(0, 87, 240, 87, (46, 30, 38))
+    # Starry bedroom window with warm oak mullions
+    c.rect(22, 14, 48, 50, (92, 60, 44))
+    c.rect(25, 17, 42, 44, (20, 26, 58))
+    c.oval(36, 28, 5, 5, (250, 232, 162)); c.oval(38, 27, 4, 4, (20, 26, 58))
+    c.px(56, 24, (220, 236, 255)); c.px(32, 48, (220, 236, 255)); c.px(58, 50, (250, 232, 162))
+    c.rect(45, 17, 2, 44, (118, 78, 56)); c.rect(25, 38, 42, 2, (118, 78, 56))
+    # Sculpted Bed + outlined Nadia sleeping silhouette + shaded Open Tome with drifting runes
+    c.rect(86, 54, 106, 36, (72, 42, 34))
+    c.rect(88, 56, 102, 34, (114, 68, 54))
+    c.rect(85, 43, 10, 49, (84, 48, 36))
+    c.rect(182, 53, 8, 39, (84, 48, 36))
+    c.rect(96, 62, 86, 24, (148, 92, 186))
+    c.rect(96, 62, 86, 5, (186, 124, 224))
+    c.rect(95, 53, 24, 13, (246, 240, 230))
+    c.rect(102, 46, 18, 15, (34, 20, 44))  # crisp dark outline around sleeping head
+    c.rect(103, 47, 16, 13, (246, 204, 174))
+    c.rect(101, 42, 19, 7, (34, 20, 44))
+    c.rect(102, 43, 17, 6, (242, 206, 98))
+    c.rect(102, 47, 5, 11, (208, 170, 74))
+    c.rect(108, 54, 3, 1, (54, 34, 62)); c.rect(114, 54, 3, 1, (54, 34, 62))
+    c.px(107, 56, (238, 146, 168)); c.px(116, 56, (238, 146, 168))
+    c.rect(142, 52, 28, 17, (34, 20, 44))
+    c.rect(144, 54, 24, 13, (246, 236, 214))
+    c.rect(155, 54, 2, 13, (176, 152, 128))
+    c.line(146, 57, 152, 57, (196, 172, 146)); c.line(159, 58, 165, 58, (196, 172, 146))
+    for gx, gy in ((146, 42), (158, 36), (168, 44), (152, 28), (162, 24)):
+        c.rect(gx, gy, 5, 2, (236, 152, 206, 210))
     plates.append(c.im)
 
-    # Plate 1: Mark & River studying late by warm lamp + stacked books
+    # Plate 1: Mark & River studying late by warm lamp using true 3/4 outlined sprites
     c = Canvas(240, 120)
     c.rect(0, 0, 240, 120, (34, 28, 50))
     c.rect(0, 90, 240, 30, (82, 54, 44))
-    c.line(0, 90, 240, 90, (56, 36, 30))
-    c.oval(160, 52, 56, 44, (108, 74, 52))
-    c.oval(160, 52, 34, 28, (166, 118, 64))
-    # Desk, Lamp & Open Books
-    c.rect(118, 68, 94, 24, (118, 78, 52))
-    c.rect(118, 68, 94, 3, (148, 102, 70))
+    c.rect(0, 88, 240, 3, (124, 84, 58))
+    c.line(0, 91, 240, 91, (48, 30, 36))
+    c.oval(162, 54, 56, 42, (98, 66, 48))
+    c.oval(164, 54, 34, 26, (162, 114, 60))
+    # Doorway frame & Mark carrying crate in crisp 3/4 profile
+    c.rect(38, 26, 42, 62, (24, 18, 36))
+    c.rect(40, 28, 38, 60, (48, 34, 56))
+    if mark_spr:
+        _stamp(c, mark_spr, 43, 50)
+    c.rect(63, 62, 15, 11, (148, 102, 64))
+    c.line(63, 66, 78, 66, (96, 62, 38))
+    # Oak study desk, glowing lamp, and crisp River studying
+    if river_spr:
+        _stamp(c, river_spr, 116, 40)
+    c.rect(118, 68, 94, 22, (118, 78, 52))
+    c.rect(118, 68, 94, 3, (152, 106, 74))
     c.rect(182, 46, 14, 11, (252, 222, 134))
     c.rect(188, 57, 2, 11, (90, 74, 86))
-    c.rect(138, 61, 22, 7, (46, 134, 232))
-    c.rect(140, 58, 18, 4, (246, 238, 218))
-    # River seated studious at desk
-    c.rect(122, 50, 16, 18, (46, 134, 232))
-    c.rect(126, 50, 6, 3, (236, 242, 250))
-    c.rect(134, 62, 12, 4, (242, 196, 160))
-    c.rect(124, 34, 15, 15, (242, 196, 160))
-    c.rect(123, 30, 17, 6, (107, 68, 46))
-    c.rect(123, 34, 4, 8, (82, 50, 32))
-    c.eyes(131, 136, 40, iris=(40, 28, 60))
-    # Mark in doorway with crate
-    c.rect(42, 30, 38, 60, (52, 38, 60))
-    c.rect(52, 48, 16, 24, (74, 92, 116))
-    c.rect(53, 34, 14, 13, (232, 184, 150))
-    c.rect(52, 30, 16, 5, (62, 42, 34))
-    c.eyes(55, 61, 40, iris=(40, 28, 60))
-    c.rect(62, 56, 15, 11, (148, 102, 64))
+    c.rect(142, 61, 22, 7, (46, 134, 232))
+    c.rect(144, 58, 18, 4, (246, 238, 218))
     plates.append(c.im)
 
-    # Plate 2: Moonlit beach, River sitting as glowing Heirloom Tome washes ashore
+    # Plate 2: Moonlit beach, crisp River & glowing Heirloom Tome washing ashore
     c = Canvas(240, 120)
-    c.rect(0, 0, 240, 62, (14, 22, 54))
+    c.rect(0, 0, 240, 60, (14, 22, 54))
     c.oval(188, 22, 12, 12, (250, 240, 196))
     for sx, sy in ((28, 16), (68, 26), (112, 12), (144, 30), (214, 14), (92, 36)):
         c.rect(sx, sy, 2, 2, (240, 246, 255))
     c.rect(0, 56, 240, 24, (22, 68, 124))
     c.rect(0, 72, 240, 8, (110, 196, 224))
     c.rect(0, 80, 240, 40, (214, 186, 126))
-    c.line(0, 80, 240, 80, (240, 248, 255))
-    # River seated in sand looking at book
-    c.rect(56, 70, 14, 16, (46, 134, 232))
-    c.rect(56, 84, 20, 6, (182, 137, 82))
-    c.rect(56, 54, 14, 14, (242, 196, 160))
-    c.rect(55, 50, 16, 6, (107, 68, 46))
-    c.eyes(61, 66, 60, iris=(40, 28, 60))
-    # Glowing Book washing ashore
-    c.oval(146, 80, 20, 11, (108, 240, 255, 140))
-    c.rect(136, 73, 20, 15, (90, 44, 128))
-    c.rect(140, 76, 12, 9, (242, 198, 96))
-    c.rect(144, 78, 4, 5, (104, 244, 255))
+    c.rect(0, 80, 240, 2, (240, 248, 255))
+    if river_spr:
+        _stamp(c, river_spr, 46, 56)
+    c.oval(156, 82, 28, 14, (108, 240, 255, 130))
+    if tome_spr:
+        _stamp(c, tome_spr, 138, 58)
     plates.append(c.im)
 
-    # Plate 3: Swirling starlight whirlpool pulling River into the deep
+    # Plate 3: Swirling tidal portal & Heirloom Tome pulling River into the deep
     c = Canvas(240, 120)
     c.rect(0, 0, 240, 120, (12, 20, 48))
-    c.oval(120, 60, 86, 50, (24, 72, 124))
-    c.oval(120, 60, 58, 34, (42, 134, 178))
-    c.oval(120, 60, 32, 18, (122, 236, 246))
-    c.poly([(92, 68), (120, 72), (120, 52), (96, 50)], (252, 242, 214))
-    c.poly([(148, 68), (120, 72), (120, 52), (144, 50)], (252, 242, 214))
-    c.rect(112, 24, 14, 18, (46, 134, 232))
-    c.rect(112, 10, 14, 14, (242, 196, 160))
-    c.rect(111, 7, 16, 5, (107, 68, 46))
-    c.eyes(115, 121, 16, iris=(40, 28, 60), mood="shocked")
+    c.oval(120, 62, 90, 50, (24, 72, 124))
+    c.oval(120, 62, 62, 34, (42, 134, 178))
+    c.oval(120, 62, 36, 20, (122, 236, 246))
+    if tome_spr:
+        _stamp(c, tome_spr, 102, 52)
+    if river_spr:
+        _stamp(c, river_spr, 104, 10)
     for a in range(12):
         ang = a * math.pi / 6.0
-        px = 120 + math.cos(ang) * (36 + (a % 3) * 14)
-        py = 56 + math.sin(ang) * (20 + (a % 2) * 8)
+        px = 120 + math.cos(ang) * (44 + (a % 3) * 14)
+        py = 58 + math.sin(ang) * (22 + (a % 2) * 8)
         c.rect(px, py, 3, 3, (255, 224, 126) if a % 2 == 0 else (140, 248, 255))
     plates.append(c.im)
     return plates
@@ -978,65 +982,72 @@ def draw_props(out_dir):
                 c.oval(16 + ox + side * 6, y - 1, 3, 1, hi)
         c.finish(OUTLINE_SEA).save(os.path.join(out_dir, f"kelp_{vi}.png"))
 
-    # 2. Kenny's Cozy Kelp Hut (96x80) - shingled shell dome, chimney, plank walls & shuttered windows
+    # 2. Kenny's Cozy Kelp Hut (96x80) - overhanging scalloped dome clipped cleanly above facade
     c = Canvas(96, 80)
     roof = (212, 102, 68); roof_hi = shade(roof, 1.24); roof_lo = shade(roof, 0.72)
-    wall = (182, 132, 86); wall_lo = shade(wall, 0.78)
+    wall = (182, 132, 86); wall_lo = shade(wall, 0.78); wall_deep = shade(wall, 0.56)
     c.rect(62, 10, 12, 22, (132, 76, 72)); c.rect(60, 8, 16, 4, (164, 96, 88))
     c.rect(65, 2, 4, 4, (216, 244, 250, 170))
-    c.oval(48, 38, 39, 26, roof_lo)
-    c.oval(48, 36, 38, 24, roof)
-    c.oval(42, 28, 26, 13, roof_hi)
-    # Layered scallop shell shingles across dome
-    for sy in (22, 30, 38):
+    # Overhanging shell-shingle dome drawn FIRST so timber walls mask bottom oval belly
+    c.oval(48, 39, 42, 26, roof_lo)
+    c.oval(48, 37, 41, 24, roof)
+    c.oval(42, 27, 28, 13, roof_hi)
+    c.rect(0, 43, 96, 37, CLEAR)  # clip dome cleanly into a side-view cap above walls
+    for sy in (22, 30, 36):
         for sx in range(20 + (sy % 8), 76, 10):
             c.line(sx - 3, sy, sx + 3, sy, roof_lo)
             c.px(sx, sy + 1, roof_hi)
-    # Timber wall planks & cast shadow beneath roof eave
-    c.rect(12, 46, 72, 32, wall)
-    c.rect(12, 46, 72, 5, wall_lo)
-    for vx in range(20, 80, 10):
-        c.line(vx, 49, vx, 77, wall_lo)
-    c.rect(12, 74, 72, 4, (108, 92, 92))
-    # Arched timber door + brass knob + glowing leaded glass windows
+    # Recessed facade walls + dark soffit shadow + stone plinth base
+    c.rect(14, 43, 68, 35, wall)
+    for vx in range(22, 78, 10):
+        c.line(vx, 47, vx, 75, wall_lo)
+    c.rect(14, 43, 68, 6, wall_deep)
+    c.rect(12, 74, 72, 4, (72, 64, 74))
+    c.rect(12, 74, 72, 1, (108, 96, 104))
+    # Crisp horizontal overhanging roof brim + kelp fascia garland above walls
+    c.rect(7, 39, 82, 5, roof_lo)
+    c.rect(8, 39, 80, 2, roof)
+    # Arched timber door + warm brass knob + leaded glass windows
     c.rect(37, 51, 22, 27, (84, 48, 34))
     c.rect(39, 53, 18, 25, (108, 64, 44))
     c.rect(52, 65, 2, 3, (242, 198, 86))
-    for wx in (20, 66):
-        c.rect(wx, 54, 11, 11, (78, 48, 36))
-        c.rect(wx + 1, 55, 9, 9, (255, 220, 124))
-        c.line(wx + 5, 55, wx + 5, 64, (78, 48, 36))
-        c.line(wx + 1, 59, wx + 10, 59, (78, 48, 36))
-    for kx in range(12, 84, 7):
-        c.rect(kx, 44, 6, 4, (54, 152, 82))
-        c.px(kx + 2, 44, (110, 212, 134))
+    for wx in (21, 65):
+        c.rect(wx, 54, 10, 10, (78, 48, 36))
+        c.rect(wx + 1, 55, 8, 8, (255, 220, 124))
+        c.line(wx + 4, 55, wx + 4, 63, (78, 48, 36))
+        c.line(wx + 1, 59, wx + 9, 59, (78, 48, 36))
+    for kx in range(10, 84, 8):
+        c.rect(kx, 42, 6, 4, (54, 152, 82))
+        c.px(kx + 2, 42, (110, 212, 134))
     c.finish(OUTLINE_WARM).save(os.path.join(out_dir, "kenny_house.png"))
 
-    # 3. Riddle Stone Monolith (36x52) with beveled frame, cracks & inlaid sea moss
+    # 3. Riddle Stone Monolith (36x52) with stepped stone plinth & glowing aqua veins
     c = Canvas(36, 52)
-    c.poly([(5, 50), (7, 12), (18, 4), (29, 12), (31, 50)], (76, 92, 118))
-    c.poly([(8, 48), (10, 13), (18, 6), (25, 13), (26, 48)], (124, 144, 174))
-    c.line(10, 13, 18, 6, (176, 202, 232))
+    c.poly([(6, 48), (8, 12), (18, 4), (28, 12), (30, 48)], (76, 92, 118))
+    c.poly([(9, 46), (11, 13), (18, 6), (25, 13), (26, 46)], (124, 144, 174))
+    c.line(11, 13, 18, 6, (176, 202, 232))
     c.rect(11, 15, 14, 25, (42, 54, 76))
     c.rect(12, 16, 12, 23, (54, 68, 94))
     for ry, rx in ((19, 15), (24, 17), (29, 14), (34, 16)):
         c.rect(rx, ry, 5, 2, (114, 248, 224))
     c.rect(14, 20, 2, 15, (72, 204, 196))
-    c.line(8, 36, 13, 39, (52, 66, 90))
-    c.rect(7, 44, 7, 4, (52, 150, 90)); c.rect(21, 45, 8, 3, (44, 134, 80))
+    c.rect(4, 46, 28, 4, (58, 72, 96))  # stepped base plinth
+    c.rect(7, 43, 7, 4, (52, 150, 90)); c.rect(21, 44, 8, 3, (44, 134, 80))
     c.finish(OUTLINE_SEA).save(os.path.join(out_dir, "riddle_stone.png"))
 
-    # 4. Throne Gate Archway (128x112) with masonry courses & glowing aqua runes
+    # 4. Throne Gate Archway (128x112) with projecting pediment eaves, masonry & plinth
     c = Canvas(128, 112)
-    c.rect(14, 18, 100, 92, (62, 74, 98))
-    c.rect(18, 22, 92, 86, (104, 120, 152))
-    for by in range(28, 104, 12):
-        c.line(18, by, 110, by, (70, 84, 112))
+    c.rect(16, 18, 96, 92, (62, 74, 98))
+    c.rect(20, 22, 88, 86, (104, 120, 152))
+    c.rect(16, 22, 96, 5, (48, 58, 80))  # shadow beneath overhanging pediment
+    for by in range(30, 102, 12):
+        c.line(20, by, 108, by, (70, 84, 112))
         off = 8 if (by // 12) % 2 else 0
-        for bx in range(22 + off, 106, 16):
-            c.line(bx, by, bx, min(107, by + 11), (70, 84, 112))
-    c.poly([(10, 22), (64, 4), (118, 22)], (134, 150, 184))
-    c.poly([(22, 22), (64, 9), (106, 22)], (162, 180, 212))
+        for bx in range(24 + off, 104, 16):
+            c.line(bx, by, bx, min(106, by + 11), (70, 84, 112))
+    c.rect(14, 105, 100, 5, (44, 54, 74))  # heavy threshold stone step
+    c.poly([(8, 22), (64, 3), (120, 22)], (134, 150, 184))
+    c.poly([(20, 21), (64, 8), (108, 21)], (162, 180, 212))
     c.rect(38, 42, 52, 68, (16, 20, 38))
     c.oval(64, 44, 26, 20, (16, 20, 38))
     c.rect(28, 26, 72, 5, (118, 232, 226))
@@ -1045,7 +1056,7 @@ def draw_props(out_dir):
             c.rect(px_col, py_r, 4, 6, (112, 236, 226))
     c.finish(OUTLINE_SEA).save(os.path.join(out_dir, "throne_gate.png"))
 
-    # 5. Crab Castle Silhouette Facade (180x140) with crenellations, banners & brick depth
+    # 5. Crab Castle Facade (180x140) with corbel eaves, brick depth & plinth foundation
     c = Canvas(180, 140)
     wall = (146, 52, 70); wall_hi = shade(wall, 1.24); wall_lo = shade(wall, 0.72); roof = (212, 60, 50)
     c.rect(20, 48, 140, 90, wall)
@@ -1057,11 +1068,14 @@ def draw_props(out_dir):
     for tx in (14, 134):
         c.rect(tx, 26, 32, 112, wall)
         c.rect(tx + 3, 28, 24, 108, wall_hi)
-        c.poly([(tx - 4, 26), (tx + 16, 6), (tx + 36, 26)], roof)
+        c.rect(tx, 26, 32, 4, wall_lo)  # eave shadow under tower spire
+        c.poly([(tx - 5, 26), (tx + 16, 5), (tx + 37, 26)], roof)
         c.rect(tx + 13, 38, 6, 12, (34, 18, 32))
     c.rect(64, 18, 52, 120, wall)
     c.rect(68, 20, 42, 116, wall_hi)
-    c.poly([(60, 18), (90, 2), (120, 18)], roof)
+    c.rect(64, 18, 52, 5, wall_lo)
+    c.poly([(58, 18), (90, 2), (122, 18)], roof)
+    c.rect(12, 134, 156, 4, (84, 34, 48))  # castle plinth base
     c.rect(72, 84, 36, 54, (30, 16, 30))
     c.oval(90, 86, 18, 15, (30, 16, 30))
     c.rect(87, 36, 6, 18, (244, 198, 72))
@@ -1082,17 +1096,22 @@ def draw_props(out_dir):
     c.line(22, 34, 42, 48, (150, 138, 116))
     c.finish(OUTLINE_SEA).save(os.path.join(out_dir, "shipwreck.png"))
 
-    # 7. Coral Houses (80x72) & Market Stall (84x68)
+    # 7. Coral Houses (80x72) & Market Stall (84x68) with dome clipped above facade & soffit AO
     for idx, col in enumerate(((230, 114, 144), (86, 186, 202))):
         c = Canvas(80, 72)
-        hi = shade(col, 1.22); lo = shade(col, 0.78)
-        c.oval(40, 31, 31, 22, lo)
-        c.oval(40, 29, 30, 20, col)
-        c.oval(35, 22, 20, 11, hi)
-        for rx in (24, 34, 44, 54):
-            c.line(rx, 15, rx, 34, lo)
+        hi = shade(col, 1.22); lo = shade(col, 0.78); deep = shade(col, 0.56)
+        c.oval(40, 29, 34, 22, lo)
+        c.oval(40, 27, 33, 20, col)
+        c.oval(35, 20, 22, 11, hi)
+        c.rect(0, 33, 80, 39, CLEAR)  # clip dome cleanly into an overhanging coral roof cap
+        for rx in (22, 34, 46, 58):
+            c.line(rx, 13, rx, 32, lo)
         c.rect(14, 34, 52, 36, lo)
         c.rect(16, 36, 48, 32, col)
+        c.rect(14, 34, 52, 5, deep)
+        c.rect(12, 66, 56, 4, (62, 74, 92))
+        c.rect(6, 30, 68, 4, lo)
+        c.rect(7, 30, 66, 2, col)
         c.rect(31, 45, 18, 25, (72, 46, 56))
         c.rect(33, 47, 14, 23, (34, 24, 50))
         for wx in (20, 53):
@@ -1112,16 +1131,20 @@ def draw_props(out_dir):
     c.rect(20, 37, 8, 7, (62, 166, 246)); c.rect(38, 36, 8, 8, (218, 92, 186)); c.rect(56, 37, 8, 7, (64, 196, 148))
     c.finish(OUTLINE_SEA).save(os.path.join(out_dir, "market_stall.png"))
 
-    # 8. Tow-Tou's Scrapyard Garage (120x84)
+    # 8. Tow-Tou's Scrapyard Garage (120x84) with corrugated overhang roof, soffit shadow & plinth
     c = Canvas(120, 84)
-    c.rect(12, 16, 96, 66, (68, 78, 92))
-    c.rect(16, 20, 88, 58, (96, 110, 126))
+    c.rect(12, 18, 96, 64, (68, 78, 92))
+    c.rect(16, 22, 88, 56, (96, 110, 126))
     for sx in range(18, 102, 7):
-        c.line(sx, 20, sx, 78, (64, 74, 88))
+        c.line(sx, 22, sx, 78, (64, 74, 88))
+    c.rect(14, 21, 92, 5, (42, 50, 62))  # roof overhang shadow
+    c.rect(6, 12, 108, 9, (84, 96, 114))
+    c.rect(6, 12, 108, 3, (128, 144, 168))  # bright metal roof trim
+    c.rect(10, 78, 100, 4, (44, 52, 64))
     c.rect(32, 34, 56, 48, (22, 28, 38))
     for gy in range(36, 52, 4):
         c.rect(34, gy, 52, 2, (124, 136, 150))
-    c.rect(74, 56, 10, 8, (255, 212, 96))  # warm workbench glow inside bay
+    c.rect(74, 56, 10, 8, (255, 212, 96))
     c.rect(38, 22, 44, 10, (214, 142, 62)); c.rect(40, 24, 40, 6, (238, 174, 88))
     c.finish(OUTLINE_SEA).save(os.path.join(out_dir, "towtou_garage.png"))
 
@@ -1131,11 +1154,10 @@ def draw_props(out_dir):
     c.poly([(8, 44), (16, 26), (38, 22), (46, 34), (44, 49), (12, 49)], bone_lo)
     c.poly([(10, 42), (18, 28), (37, 25), (43, 35), (41, 46), (14, 46)], bone)
     c.poly([(16, 30), (32, 27), (36, 33), (20, 36)], bone_hi)
-    c.oval(24, 36, 4, 4, (14, 16, 32))  # hollow eye socket
-    c.line(12, 46, 42, 46, (30, 28, 48))  # jaw seam
+    c.oval(24, 36, 4, 4, (14, 16, 32))
+    c.line(12, 46, 42, 46, (30, 28, 48))
     for tx in range(15, 39, 5):
         c.rect(tx, 46, 2, 2, bone_hi)
-    # Tapered vertebrae spine + curving shaded rib arcs
     for i, rx in enumerate(range(48, 132, 10)):
         r_len = max(10, 26 - i * 2)
         c.rect(rx, 33, 6, 6, bone_hi)
@@ -1144,28 +1166,35 @@ def draw_props(out_dir):
         c.line(rx + 2, 39, rx + 3, 37 + r_len, bone_hi)
     c.finish(OUTLINE_ABYSS).save(os.path.join(out_dir, "whale_skeleton.png"))
 
+    # Slum Shack (76x68) with protruding eaves, soffit shadow, lantern & stone base
     c = Canvas(76, 68)
     c.rect(10, 22, 56, 44, (44, 40, 62))
     for sy in (30, 38, 46, 54):
         c.line(12, sy, 64, sy, (32, 28, 48))
-    c.poly([(4, 24), (38, 6), (72, 24)], (64, 58, 88))
+    c.rect(10, 22, 56, 4, (24, 20, 36))  # eave drop shadow
+    c.rect(8, 62, 60, 4, (28, 24, 42))
+    c.poly([(3, 24), (38, 5), (73, 24)], (64, 58, 88))
     c.poly([(10, 22), (38, 9), (66, 22)], (80, 72, 108))
     c.rect(28, 38, 16, 28, (22, 18, 34))
+    c.rect(15, 36, 4, 6, (255, 196, 98))  # porch lantern glow
     c.rect(48, 34, 12, 12, (110, 232, 246))
     c.rect(53, 34, 2, 12, (44, 40, 62)); c.rect(48, 39, 12, 2, (44, 40, 62))
     c.finish(OUTLINE_ABYSS).save(os.path.join(out_dir, "slum_shack.png"))
 
+    # Algae Temple (112x96) with cornice shadow & foundation step
     c = Canvas(112, 96)
     st = (54, 52, 88); st_hi = (92, 90, 142); st_lo = (34, 32, 58)
-    c.poly([(8, 28), (56, 6), (104, 28)], st_hi)
-    c.poly([(22, 26), (56, 11), (90, 26)], st)
-    c.rect(48, 16, 16, 8, (82, 246, 206))
     c.rect(14, 28, 84, 66, st)
+    c.rect(14, 28, 84, 5, st_lo)
     for by in range(38, 90, 12):
         c.line(14, by, 98, by, st_lo)
     for px in (18, 40, 64, 86):
         c.rect(px, 28, 8, 66, st_hi)
         c.rect(px + 2, 32, 2, 58, (118, 116, 178))
+    c.poly([(6, 28), (56, 5), (106, 28)], st_hi)
+    c.poly([(20, 26), (56, 11), (92, 26)], st)
+    c.rect(48, 16, 16, 8, (82, 246, 206))
+    c.rect(10, 90, 92, 4, st_lo)
     c.rect(42, 48, 28, 46, (14, 12, 28))
     c.oval(56, 70, 9, 11, (82, 246, 206)); c.oval(56, 70, 4, 5, (216, 255, 246))
     c.finish(OUTLINE_ABYSS).save(os.path.join(out_dir, "algae_temple.png"))
@@ -1307,10 +1336,13 @@ def generate_all(char_dir, portrait_dir, intro_dir, props_dir):
         "tenebris": {"species": "angler", "skin": (62, 68, 96), "lure": (255, 96, 136), "shirt": (28, 26, 42), "pants": (22, 20, 34), "hair": (24, 22, 36), "short": 8, "trenchcoat": True, "hat": True, "sunglasses": True, "outline": OUTLINE_ABYSS},
     }
 
+    cast_imgs = {}
     for cid, cfg in humanoid_specs.items():
         poses = ("stand", "idle", "w1", "w2", "w3", "w4") if cid == "river" else ("stand", "idle", "w1", "w2")
         for pose in poses:
             im = draw_humanoid(cfg, pose)
+            if pose == "stand":
+                cast_imgs[cid] = im
             fn = cid if pose == "stand" else f"{cid}_{pose}"
             im.save(os.path.join(char_dir, f"{fn}.png"))
         make_shadow(draw_humanoid(cfg, "stand")).save(os.path.join(char_dir, f"{cid}_shadow.png"))
@@ -1364,10 +1396,10 @@ def generate_all(char_dir, portrait_dir, intro_dir, props_dir):
         for ex in exprs:
             draw_portrait(kind, ex).save(os.path.join(portrait_dir, f"{kind}_{ex}.png"))
 
-    # Intro plates
-    for idx, plate in enumerate(draw_intro_plates()):
-        plate.save(os.path.join(intro_dir, f"plate_{idx}.png"))
-
-    # Biome props
+    # Biome props first so Intro plates can stamp heirloom tome cleanly
     draw_props(props_dir)
+
+    # Intro plates
+    for idx, plate in enumerate(draw_intro_plates(cast_imgs, props_dir)):
+        plate.save(os.path.join(intro_dir, f"plate_{idx}.png"))
     print(f"pixel_cast: {len(humanoid_specs) + len(custom_fns)} characters, portraits, 4 intro plates, props emitted")
