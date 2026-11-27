@@ -202,17 +202,19 @@ pub fn draw_panel(tex: &Textures, x: f32, y: f32, w: f32, h: f32, skin: &Skin) {
     draw_nine_slice(tex, x, y, w, h, skin.bg, skin.border);
 }
 
-/// Interactive pill/panel button with hover highlight. Returns true if clicked this frame.
+/// Interactive pill/panel button with hover/press feedback. Returns true if clicked this frame.
 pub fn draw_btn(tex: &Textures, x: f32, y: f32, w: f32, h: f32, label: &str, skin: &Skin, active: bool) -> bool {
     let (mx, my) = mouse_position();
     let hov = mx >= x && mx <= x + w && my >= y && my <= y + h;
+    let down = hov && is_mouse_button_down(MouseButton::Left);
+    let dy = if down { 1.5 } else if hov { -1.0 } else { 0.0 };
     let fill = if active || hov { skin.sel } else { skin.chip };
     let border = if active || hov { skin.accent } else { skin.border };
-    draw_nine_slice(tex, x, y, w, h, fill, border);
+    draw_nine_slice(tex, x, y + dy, w, h, fill, border);
     let size = if tag_width(label, 12) <= w - 16.0 { 12 } else { 10 };
     let tw = tag_width(label, size);
     let col = if active || hov { skin.accent } else { skin.ink };
-    draw_tag_shadow(label, x + (w - tw) * 0.5, y + h * 0.5 + (size as f32 * 0.42), size, col);
+    draw_tag_shadow(label, x + (w - tw) * 0.5, y + dy + h * 0.5 + (size as f32 * 0.42), size, col);
     hov && is_mouse_button_pressed(MouseButton::Left)
 }
 
@@ -229,10 +231,12 @@ pub fn draw_icon_only_btn(
 ) -> bool {
     let (mx, my) = mouse_position();
     let hov = mx >= x && mx <= x + w && my >= y && my <= y + h;
+    let down = hov && is_mouse_button_down(MouseButton::Left);
+    let dy = if down { 1.5 } else if hov { -1.0 } else { 0.0 };
     let fill = if active || hov { skin.sel } else { skin.chip };
     let border = if active || hov { skin.accent } else { skin.border };
-    draw_nine_slice(tex, x, y, w, h, fill, border);
-    draw_texture_ex(ico, x + (w - 22.0) * 0.5, y + (h - 22.0) * 0.5, WHITE, DrawTextureParams {
+    draw_nine_slice(tex, x, y + dy, w, h, fill, border);
+    draw_texture_ex(ico, x + (w - 22.0) * 0.5, y + dy + (h - 22.0) * 0.5, WHITE, DrawTextureParams {
         dest_size: Some(vec2(22.0, 22.0)),
         ..Default::default()
     });
@@ -253,19 +257,21 @@ pub fn draw_btn_icon(
 ) -> bool {
     let (mx, my) = mouse_position();
     let hov = mx >= x && mx <= x + w && my >= y && my <= y + h;
+    let down = hov && is_mouse_button_down(MouseButton::Left);
+    let dy = if down { 1.5 } else if hov { -1.0 } else { 0.0 };
     let fill = if active || hov { skin.sel } else { skin.chip };
     let border = if active || hov { skin.accent } else { skin.border };
-    draw_nine_slice(tex, x, y, w, h, fill, border);
-    let size = 10;
+    draw_nine_slice(tex, x, y + dy, w, h, fill, border);
+    let size = if tag_width(label, 12) + 26.0 <= w - 16.0 { 12 } else { 10 };
     let tw = tag_width(label, size);
-    let total = (18.0 + 6.0 + tw).min(w - 14.0);
+    let total = (18.0 + 8.0 + tw).min(w - 14.0);
     let x0 = (x + (w - total) * 0.5).max(x + 8.0);
-    draw_texture_ex(ico, x0, y + (h - 18.0) * 0.5, WHITE, DrawTextureParams {
+    draw_texture_ex(ico, x0, y + dy + (h - 18.0) * 0.5, WHITE, DrawTextureParams {
         dest_size: Some(vec2(18.0, 18.0)),
         ..Default::default()
     });
     let col = if active || hov { skin.accent } else { skin.ink };
-    draw_tag_shadow(label, x0 + 24.0, y + h * 0.5 + 4.0, size, col);
+    draw_tag_shadow(label, x0 + 26.0, y + dy + h * 0.5 + (size as f32 * 0.42), size, col);
     hov && is_mouse_button_pressed(MouseButton::Left)
 }
 
@@ -465,15 +471,18 @@ impl DialogueBox {
 
         if self.shown >= self.text.len() {
             if !self.choices.is_empty() {
-                let base_y = by + bh - 18.0 - self.choices.len() as f32 * 26.0;
+                let row_h = 28.0;
+                let base_y = by + bh - 14.0 - self.choices.len() as f32 * row_h;
                 for (i, (label, _)) in self.choices.iter().enumerate() {
-                    let cy = base_y + i as f32 * 26.0;
+                    let cy = base_y + i as f32 * row_h;
                     let sel = i == self.choice_sel;
+                    let fill = if sel { skin.sel } else { skin.chip };
+                    let bord = if sel { skin.accent } else { skin.border };
+                    draw_nine_slice(tex, tx - 6.0, cy - 2.0, max_w, row_h - 3.0, fill, bord);
                     if sel {
-                        draw_rectangle(tx - 6.0, cy - 2.0, max_w, 24.0, skin.sel);
+                        draw_rectangle(tx, cy + 2.0, 3.0, row_h - 11.0, skin.accent);
                     }
-                    let txt = if sel { format!("> {}", label) } else { format!("  {}", label) };
-                    draw_dlg_shadow(&txt, tx + 4.0, cy + 17.0, 22, if sel { skin.accent } else { skin.ink });
+                    draw_dlg_shadow(label, tx + 10.0, cy + 16.0, 21, if sel { skin.accent } else { skin.ink });
                 }
             } else {
                 let bob = (get_time() as f32 * 4.5).sin() * 2.5;
@@ -571,6 +580,19 @@ pub fn quiz_header_skinned(tex: &Textures, title: &str, x: f32, y: f32, w: f32, 
     });
 }
 
+fn draw_option_label(x: f32, y: f32, w: f32, h: f32, label: &str, col: Color, accent: Color) {
+    let mut size = 24u16;
+    let mut lh = 24.0f32;
+    let mut lines = wrapped_line_count(label, w - 42.0, size) as f32;
+    if lines * lh > h - 12.0 {
+        size = 20;
+        lh = 20.0;
+        lines = wrapped_line_count(label, w - 42.0, size) as f32;
+    }
+    let start_y = y + (h - lines * lh) * 0.5 + (size as f32 * 0.72);
+    draw_wrapped_rich(label, x + 20.0, start_y, w - 40.0, size, lh, col, accent);
+}
+
 pub fn draw_option_row_skinned(
     tex: &Textures,
     x: f32,
@@ -583,18 +605,41 @@ pub fn draw_option_row_skinned(
 ) -> bool {
     let (mx, my) = mouse_position();
     let hov = mx >= x && mx <= x + w && my >= y && my <= y + h;
-    let lit = selected || hov;
-    let fill = if lit { skin.sel } else { skin.chip };
-    let border = if lit { skin.accent } else { skin.border };
+    let fill = if selected || hov { skin.sel } else { skin.chip };
+    let border = if selected { skin.accent } else if hov { skin.chip_ink } else { skin.border };
     draw_nine_slice(tex, x, y, w, h, fill, border);
-    if lit {
+    if selected {
         draw_rectangle(x + 7.0, y + 9.0, 4.0, (h - 18.0).max(8.0), skin.accent);
     }
-    let lines = wrapped_line_count(label, w - 42.0, 24) as f32;
-    let start_y = y + (h - lines * 24.0) * 0.5 + 17.0;
-    let txt_col = if lit { skin.accent } else { skin.ink };
-    draw_wrapped_rich(label, x + 20.0, start_y, w - 40.0, 24, 24.0, txt_col, skin.accent);
+    let txt_col = if selected { skin.accent } else { skin.ink };
+    draw_option_label(x, y, w, h, label, txt_col, skin.accent);
     hov && is_mouse_button_pressed(MouseButton::Left)
+}
+
+/// Non-interactive answer-reveal option row used once a one-try riddle is locked.
+pub fn draw_option_row_locked(
+    tex: &Textures,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    label: &str,
+    is_correct: bool,
+    is_wrong_pick: bool,
+    skin: &Skin,
+) {
+    let (fill, border, bar_col, txt_col) = if is_correct {
+        (skin.sel, Color::new(0.45, 0.94, 0.65, 1.0), Some(Color::new(0.45, 0.94, 0.65, 1.0)), skin.accent)
+    } else if is_wrong_pick {
+        (Color::new(0.28, 0.11, 0.16, 0.95), Color::new(0.98, 0.45, 0.52, 1.0), Some(Color::new(0.98, 0.45, 0.52, 1.0)), Color::new(1.0, 0.68, 0.72, 1.0))
+    } else {
+        (skin.chip, skin.border, None, skin.muted)
+    };
+    draw_nine_slice(tex, x, y, w, h, fill, border);
+    if let Some(bc) = bar_col {
+        draw_rectangle(x + 7.0, y + 9.0, 4.0, (h - 18.0).max(8.0), bc);
+    }
+    draw_option_label(x, y, w, h, label, txt_col, skin.accent);
 }
 
 // --- Field Notes & Pause Modals ---------------------------------------------
@@ -604,8 +649,8 @@ pub fn draw_field_notes(tex: &Textures, prog: &Progress, biome: Biome, skin: &Sk
     let h = screen_height();
     draw_rectangle(0.0, 0.0, w, h, Color::new(0.01, 0.01, 0.04, 0.72));
 
-    let pw = 760.0f32.min(w - 48.0);
-    let ph = 520.0f32.min(h - 48.0);
+    let pw = 780.0f32.min(w - 48.0);
+    let ph = 536.0f32.min(h - 48.0);
     let px = (w - pw) * 0.5;
     let py = (h - ph) * 0.5;
     draw_panel(tex, px, py, pw, ph, skin);
@@ -615,7 +660,6 @@ pub fn draw_field_notes(tex: &Textures, prog: &Progress, biome: Biome, skin: &Sk
         ..Default::default()
     });
     draw_tag_shadow("FIELD NOTES & JOURNAL", px + 60.0, py + 43.0, 16, skin.accent);
-    draw_tag_shadow("[Tab] Close", px + pw - 160.0, py + 42.0, 11, skin.muted);
 
     // Objective summary
     let goal = match biome {
@@ -628,73 +672,80 @@ pub fn draw_field_notes(tex: &Textures, prog: &Progress, biome: Biome, skin: &Sk
     draw_wrapped_col(goal, px + 28.0, py + 108.0, pw - 56.0, 22, 24.0, skin.ink);
 
     // Elixir vial status row
-    draw_tag_shadow("ELIXIR VIALS:", px + 28.0, py + 178.0, 11, skin.chip_ink);
+    draw_tag_shadow("ELIXIR VIALS:", px + 28.0, py + 174.0, 11, skin.chip_ink);
     let vials = [
         (&tex.ui.vial_red, "Pearl of Clarity", prog.elixir >= 1),
         (&tex.ui.vial_green, "Algae Synthesis", prog.elixir >= 2),
         (&tex.ui.vial_blue, "Elixir of Literacy", prog.elixir >= 3),
     ];
+    let card_w = (pw - 56.0 - 20.0) / 3.0;
     for (i, (ico, lbl, got)) in vials.iter().enumerate() {
-        let vx = px + 28.0 + i as f32 * 230.0;
-        let vy = py + 190.0;
-        draw_nine_slice(tex, vx, vy, 218.0, 56.0, skin.chip, if *got { skin.accent } else { skin.border });
+        let vx = px + 28.0 + i as f32 * (card_w + 10.0);
+        let vy = py + 186.0;
+        draw_nine_slice(tex, vx, vy, card_w, 54.0, skin.chip, if *got { skin.accent } else { skin.border });
         let img = if *got { *ico } else { &tex.ui.vial_empty };
-        draw_texture_ex(img, vx + 10.0, vy + 12.0, WHITE, DrawTextureParams {
-            dest_size: Some(vec2(32.0, 32.0)),
+        draw_texture_ex(img, vx + 10.0, vy + 13.0, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(28.0, 28.0)),
             ..Default::default()
         });
-        draw_dlg_shadow(lbl, vx + 48.0, vy + 36.0, 21, if *got { skin.accent } else { skin.muted });
+        draw_dlg_shadow(lbl, vx + 44.0, vy + 34.0, 20, if *got { skin.accent } else { skin.muted });
     }
 
     // Aquarius clues & ingredients
-    draw_tag_shadow("AQUARIUS CLUES & REAGENTS:", px + 28.0, py + 280.0, 11, skin.chip_ink);
+    draw_tag_shadow("AQUARIUS CLUES & REAGENTS:", px + 28.0, py + 272.0, 11, skin.chip_ink);
     let items = [
         (&tex.props.item_seashroom, "Blue Seashroom", prog.items[0]),
         (&tex.props.item_anemone, "Tentacle Anemone", prog.items[1]),
         (&tex.props.item_seaberry, "True Seaberry", prog.items[2]),
     ];
     for (i, (ico, name, got)) in items.iter().enumerate() {
-        let ix = px + 28.0 + i as f32 * 230.0;
+        let ix = px + 28.0 + i as f32 * (card_w + 10.0);
+        let iy = py + 284.0;
+        draw_nine_slice(tex, ix, iy, card_w, 42.0, skin.chip, if *got { skin.accent } else { skin.border });
         let tint = if *got { WHITE } else { Color::new(0.45, 0.48, 0.58, 0.7) };
-        draw_texture_ex(*ico, ix, py + 290.0, tint, DrawTextureParams {
+        draw_texture_ex(*ico, ix + 10.0, iy + 9.0, tint, DrawTextureParams {
             dest_size: Some(vec2(24.0, 24.0)),
             ..Default::default()
         });
         draw_dlg_shadow(
             name,
-            ix + 30.0,
-            py + 308.0,
-            22,
+            ix + 40.0,
+            iy + 27.0,
+            20,
             if *got { skin.accent } else { skin.muted },
         );
     }
 
-    let mut cy = py + 344.0;
+    let mut cy = py + 354.0;
+    let footer_y = py + ph - 76.0;
     if prog.clues.is_empty() {
-        draw_dlg_shadow("Talk to Gillbert, Scalleon, Market Lady, and examine the Neptune Statue.", px + 28.0, cy, 22, skin.muted);
+        draw_wrapped_col("Talk to Gillbert, Scalleon, Market Lady, and examine the Neptune Statue.", px + 28.0, cy, pw - 56.0, 21, 23.0, skin.muted);
     } else {
         for c in &prog.clues {
-            draw_dlg_shadow(&format!("* {}", c), px + 28.0, cy, 22, skin.ink);
-            cy += 26.0;
+            let line = format!("* {}", c);
+            let lines = wrapped_line_count(&line, pw - 56.0, 21);
+            if cy + lines as f32 * 22.0 > footer_y {
+                break;
+            }
+            draw_wrapped_col(&line, px + 28.0, cy, pw - 56.0, 21, 22.0, skin.ink);
+            cy += lines as f32 * 22.0 + 4.0;
         }
     }
 
     // Riddle summary footer
     draw_tag_shadow(
-        &format!("Riddles Mastered: {} / {}    Puzzles Cleared: {}/4",
+        &format!("Riddles: {} right ({}/8 seen)   Puzzles: {}/4",
             prog.total_riddles_right(),
             prog.total_riddles_seen(),
             prog.gate_solved as u8 + prog.maze_solved as u8 + prog.algae_solved as u8 + prog.rainbow_solved as u8,
         ),
         px + 28.0,
-        py + ph - 48.0,
+        py + ph - 36.0,
         11,
         skin.accent,
     );
 
-    draw_btn(tex, px + pw - 150.0, py + ph - 62.0, 126.0, 38.0, "CLOSE", skin, false)
-        || is_key_pressed(KeyCode::Tab)
-        || is_key_pressed(KeyCode::Escape)
+    draw_btn(tex, px + pw - 166.0, py + ph - 58.0, 140.0, 40.0, "CLOSE [Tab]", skin, false)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -725,18 +776,20 @@ pub fn draw_pause_overlay(tex: &Textures, muted: bool, vol: f32, skin: &Skin) ->
     let mut action = PauseAction::None;
     let bx = px + 50.0;
     let bw = pw - 100.0;
-    if draw_btn(tex, bx, py + 76.0, bw, 46.0, "RESUME GAME", skin, true) || is_key_pressed(KeyCode::Escape) {
+    if draw_btn(tex, bx, py + 76.0, bw, 46.0, "RESUME GAME [Esc]", skin, true) {
         action = PauseAction::Resume;
     }
     let m_lbl = if muted { "AUDIO: MUTED [M]" } else { "AUDIO: ON [M]" };
     if draw_btn(tex, bx, py + 134.0, bw, 46.0, m_lbl, skin, false) {
         action = PauseAction::ToggleMute;
     }
-    if draw_btn(tex, bx, py + 192.0, 72.0, 42.0, "VOL -", skin, false) {
+    if draw_btn(tex, bx, py + 192.0, 78.0, 42.0, "VOL -", skin, false) {
         action = PauseAction::VolDown;
     }
-    draw_dlg_shadow(&format!("Music {:>3}%", (vol * 100.0).round() as i32), bx + 110.0, py + 220.0, 24, skin.ink);
-    if draw_btn(tex, bx + bw - 72.0, py + 192.0, 72.0, 42.0, "VOL +", skin, false) {
+    let v_lbl = format!("Music {}%", (vol * 100.0).round() as i32);
+    let vw = dlg_width(&v_lbl, 24);
+    draw_dlg_shadow(&v_lbl, px + (pw - vw) * 0.5, py + 220.0, 24, skin.ink);
+    if draw_btn(tex, bx + bw - 78.0, py + 192.0, 78.0, 42.0, "VOL +", skin, false) {
         action = PauseAction::VolUp;
     }
     if draw_btn(tex, bx, py + 248.0, bw, 46.0, "RESTART BIOME", skin, false) {

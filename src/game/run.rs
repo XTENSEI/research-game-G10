@@ -11,9 +11,9 @@ use crate::game::{
     set_swift_swim,
     ui::{
         draw_btn, draw_btn_icon, draw_dlg_shadow, draw_field_notes, draw_nine_slice,
-        draw_option_row_skinned, draw_panel, draw_pause_overlay, draw_tag_shadow, draw_wrapped_col,
-        draw_wrapped_rich, dlg_width, quiz_header_skinned, tag_width, wrapped_line_count,
-        DialogueBox, PauseAction, Skin,
+        draw_option_row_locked, draw_option_row_skinned, draw_panel, draw_pause_overlay,
+        draw_tag_shadow, draw_wrapped_col, draw_wrapped_rich, dlg_width, quiz_header_skinned,
+        tag_width, wrapped_line_count, DialogueBox, PauseAction, Skin,
     },
     world::World,
     Progress,
@@ -549,18 +549,23 @@ impl Game {
             self.audio.toggle_mute();
         }
 
-        // Global UI overlays inside Explore
-        if matches!(self.phase, Phase::Explore) {
-            if is_key_pressed(KeyCode::Tab) && !self.paused {
-                self.show_notes = !self.show_notes;
-                self.audio.play_sfx(&self.audio.sfx.page, 0.55);
+        // Global UI overlays inside Explore (consume close keys cleanly here so draw() doesn't re-close same frame)
+        if self.show_notes {
+            if is_key_pressed(KeyCode::Tab) || is_key_pressed(KeyCode::Escape) {
+                self.show_notes = false;
+                self.audio.play_sfx(&self.audio.sfx.page, 0.5);
             }
+        } else if self.paused {
             if is_key_pressed(KeyCode::Escape) {
-                if self.show_notes {
-                    self.show_notes = false;
-                } else {
-                    self.paused = !self.paused;
-                }
+                self.paused = false;
+                self.audio.play_sfx(&self.audio.sfx.select, 0.45);
+            }
+        } else if matches!(self.phase, Phase::Explore) {
+            if is_key_pressed(KeyCode::Tab) {
+                self.show_notes = true;
+                self.audio.play_sfx(&self.audio.sfx.page, 0.55);
+            } else if is_key_pressed(KeyCode::Escape) {
+                self.paused = true;
             }
         }
 
@@ -923,11 +928,45 @@ impl Game {
                 }
                 self.phase = Phase::Riddle { idx, sel, picked };
             }
-            Phase::Gate { picks, active_slot, feedback } => {
+            Phase::Gate { mut picks, mut active_slot, mut feedback } => {
                 if is_key_pressed(KeyCode::Escape) {
                     self.world.interact_cd = 0.25;
                     self.phase = Phase::Explore;
                     return;
+                }
+                let slot_i = active_slot.unwrap_or(0);
+                if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A) {
+                    active_slot = Some((slot_i + gate::SLOTS.len() - 1) % gate::SLOTS.len());
+                } else if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D) {
+                    active_slot = Some((slot_i + 1) % gate::SLOTS.len());
+                }
+                let pat_keys = [
+                    KeyCode::Key1, KeyCode::Key2, KeyCode::Key3, KeyCode::Key4, KeyCode::Key5,
+                    KeyCode::Key6, KeyCode::Key7, KeyCode::Key8, KeyCode::Key9, KeyCode::Key0,
+                ];
+                for (pi, key) in pat_keys.iter().enumerate() {
+                    if is_key_pressed(*key) && pi < gate::PALETTE.len() {
+                        picks[slot_i] = Some(pi);
+                        self.audio.play_sfx(&self.audio.sfx.click, 0.5);
+                        if let Some(next_empty) = (1..=gate::SLOTS.len()).map(|o| (slot_i + o) % gate::SLOTS.len()).find(|&idx| picks[idx].is_none()) {
+                            active_slot = Some(next_empty);
+                        }
+                    }
+                }
+                if is_key_pressed(KeyCode::Enter) {
+                    let (right, hint) = gate::evaluate(&picks);
+                    if right == gate::SLOTS.len() {
+                        self.prog.gate_solved = true;
+                        self.prog.done.insert("gate");
+                        self.audio.play_sfx(&self.audio.sfx.good, 0.75);
+                        self.fx.accent(true);
+                        self.phase = Phase::Explore;
+                        self.world.say_hint("All 14 marks aligned! The Lone Stone Gate swings wide open!");
+                        return;
+                    } else {
+                        self.audio.play_sfx(&self.audio.sfx.bad, 0.5);
+                        feedback = Some((right, hint.unwrap_or("Check punctuation inside the quotes.").to_string()));
+                    }
                 }
                 self.phase = Phase::Gate { picks, active_slot, feedback };
             }
@@ -1868,8 +1907,11 @@ impl Game {
             self.audio.toggle_mute();
         }
         let _ = skin;
-        let hint = "Arrow Keys / WASD / Click to Move   •   Enter / E / Click to Interact";
-        draw_dlg_shadow(hint, (w - dlg_width(hint, 22)) * 0.5, 686.0, 22, title_skin.muted);
+        let hint = "Arrow Keys / WASD / Click to Move   |   Enter / E / Click to Interact";
+        let hw = dlg_width(hint, 22);
+        let pill_w = hw + 38.0;
+        draw_nine_slice(&self.tex, (w - pill_w) * 0.5, 660.0, pill_w, 34.0, title_skin.bg, title_skin.border);
+        draw_dlg_shadow(hint, (w - hw) * 0.5, 683.0, 22, title_skin.ink);
     }
 
     fn draw_hud(&mut self, skin: &Skin) {
@@ -1908,7 +1950,7 @@ impl Game {
     fn draw_qte(&self, timer: f32, prog: f32, skin: &Skin) {
         let w = screen_width();
         crate::art::draw_biome_bg(Biome::Kelp, get_time() as f32, get_time() as f32 * 180.0, &self.fx, &self.tex);
-        self.world.draw_ground(&self.tex, get_time() as f32 * 220.0, 556.0, get_time() as f32);
+        self.world.draw_ground(&self.tex, (get_time() as f32 * 220.0).rem_euclid(480.0), 556.0, get_time() as f32);
 
         let chase_gap = (1.0 - prog) * 320.0;
         let rx = 680.0;
@@ -1975,8 +2017,10 @@ impl Game {
         }
 
         if round_dodge {
+            draw_nine_slice(&self.tex, 296.0, 274.0, 432.0, 40.0, skin.chip, skin.accent);
+            let d_hdr = format!("DODGE KENNY'S SHELLS!  {:.1}s", timer);
+            draw_tag_shadow(&d_hdr, 296.0 + (432.0 - tag_width(&d_hdr, 12)) * 0.5, 299.0, 12, skin.accent);
             draw_panel(&self.tex, 296.0, 324.0, 432.0, 224.0, skin);
-            draw_tag_shadow(&format!("DODGE KENNY'S BUBBLE SHELLS!  {:.1}s", timer), 312.0, 304.0, 12, skin.accent);
             for (i, &(bx, by, _, _)) in bullets.iter().enumerate() {
                 draw_texture_ex(&self.tex.ui.gem, bx - 14.0, by - 14.0, c(120, 246, 220, 255), DrawTextureParams {
                     dest_size: Some(vec2(28.0, 28.0)),
@@ -2008,39 +2052,47 @@ impl Game {
         draw_rectangle(0.0, 0.0, w, screen_height(), Color::new(0.01, 0.01, 0.03, 0.65));
 
         let pw = 800.0;
-        let ph = 560.0;
+        let ph = 568.0;
         let px = (w - pw) * 0.5;
-        let py = 76.0;
+        let py = 72.0;
         draw_panel(&self.tex, px, py, pw, ph, skin);
         quiz_header_skinned(&self.tex, r.title, px + 28.0, py + 24.0, pw - 56.0, skin);
-        draw_tag_shadow("ONE TRY ONLY", px + pw - 190.0, py + 40.0, 11, c(255, 130, 150, 255));
+        let badge = "ONE TRY ONLY";
+        draw_nine_slice(&self.tex, px + pw - 186.0, py + 20.0, 158.0, 32.0, skin.chip, c(232, 102, 122, 255));
+        draw_tag_shadow(badge, px + pw - 186.0 + (158.0 - tag_width(badge, 10)) * 0.5, py + 41.0, 10, c(255, 146, 162, 255));
 
-        let p_lines = wrapped_line_count(r.prompt, pw - 64.0, 26);
-        draw_wrapped_rich(r.prompt, px + 32.0, py + 94.0, pw - 64.0, 26, 28.0, skin.ink, skin.accent);
+        let p_lines = wrapped_line_count(r.prompt, pw - 64.0, 25);
+        draw_wrapped_rich(r.prompt, px + 32.0, py + 92.0, pw - 64.0, 25, 26.0, skin.ink, skin.accent);
 
-        let opt_y0 = (py + 106.0 + p_lines as f32 * 28.0).max(py + 210.0);
+        let compact = p_lines >= 4;
+        let row_h = if compact { 46.0 } else { 52.0 };
+        let row_step = if compact { 52.0 } else { 58.0 };
+        let opt_y0 = (py + 96.0 + p_lines as f32 * 26.0).max(py + 178.0).min(py + 228.0);
         let mut hit = None;
         for (i, ch) in r.choices.iter().enumerate() {
-            let mut label = ch.to_string();
+            let oy = opt_y0 + i as f32 * row_step;
             if let Some(p) = picked {
+                let mut label = ch.to_string();
                 if i == r.correct {
                     label = format!("[CORRECT] {}", ch);
                 } else if i == p {
                     label = format!("[YOUR PICK] {}", ch);
                 }
-            }
-            if draw_option_row_skinned(&self.tex, px + 32.0, opt_y0 + i as f32 * 62.0, pw - 64.0, 52.0, &label, picked.unwrap_or(sel) == i, skin) && picked.is_none() {
+                draw_option_row_locked(&self.tex, px + 32.0, oy, pw - 64.0, row_h, &label, i == r.correct, i == p && p != r.correct, skin);
+            } else if draw_option_row_skinned(&self.tex, px + 32.0, oy, pw - 64.0, row_h, ch, sel == i, skin) {
                 hit = Some(i);
             }
         }
 
         if let Some(p) = picked {
             let ok = p == r.correct;
-            let foot = if ok { "Nice work! " } else { "LOCKED. Note the explanation: " };
-            draw_wrapped_rich(&format!("{}{}", foot, r.explain), px + 32.0, opt_y0 + 266.0, pw - 64.0, 22, 24.0, skin.accent, skin.ink);
-            draw_tag_shadow("Press [Enter] or Click to return", px + pw - 330.0, py + ph - 26.0, 10, skin.muted);
+            let foot = if ok { "Nice work! " } else { "LOCKED. Note: " };
+            let exp_y = (opt_y0 + 4.0 * row_step + 14.0).min(py + ph - 78.0);
+            draw_wrapped_rich(&format!("{}{}", foot, r.explain), px + 32.0, exp_y, pw - 64.0, 21, 22.0, skin.accent, skin.ink);
+            let ret = "Press [Enter] or Click to return";
+            draw_tag_shadow(ret, px + pw - tag_width(ret, 10) - 28.0, py + ph - 20.0, 10, skin.muted);
         } else {
-            draw_tag_shadow("Keys [1-4] / [Enter] or Click an option", px + 32.0, py + ph - 26.0, 10, skin.muted);
+            draw_tag_shadow("Keys [1-4] / [Enter] or Click an option", px + 32.0, py + ph - 20.0, 10, skin.muted);
         }
         hit
     }
@@ -2054,13 +2106,13 @@ impl Game {
     ) -> Option<(Option<usize>, Option<usize>, bool)> {
         let w = screen_width();
         let pw = 920.0;
-        let ph = 636.0;
+        let ph = 644.0;
         let px = (w - pw) * 0.5;
-        let py = 42.0;
+        let py = 38.0;
         draw_panel(&self.tex, px, py, pw, ph, skin);
         quiz_header_skinned(&self.tex, "THE LONE STONE THRONE STORY (14 PUNCTUATION SLOTS)", px + 26.0, py + 22.0, pw - 52.0, skin);
 
-        // Flow verbatim text + clickable inline slot chips
+        // Flow verbatim text + themed clickable inline slot chips
         let x0 = px + 28.0;
         let max_x = px + pw - 28.0;
         let mut x = x0;
@@ -2097,11 +2149,12 @@ impl Game {
             let by = y - 20.0;
             let sel = next_active == Some(i);
             let hov = mx >= x && mx <= x + bw && my >= by && my <= by + 24.0;
-            let fill = if sel { c(46, 130, 210, 255) } else if picks[i].is_some() { c(28, 86, 138, 255) } else { c(24, 58, 108, 255) };
-            let bord = if sel || hov { skin.accent } else { c(110, 200, 255, 255) };
-            draw_rectangle(x, by, bw, 24.0, fill);
-            draw_rectangle_lines(x, by, bw, 24.0, if sel { 2.5 } else { 2.0 }, bord);
-            draw_dlg_shadow(sym, x + (bw - dlg_width(sym, 22)) * 0.5, y - 1.0, 22, WHITE);
+            let filled = picks[i].is_some();
+            let fill = if sel { skin.sel } else if filled { skin.chip } else { c(18, 42, 54, 255) };
+            let bord = if sel || hov { skin.accent } else if filled { skin.chip_ink } else { skin.border };
+            draw_nine_slice(&self.tex, x, by, bw, 24.0, fill, bord);
+            let sym_col = if sel { skin.accent } else if filled { skin.ink } else { skin.chip_ink };
+            draw_dlg_shadow(sym, x + (bw - dlg_width(sym, 22)) * 0.5, y - 1.0, 22, sym_col);
             if hov && mclick {
                 next_active = Some(i);
             }
@@ -2109,34 +2162,50 @@ impl Game {
         }
         draw_frag(gate::TRAILING_TEXT, &mut x, &mut y);
 
-        // Palette bar
-        let pal_y = py + ph - 144.0;
-        draw_tag_shadow(
-            &format!("SELECT PUNCTUATION FOR SLOT #{}:", next_active.map(|i| i + 1).unwrap_or(1)),
-            px + 28.0,
-            pal_y,
-            11,
-            skin.accent,
+        // Centered 10-button punctuation palette with micro-labels so em-dash vs hyphen is unmistakable
+        let btn_w = 72.0;
+        let btn_gap = 8.0;
+        let pal_total = gate::PALETTE.len() as f32 * btn_w + (gate::PALETTE.len() - 1) as f32 * btn_gap;
+        let pal_x0 = px + (pw - pal_total) * 0.5;
+        let pal_y = py + ph - 156.0;
+        let by = pal_y + 14.0;
+
+        let hovered_pat = gate::PALETTE.iter().enumerate().find_map(|(pi, (_, lbl))| {
+            let bx = pal_x0 + pi as f32 * (btn_w + btn_gap);
+            (mx >= bx && mx <= bx + btn_w && my >= by && my <= by + 42.0).then_some(*lbl)
+        });
+        let cur_pat = active_slot.and_then(|si| picks[si]).and_then(|pi| gate::PALETTE.get(pi)).map(|p| p.1);
+        let slot_hdr = format!(
+            "SLOT #{}/{}   {}",
+            next_active.map(|i| i + 1).unwrap_or(1),
+            gate::SLOTS.len(),
+            hovered_pat.or(cur_pat).unwrap_or("Pick punctuation mark [1-0 / Click]")
         );
+        draw_tag_shadow(&slot_hdr, pal_x0, pal_y, 11, skin.accent);
+
         let mut chosen_pat = None;
         for (pi, (sym, _lbl)) in gate::PALETTE.iter().enumerate() {
-            let bx = px + 28.0 + pi as f32 * 70.0;
-            let by = pal_y + 12.0;
-            if draw_btn(&self.tex, bx, by, 62.0, 42.0, sym, skin, false) {
+            let bx = pal_x0 + pi as f32 * (btn_w + btn_gap);
+            let active_pick = active_slot.and_then(|si| picks[si]) == Some(pi);
+            if draw_btn(&self.tex, bx, by, btn_w, 42.0, sym, skin, active_pick) {
                 chosen_pat = Some(pi);
             }
+            let key_tag = format!("[{}]", (pi + 1) % 10);
+            draw_tag_shadow(&key_tag, bx + (btn_w - tag_width(&key_tag, 9)) * 0.5, by + 56.0, 9, skin.muted);
         }
 
         if let Some((right, msg)) = feedback {
-            draw_dlg_shadow(
+            draw_wrapped_col(
                 &format!("Score: {}/14: {}", right, msg),
                 px + 28.0,
-                py + ph - 26.0,
-                22,
+                py + ph - 52.0,
+                pw - 252.0,
+                21,
+                22.0,
                 skin.accent,
             );
         } else {
-            draw_dlg_shadow("Click any glowing box, pick a mark above, then press CHECK GATE.", px + 28.0, py + ph - 26.0, 22, skin.muted);
+            draw_dlg_shadow("Arrows [<-/->] step slots   Keys [1-0] / Click mark   [Enter] or CHECK GATE.", px + 28.0, py + ph - 26.0, 21, skin.muted);
         }
 
         let check_now = draw_btn(&self.tex, px + pw - 210.0, py + ph - 68.0, 182.0, 48.0, "CHECK GATE", skin, true);
@@ -2197,14 +2266,16 @@ impl Game {
         let cur = &cosma::RAP_BARS[bar];
         let right_idx = (bar * 2) % 3;
         draw_panel(&self.tex, 400.0, 350.0, 564.0, 320.0, skin);
-        draw_wrapped_rich(cur.prompt, 428.0, 396.0, 510.0, 24, 26.0, skin.ink, skin.accent);
+        let p_lines = wrapped_line_count(cur.prompt, 510.0, 22);
+        draw_wrapped_rich(cur.prompt, 428.0, 388.0, 510.0, 22, 23.0, skin.ink, skin.accent);
+        let opt_y0 = (388.0 + p_lines as f32 * 23.0 + 4.0).max(468.0).min(486.0);
         for i in 0..3 {
             let word = if i == right_idx {
                 cur.rhyming_word
             } else {
                 cur.decoys[if i > right_idx { i - 1 } else { i }]
             };
-            if draw_option_row_skinned(&self.tex, 428.0, 476.0 + i as f32 * 52.0, 510.0, 44.0, &format!("{}) {}", i + 1, word), sel == i, skin) {
+            if draw_option_row_skinned(&self.tex, 428.0, opt_y0 + i as f32 * 48.0, 510.0, 42.0, &format!("{}) {}", i + 1, word), sel == i, skin) {
                 hit = Some(i);
             }
         }
@@ -2236,7 +2307,7 @@ impl Game {
                 hit = Some(i);
             }
         }
-        draw_tag_shadow("Keys [1-4], [Enter], or Click carefully! Wrong turns push back silently.", 132.0, 622.0, 11, skin.muted);
+        draw_tag_shadow("Keys [1-4], [Enter], or Click! Wrong turns push back silently.", 132.0, 624.0, 10, skin.muted);
         hit
     }
 
@@ -2247,7 +2318,7 @@ impl Game {
         draw_panel(&self.tex, 60.0, 52.0, w - 120.0, 606.0, skin);
         quiz_header_skinned(&self.tex, &format!("FIGURATE ALGAE TEMPLE: {}", tr.chamber), 90.0, 78.0, w - 180.0, skin);
 
-        draw_nine_slice(&self.tex, 90.0, 142.0, 250.0, 286.0, skin.chip, skin.border);
+        draw_nine_slice(&self.tex, 90.0, 142.0, 250.0, 310.0, skin.chip, skin.border);
         let rows = stage + 2;
         let pulse = (get_time() as f32 * 3.0).sin() * 2.0;
         for r in 0..rows {
@@ -2260,9 +2331,9 @@ impl Game {
         }
         draw_wrapped_col(tr.sequence_hint, 108.0, 356.0, 214.0, 20, 22.0, skin.muted);
 
-        draw_wrapped_rich(tr.riddle_text, 368.0, 174.0, 560.0, 25, 28.0, skin.ink, skin.accent);
+        draw_wrapped_rich(tr.riddle_text, 368.0, 174.0, 560.0, 25, 27.0, skin.ink, skin.accent);
         for (i, ch) in tr.choices.iter().enumerate() {
-            if draw_option_row_skinned(&self.tex, 368.0, 300.0 + i as f32 * 62.0, 560.0, 52.0, ch, sel == i, skin) && feedback.is_none() {
+            if draw_option_row_skinned(&self.tex, 368.0, 312.0 + i as f32 * 60.0, 560.0, 52.0, ch, sel == i, skin) && feedback.is_none() {
                 hit = Some(i);
             }
         }
@@ -2291,31 +2362,32 @@ impl Game {
         let r_spr = &self.tex.river_walks[((t * 8.0) as usize) % 4];
         draw_texture_ex(r_spr, basket_x - 24.0, 554.0, WHITE, DrawTextureParams { dest_size: Some(vec2(48.0, 57.0)), ..Default::default() });
 
-        draw_panel(&self.tex, 60.0, 22.0, w - 120.0, 74.0, skin);
-        draw_tag_shadow(&format!("RAINBOW ROAD: CATCH STARS  {}/{}", caught, cosma::STAR_TARGET), 84.0, 62.0, 14, skin.accent);
+        draw_panel(&self.tex, 60.0, 20.0, w - 120.0, 82.0, skin);
+        draw_tag_shadow(&format!("RAINBOW ROAD: CATCH STARS  {}/{}", caught, cosma::STAR_TARGET), 84.0, 54.0, 14, skin.accent);
         for i in 0..3 {
             let ht = if (i as u8) < lives { &self.tex.ui.heart_full } else { &self.tex.ui.heart_empty };
-            draw_texture_ex(ht, w - 200.0 + i as f32 * 36.0, 42.0, WHITE, DrawTextureParams { dest_size: Some(vec2(30.0, 30.0)), ..Default::default() });
+            draw_texture_ex(ht, w - 200.0 + i as f32 * 36.0, 36.0, WHITE, DrawTextureParams { dest_size: Some(vec2(30.0, 30.0)), ..Default::default() });
         }
-        draw_dlg_shadow("Arrows / Mouse to Catch Gold Stars (Dodge Dying Stars!)", 84.0, 86.0, 21, skin.muted);
+        draw_dlg_shadow("Arrows / Mouse to Catch Gold Stars (Dodge Dying Stars!)", 84.0, 82.0, 21, skin.muted);
     }
 
     fn draw_torches(&self, lit: [bool; 3], skin: &Skin) -> Option<usize> {
         let w = screen_width();
         let mut hit = None;
         let flick = 1 + ((get_time() * 8.0) as usize % 2);
-        draw_panel(&self.tex, (w - 640.0) * 0.5, 160.0, 640.0, 256.0, skin);
+        draw_panel(&self.tex, (w - 640.0) * 0.5, 152.0, 640.0, 274.0, skin);
         let head = "CARVE & PLACE THE 3 POEM SLABS";
-        draw_tag_shadow(head, (w - tag_width(head, 15)) * 0.5, 210.0, 15, skin.accent);
+        draw_tag_shadow(head, (w - tag_width(head, 15)) * 0.5, 202.0, 15, skin.accent);
         for i in 0..3 {
             let tx = (w - 380.0) * 0.5 + i as f32 * 140.0;
             let spr = if lit[i] { &self.tex.props.torch[flick] } else { &self.tex.props.torch[0] };
-            draw_texture_ex(spr, tx + 16.0, 232.0, WHITE, DrawTextureParams { dest_size: Some(vec2(64.0, 108.0)), ..Default::default() });
-            if draw_btn(&self.tex, tx, 344.0, 96.0, 38.0, if lit[i] { "LIT" } else { "LIGHT" }, skin, lit[i]) {
+            draw_texture_ex(spr, tx + 16.0, 224.0, WHITE, DrawTextureParams { dest_size: Some(vec2(64.0, 108.0)), ..Default::default() });
+            if draw_btn(&self.tex, tx, 338.0, 96.0, 38.0, if lit[i] { "LIT" } else { "LIGHT" }, skin, lit[i]) {
                 hit = Some(i);
             }
         }
-        draw_dlg_shadow("Press [Space] / [1][2][3] or Click each Torch!", 270.0, 404.0, 22, skin.ink);
+        let hint = "Press [Space] / [1][2][3] or Click each Torch!";
+        draw_dlg_shadow(hint, (w - dlg_width(hint, 22)) * 0.5, 404.0, 22, skin.ink);
         hit
     }
 
@@ -2326,29 +2398,35 @@ impl Game {
         let q = &poem.questions[q_idx];
         let mut hit = None;
 
-        draw_panel(&self.tex, 36.0, 48.0, 452.0, 620.0, skin);
-        draw_tag_shadow(poem.title, 58.0, 88.0, 11, skin.accent);
-        draw_dlg_shadow(poem.author, 58.0, 114.0, 20, skin.muted);
-        let mut py = 148.0;
+        draw_panel(&self.tex, 32.0, 44.0, 404.0, 632.0, skin);
+        draw_tag_shadow(poem.title, 52.0, 82.0, 10, skin.accent);
+        draw_dlg_shadow(poem.author, 52.0, 108.0, 20, skin.muted);
+        let mut py = 142.0;
         for line in poem.lines {
             if !line.is_empty() {
-                draw_dlg_shadow(line, 58.0, py, 20, skin.ink);
+                draw_dlg_shadow(line, 52.0, py, 19, skin.ink);
             }
             py += 22.0;
         }
 
-        draw_panel(&self.tex, 504.0, 48.0, w - 540.0, 620.0, skin);
+        let rx = 448.0;
+        let rw = w - rx - 32.0;
+        draw_panel(&self.tex, rx, 44.0, rw, 632.0, skin);
         let g_spr = &self.tex.walks["genie"][((t * 8.0) as usize) % 4];
-        draw_texture_ex(g_spr, 528.0, 74.0 + (t * 3.0).sin() * 4.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 108.0)), ..Default::default() });
-        draw_tag_shadow("MAGIC FIRE GENIE", 640.0, 110.0, 15, skin.accent);
-        draw_wrapped_rich(q.prompt, 528.0, 210.0, w - 588.0, 24, 26.0, skin.ink, skin.accent);
+        draw_texture_ex(g_spr, rx + 24.0, 68.0 + (t * 3.0).sin() * 4.0, WHITE, DrawTextureParams { dest_size: Some(vec2(90.0, 100.0)), ..Default::default() });
+        draw_tag_shadow("MAGIC FIRE GENIE", rx + 128.0, 102.0, 15, skin.accent);
+        let qw = rw - 48.0;
+        let q_lines = wrapped_line_count(q.prompt, qw, 23);
+        draw_wrapped_rich(q.prompt, rx + 24.0, 190.0, qw, 23, 25.0, skin.ink, skin.accent);
+        let opt_y0 = (198.0 + q_lines as f32 * 25.0 + 10.0).max(264.0).min(296.0);
+        let row_pitch = 78.0;
         for (i, ch) in q.choices.iter().enumerate() {
-            if draw_option_row_skinned(&self.tex, 528.0, 290.0 + i as f32 * 74.0, w - 588.0, 62.0, ch, sel == i, skin) && feedback.is_none() {
+            if draw_option_row_skinned(&self.tex, rx + 24.0, opt_y0 + i as f32 * row_pitch, qw, 70.0, ch, sel == i, skin) && feedback.is_none() {
                 hit = Some(i);
             }
         }
         if let Some((good, msg)) = feedback {
-            draw_wrapped_rich(msg, 528.0, 606.0, w - 588.0, 22, 24.0, if good { skin.accent } else { c(255, 130, 140, 255) }, skin.ink);
+            draw_wrapped_rich(msg, rx + 24.0, 614.0, qw, 21, 23.0, if good { skin.accent } else { c(255, 130, 140, 255) }, skin.ink);
         }
         hit
     }
@@ -2525,7 +2603,7 @@ impl Game {
         );
 
         let stats = format!(
-            "Riddles Mastered: {} / {}\nStory Puzzles Cleared: {}/4\nKenny Duel Rank: {}",
+            "Riddles: {} right ({}/8 attempted)\nStory Puzzles Cleared: {}/4\nKenny Duel Rank: {}",
             self.prog.total_riddles_right(),
             self.prog.total_riddles_seen(),
             self.prog.gate_solved as u8 + self.prog.maze_solved as u8 + self.prog.algae_solved as u8 + self.prog.rainbow_solved as u8,
