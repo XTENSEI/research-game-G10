@@ -94,8 +94,8 @@ pub const ALGAE_TRIALS: &[AlgaeTrial] = &[
 // The Rainbow Road: Falling Stars + Torch Slabs + Magic Fire Genie Poems
 // ---------------------------------------------------------------------------
 
-pub const STAR_TARGET: u32 = 14;
-pub const DYING_PENALTY: u32 = 3;
+pub const STAR_TARGET: u32 = 10;
+pub const DYING_PENALTY: u32 = 1;
 pub const LIVES: u32 = 3;
 
 #[derive(Clone, Copy)]

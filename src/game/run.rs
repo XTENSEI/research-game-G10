@@ -766,11 +766,11 @@ impl Game {
                     || is_key_pressed(KeyCode::Enter)
                     || is_mouse_button_pressed(MouseButton::Left)
                 {
-                    prog = (prog + 0.14).min(1.0);
+                    prog = (prog + 0.18).min(1.0);
                     self.audio.play_sfx(&self.audio.sfx.click, 0.45);
                     self.fx.punch(0.012);
                 } else {
-                    prog = (prog - dt * 0.09).max(0.0);
+                    prog = (prog - dt * 0.045).max(0.0);
                 }
                 if prog >= 1.0 {
                     self.audio.play_sfx(&self.audio.sfx.good, 0.6);
@@ -834,13 +834,14 @@ impl Game {
                         feedback = None;
                         if good {
                             round_dodge = true;
-                            timer = 4.2;
+                            timer = 3.2;
+                            heart = (512.0, 436.0);
                             bullets.clear();
-                            for b in 0..8 {
-                                let bx = 340.0 + (b % 4) as f32 * 96.0;
-                                let by = 348.0 + (b / 4) as f32 * 140.0;
-                                let vx = if b % 2 == 0 { 130.0 } else { -135.0 };
-                                let vy = if b < 4 { 105.0 } else { -110.0 };
+                            for b in 0..5 {
+                                let bx = 342.0 + b as f32 * 82.0;
+                                let by = if b % 2 == 0 { 354.0 } else { 512.0 };
+                                let vx = if b % 2 == 0 { 92.0 } else { -88.0 };
+                                let vy = if b % 2 == 0 { 76.0 } else { -74.0 };
                                 bullets.push((bx, by, vx, vy));
                             }
                         }
@@ -856,16 +857,16 @@ impl Game {
                     if is_key_down(KeyCode::Right) || is_key_down(KeyCode::D) { hx += 1.0; }
                     if is_key_down(KeyCode::Up) || is_key_down(KeyCode::W) { hy -= 1.0; }
                     if is_key_down(KeyCode::Down) || is_key_down(KeyCode::S) { hy += 1.0; }
-                    heart.0 = (heart.0 + hx * 240.0 * dt).clamp(328.0, 696.0);
-                    heart.1 = (heart.1 + hy * 240.0 * dt).clamp(352.0, 520.0);
+                    heart.0 = (heart.0 + hx * 260.0 * dt).clamp(328.0, 696.0);
+                    heart.1 = (heart.1 + hy * 260.0 * dt).clamp(352.0, 520.0);
 
                     for (bx, by, vx, vy) in &mut bullets {
                         *bx += *vx * dt;
                         *by += *vy * dt;
                         if *bx < 322.0 || *bx > 702.0 { *vx = -*vx; }
                         if *by < 346.0 || *by > 526.0 { *vy = -*vy; }
-                        if hit_cd <= 0.0 && (*bx - heart.0).hypot(*by - heart.1) < 16.0 {
-                            hit_cd = 0.85;
+                        if hit_cd <= 0.0 && (*bx - heart.0).hypot(*by - heart.1) < 11.0 {
+                            hit_cd = 1.15;
                             hp = hp.saturating_sub(1);
                             flawless = false;
                             self.audio.play_sfx(&self.audio.sfx.bad, 0.6);
@@ -983,7 +984,7 @@ impl Game {
                 let lanes = [KeyCode::A, KeyCode::S, KeyCode::D, KeyCode::F];
                 for (li, key) in lanes.iter().enumerate() {
                     if is_key_pressed(*key) {
-                        if let Some(n) = notes.iter_mut().find(|(nt, nl, hit)| !*hit && *nl == li && (*nt - beat_t).abs() < 0.28) {
+                        if let Some(n) = notes.iter_mut().find(|(nt, nl, hit)| !*hit && *nl == li && (*nt - beat_t).abs() < 0.38) {
                             n.2 = true;
                             score += 100;
                             self.audio.play_sfx(&self.audio.sfx.coin, 0.45);
@@ -1103,11 +1104,11 @@ impl Game {
 
                 spawn_t -= dt;
                 if spawn_t <= 0.0 {
-                    spawn_t = 0.52;
+                    spawn_t = 0.44;
                     let s = ((get_time() * 1000.0) as u64).wrapping_mul(2654435761);
                     let sx = 110.0 + (s % 804) as f32;
-                    let spd = 175.0 + ((s >> 12) % 120) as f32;
-                    let dying = (s >> 20) % 4 == 0;
+                    let spd = 135.0 + ((s >> 12) % 75) as f32;
+                    let dying = (s >> 20) % 5 == 0;
                     stars.push((sx, -20.0, spd, dying));
                 }
 
@@ -1214,13 +1215,13 @@ impl Game {
                 self.phase = Phase::GenieQuiz { poem_idx, q_idx, sel, feedback };
             }
             Phase::Crumble { mut dist, mut py, mut vy, mut lives, mut hit_cd, mut spawn_t, mut shards } => {
-                dist += dt * 0.085;
+                dist += dt * 0.10;
                 hit_cd = (hit_cd - dt).max(0.0);
                 if (is_key_pressed(KeyCode::Space) || is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) || is_mouse_button_pressed(MouseButton::Left)) && py >= 496.0 {
-                    vy = -520.0;
+                    vy = -540.0;
                     self.audio.play_sfx(&self.audio.sfx.click, 0.5);
                 }
-                vy += 1280.0 * dt;
+                vy += 1240.0 * dt;
                 py = (py + vy * dt).min(500.0);
                 if py >= 500.0 {
                     vy = 0.0;
@@ -1228,9 +1229,9 @@ impl Game {
 
                 spawn_t -= dt;
                 if spawn_t <= 0.0 {
-                    spawn_t = 0.85;
+                    spawn_t = 0.96;
                     let low = ((get_time() * 100.0) as u64) % 2 == 0;
-                    shards.push((1060.0, if low { 485.0 } else { 370.0 }, 360.0, low));
+                    shards.push((1060.0, if low { 485.0 } else { 370.0 }, 320.0, low));
                 }
                 for (sx, _, spd, _) in &mut shards {
                     *sx -= *spd * dt;
@@ -1238,8 +1239,8 @@ impl Game {
                 shards.retain(|(sx, _, _, _)| *sx > -80.0);
 
                 for (sx, sy, _, _) in &shards {
-                    if hit_cd <= 0.0 && (*sx - 240.0).abs() < 34.0 && (*sy - (py - 36.0)).abs() < 42.0 {
-                        hit_cd = 0.9;
+                    if hit_cd <= 0.0 && (*sx - 240.0).abs() < 24.0 && (*sy - (py - 26.0)).abs() < 32.0 {
+                        hit_cd = 1.05;
                         lives = lives.saturating_sub(1);
                         self.audio.play_sfx(&self.audio.sfx.bad, 0.6);
                         self.fx.accent(false);
@@ -1283,7 +1284,7 @@ impl Game {
                     }
                     AfterDialogue::StartQte => {
                         self.audio.ensure_music(MusicTrack::Battle);
-                        self.phase = Phase::CrabQte { timer: 6.5, prog: 0.15 };
+                        self.phase = Phase::CrabQte { timer: 8.5, prog: 0.26 };
                     }
                     AfterDialogue::StartKennyTree => {
                         self.dlg.ask_expr(
