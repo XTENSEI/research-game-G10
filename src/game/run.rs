@@ -1782,16 +1782,9 @@ impl Game {
         for c_idx in 0..((w / step).ceil() as i32 + 1) {
             let x = c_idx as f32 * step;
             for r in 0..4 {
-                let tile = if r <= 1 { &tp.coral_sand } else { &tp.dirt };
+                let tile = if r == 0 { &tp.coral_sand } else { &tp.dirt };
                 crate::art::draw_tile(tile, x, 556.0 + r as f32 * step, step);
             }
-        }
-        let ledge_w = 144.0;
-        for lc in 0..((w / ledge_w).ceil() as i32 + 1) {
-            draw_texture_ex(&self.tex.aqua.seabed_ledge, lc as f32 * ledge_w, 542.0, WHITE, DrawTextureParams {
-                dest_size: Some(vec2(ledge_w + 1.0, 22.0)),
-                ..Default::default()
-            });
         }
         draw_texture_ex(&self.tex.aqua.coral_red, 92.0, 488.0, WHITE, DrawTextureParams { dest_size: Some(vec2(68.0, 76.0)), ..Default::default() });
         draw_texture_ex(&self.tex.aqua.sea_bush, 864.0, 492.0, WHITE, DrawTextureParams { dest_size: Some(vec2(68.0, 72.0)), ..Default::default() });
@@ -1835,10 +1828,12 @@ impl Game {
                 ..Default::default()
             });
         }
-        let k_spr = match ((t * 3.4) as usize) % 5 {
-            0 | 1 => &self.tex.kenny,
-            2 => &self.tex.walks["kenny"][0],
-            3 => &self.tex.walks["kenny"][1],
+        let k_spr = match ((t * 4.6) as usize) % 6 {
+            0 => &self.tex.kenny,
+            1 => &self.tex.walks["kenny"][0],
+            2 => &self.tex.walks["kenny"][1],
+            3 => &self.tex.walks["kenny"][2],
+            4 => &self.tex.walks["kenny"][3],
             _ => self.tex.idle_of("kenny").unwrap_or(&self.tex.kenny),
         };
         let kw = k_spr.width() * 3.0;
@@ -1920,7 +1915,7 @@ impl Game {
         let kx = rx - 140.0 - chase_gap;
         let swim = &self.tex.river_swim[((get_time() * 10.0) as usize) % 4];
         draw_texture_ex(swim, rx, 456.0 + (get_time() as f32 * 8.0).sin() * 4.0, WHITE, DrawTextureParams { dest_size: Some(vec2(114.0, 96.0)), ..Default::default() });
-        let ken = &self.tex.walks["kenny"][((get_time() * 10.0) as usize) % 2];
+        let ken = &self.tex.walks["kenny"][((get_time() * 10.0) as usize) % 4];
         draw_texture_ex(ken, kx, 448.0, WHITE, DrawTextureParams { dest_size: Some(vec2(114.0, 108.0)), ..Default::default() });
 
         draw_panel(&self.tex, (w - 640.0) * 0.5, 58.0, 640.0, 160.0, skin);
@@ -2160,14 +2155,14 @@ impl Game {
     ) -> Option<usize> {
         let w = screen_width();
         let mut hit = None;
-        let pulse = ((beat_t * 4.0) as usize) % 2;
+        let pulse = ((beat_t * 5.2) as usize) % 4;
 
         // Animated stage characters grooving on the beat
-        let tow = if pulse == 0 { &self.tex.towtou } else { &self.tex.walks["towtou"][0] };
-        let riv = &self.tex.river_walks[((beat_t * 5.0) as usize) % 4];
+        let tow = &self.tex.walks["towtou"][pulse];
+        let riv = &self.tex.river_walks[((beat_t * 5.2) as usize) % 4];
         let aa = &self.tex.walks["angler_a"][pulse];
-        let ab = &self.tex.walks["angler_b"][(pulse + 1) % 2];
-        let ac = &self.tex.walks["angler_c"][pulse];
+        let ab = &self.tex.walks["angler_b"][(pulse + 1) % 4];
+        let ac = &self.tex.walks["angler_c"][(pulse + 2) % 4];
         let bob = (beat_t * 6.0).sin() * 4.0;
 
         draw_texture_ex(tow, 84.0, 210.0, WHITE, DrawTextureParams { dest_size: Some(vec2(144.0, 120.0)), ..Default::default() });
@@ -2343,11 +2338,7 @@ impl Game {
         }
 
         draw_panel(&self.tex, 504.0, 48.0, w - 540.0, 620.0, skin);
-        let g_spr = match ((t * 7.0) as usize) % 3 {
-            0 => &self.tex.genie,
-            1 => &self.tex.walks["genie"][0],
-            _ => &self.tex.walks["genie"][1],
-        };
+        let g_spr = &self.tex.walks["genie"][((t * 8.0) as usize) % 4];
         draw_texture_ex(g_spr, 528.0, 74.0 + (t * 3.0).sin() * 4.0, WHITE, DrawTextureParams { dest_size: Some(vec2(96.0, 108.0)), ..Default::default() });
         draw_tag_shadow("MAGIC FIRE GENIE", 640.0, 110.0, 15, skin.accent);
         draw_wrapped_rich(q.prompt, 528.0, 210.0, w - 588.0, 24, 26.0, skin.ink, skin.accent);

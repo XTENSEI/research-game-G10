@@ -80,7 +80,6 @@ pub struct PropPack {
 pub struct Aqua {
     pub ansimuz_bg: Texture2D,
     pub ansimuz_mid: Texture2D,
-    pub seabed_ledge: Texture2D,
     pub neptune_statue: Texture2D,
     pub neptune_coral: Texture2D,
     pub coral_arch: Texture2D,
@@ -128,7 +127,7 @@ pub struct Textures {
     pub intro: [Texture2D; 4],
     pub portraits: HashMap<String, Texture2D>,
     pub idles: HashMap<&'static str, Texture2D>,
-    pub walks: HashMap<&'static str, [Texture2D; 2]>,
+    pub walks: HashMap<&'static str, [Texture2D; 4]>,
     pub shadows: HashMap<&'static str, Texture2D>,
     pub tiles: TilePack,
     pub ui: UiPack,
@@ -296,7 +295,7 @@ async fn load_props() -> PropPack {
 
 async fn load_aqua() -> Aqua {
     let names = [
-        "ansimuz_bg", "ansimuz_mid", "seabed_ledge", "neptune_statue",
+        "ansimuz_bg", "ansimuz_mid", "neptune_statue",
         "neptune_coral", "coral_arch", "ruin_hall", "sea_bush",
         "coral_red", "sea_kelp", "anim_fish", "anim_fish_big",
         "anim_fish_dart",
@@ -305,7 +304,6 @@ async fn load_aqua() -> Aqua {
     Aqua {
         ansimuz_bg: it.next().unwrap(),
         ansimuz_mid: it.next().unwrap(),
-        seabed_ledge: it.next().unwrap(),
         neptune_statue: it.next().unwrap(),
         neptune_coral: it.next().unwrap(),
         coral_arch: it.next().unwrap(),
@@ -337,26 +335,25 @@ impl Textures {
         let mut shadows = HashMap::new();
         let mut base_sprites = HashMap::new();
 
-        let mut char_names = Vec::with_capacity(CAST_IDS.len() * 5);
+        let mut char_names = Vec::with_capacity(CAST_IDS.len() * 7);
         for &id in CAST_IDS {
             char_names.push(id.to_string());
             char_names.push(format!("{}_idle", id));
             char_names.push(format!("{}_w1", id));
             char_names.push(format!("{}_w2", id));
+            char_names.push(format!("{}_w3", id));
+            char_names.push(format!("{}_w4", id));
             char_names.push(format!("{}_shadow", id));
         }
         let mut cit = crate::game::join_all(char_names.iter().map(|n| char_tex(n)).collect()).await.into_iter();
         for &id in CAST_IDS {
             base_sprites.insert(id, cit.next().unwrap());
             idles.insert(id, cit.next().unwrap());
-            walks.insert(id, [cit.next().unwrap(), cit.next().unwrap()]);
+            walks.insert(id, [cit.next().unwrap(), cit.next().unwrap(), cit.next().unwrap(), cit.next().unwrap()]);
             shadows.insert(id, cit.next().unwrap());
         }
 
-        let rw = walks["river"].clone();
-        let river_w34 = crate::game::join_all(vec![char_tex("river_w3"), char_tex("river_w4")]).await;
-        let mut rw34 = river_w34.into_iter();
-        let river_walks = [rw[0].clone(), rw[1].clone(), rw34.next().unwrap(), rw34.next().unwrap()];
+        let river_walks = walks["river"].clone();
 
         let mut portraits = HashMap::new();
         let ppaths: Vec<_> = PORTRAIT_KEYS
@@ -428,7 +425,7 @@ impl Textures {
         self.shadows.get(id)
     }
 
-    pub fn walk_of(&self, id: &str) -> Option<&[Texture2D; 2]> {
+    pub fn walk_of(&self, id: &str) -> Option<&[Texture2D; 4]> {
         self.walks.get(id)
     }
 

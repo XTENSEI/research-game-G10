@@ -134,12 +134,16 @@ def make_shadow(sprite):
 # ---------------------------------------------------------------------------
 
 def draw_humanoid(cfg, pose="stand"):
-    """Draw 32x38 humanoid in crisp 3/4 right-facing side-profile (mirrored cleanly on flip_x)."""
+    """Draw 32x38 humanoid in crisp 3/4 right-facing profile with true 4-phase gait and zero waist/joint gaps."""
     W, H = 32, 38
     c = Canvas(W, H)
-    # Four-phase stride: w1 (near leg forward), w2 (pass/lift), w3 (far leg forward), w4 (pass)
-    step = {"stand": 0, "idle": 0, "w1": 3, "w2": 0, "w3": -3, "w4": 0}.get(pose, 0)
-    bob = {"stand": 0, "idle": 1, "w1": -1, "w2": 0, "w3": -1, "w4": 0}.get(pose, 0)
+    # 4-phase stride:
+    # - w1: near leg forward contact, far leg pushing back (bob=0)
+    # - w2: passing midstride, far knee lifted forward (bob=-1)
+    # - w3: far leg forward contact, near leg pushing back (bob=0)
+    # - w4: opposite passing recoil, near knee lifted (bob=+1)
+    # - idle: relaxed exhale + eye blink (bob=+1)
+    bob = {"stand": 0, "idle": 1, "w1": 0, "w2": -1, "w3": 0, "w4": 1}.get(pose, 0)
     short = cfg.get("short", 0)
     skin = cfg["skin"]
     skin_hi = shade(skin, 1.09)
@@ -157,29 +161,50 @@ def draw_humanoid(cfg, pose="stand"):
     shoes_hi = shade(shoes, 1.25)
 
     base_y = H - 2
-    # 3/4 side stride: far leg & near leg swap clearly forward/back on w1 and w3
-    far_x = 15 if step == 0 else (10 if step > 0 else 17)
-    far_y = base_y - 9 + (-1 if pose == "w3" else 0)
-    c.rect(far_x, far_y, 4, 5, pants_lo)
+    if pose == "w1":
+        far_x, far_y = 8, base_y - 9
+        near_x, near_y = 16, base_y - 10
+        arm_off = -3
+    elif pose == "w2":
+        far_x, far_y = 13, base_y - 11
+        near_x, near_y = 12, base_y - 9
+        arm_off = -1
+    elif pose == "w3":
+        far_x, far_y = 16, base_y - 10
+        near_x, near_y = 8, base_y - 9
+        arm_off = 3
+    elif pose == "w4":
+        far_x, far_y = 12, base_y - 9
+        near_x, near_y = 13, base_y - 11
+        arm_off = 1
+    else:
+        far_x, far_y = 15, base_y - 9
+        near_x, near_y = 11, base_y - 9
+        arm_off = 0
+
+    # Far leg (extend top up 2px to overlap pelvis seamlessly even on bob=-1)
+    c.rect(far_x, far_y - 2, 4, 7, pants_lo)
     c.rect(far_x, far_y + 5, 5, 3, shade(shoes, 0.78))
     c.px(far_x + 3, far_y + 5, shoes)
 
-    near_x = 11 if step == 0 else (16 if step > 0 else 10)
-    near_y = base_y - 9 + (-1 if pose == "w1" else (-1 if pose == "w2" else 0))
-    c.rect(near_x, near_y, 4, 5, pants)
-    c.rect(near_x, near_y, 2, 4, pants_hi)
-    c.rect(near_x, near_y + 5, 6, 3, shoes)
+    # Near leg with knee highlight and crisp heel/toe silhouette
+    near_shoe_w = 5 if pose == "w3" else 6
+    c.rect(near_x, near_y - 2, 4, 7, pants)
+    c.rect(near_x, near_y - 1, 2, 5, pants_hi)
+    c.rect(near_x, near_y + 5, near_shoe_w, 3, shoes)
     c.px(near_x + 2, near_y + 5, shoes_hi)
 
-    # Far arm tucked on the +X chest side behind torso (swings opposite near arm)
+    # Far arm tucked on +X chest side (swings opposite near arm)
     ty = 16 + bob + short
-    arm_off = step
     c.rect(19 - arm_off // 2, ty + 1 - arm_off // 2, 3, 7, shirt_lo)
     c.rect(19 - arm_off // 2, ty + 7 - arm_off // 2, 3, 2, skin_lo)
 
+    # Pelvis bridge guaranteeing zero 1px waist tear regardless of stride or bob
+    c.rect(10, ty + 9 - short // 2, 11, 3, pants_lo)
+
     # 3/4 right-angled torso with wrapped top-left rim & crisp waist belt
     if cfg.get("trenchcoat"):
-        flap = 1 if step != 0 else 0
+        flap = 2 if pose in ("w1", "w3") else (1 if pose in ("w2", "w4") else 0)
         c.poly([(9, ty), (21, ty), (22 + flap, ty + 15 - short // 2), (8 - flap, ty + 15 - short // 2)], shirt)
         c.rect(9, ty, 4, 14 - short // 2, shirt_hi)
         c.rect(19, ty + 2, 2, 12 - short // 2, shirt_lo)
@@ -202,12 +227,12 @@ def draw_humanoid(cfg, pose="stand"):
             c.px(18, ty + 4, (136, 232, 160))
             c.rect(14, ty + 10 - short // 2, 5, 1, (220, 160, 240))
 
-    # Near/front shoulder & swinging arm on the -X viewer side
+    # Near/front shoulder & swinging arm on the -X viewer side with sleeve cuff
     c.rect(8 + arm_off // 2, ty + 1 + arm_off // 2, 4, 7, shirt)
     c.rect(8 + arm_off // 2, ty + 1 + arm_off // 2, 2, 5, shirt_hi)
     c.rect(9 + arm_off // 2, ty + 7 + arm_off // 2, 3, 2, skin)
 
-    # Smooth rounded 3/4 head silhouette (clean cheek curve facing right, no pointy beak)
+    # Smooth rounded 3/4 head silhouette
     hy = 4 + bob + short
     c.rect(10, hy + 2, 11, 10, skin)
     c.rect(11, hy + 4, 10, 7, skin)
@@ -219,7 +244,6 @@ def draw_humanoid(cfg, pose="stand"):
         c.px(13, hy + 9, shade(skin, 0.92))
         c.line(16, hy + 10, 18, hy + 10, (148, 86, 78))
 
-    # 3/4 forward eyes shifted +2px toward leading edge (iris naturally looks right)
     eye_col = cfg.get("eye", (40, 28, 60))
     eye_mood = "closed" if pose == "idle" else "normal"
     if cfg.get("sunglasses"):
@@ -231,24 +255,22 @@ def draw_humanoid(cfg, pose="stand"):
     else:
         c.eyes(14, 19, hy + 5, iris=eye_col, mood=eye_mood)
 
-    # Species & 3/4 swept hair silhouette
     species = cfg.get("species", "human")
+    hair_follow = 1 if pose == "w2" else (-1 if pose == "w4" else 0)
     if species == "human":
-        hair_bounce = -1 if abs(step) == 3 else 0
-        c.rect(9, hy + hair_bounce, 12, 4, hair)
-        c.rect(9, hy + 2 + hair_bounce, 13, 3, hair)
-        # Crown tufts & forward-swept bangs toward forehead right
-        c.rect(10, hy - 1 + hair_bounce, 5, 2, hair_hi)
-        c.rect(16, hy + hair_bounce, 4, 2, hair_hi)
-        c.rect(14, hy + 3 + hair_bounce, 3, 2, hair)
-        c.rect(18, hy + 3 + hair_bounce, 3, 2, hair_hi)
-        # Sideburn & back hair mass on left side only
+        c.rect(9, hy + hair_follow, 12, 4, hair)
+        c.rect(9, hy + 2 + hair_follow, 13, 3, hair)
+        c.rect(10, hy - 1 + hair_follow, 5, 2, hair_hi)
+        c.rect(16, hy + hair_follow, 4, 2, hair_hi)
+        c.rect(14, hy + 3 + hair_follow, 3, 2, hair)
+        c.rect(18, hy + 3 + hair_follow, 3, 2, hair_hi)
         c.rect(9, hy + 4, 3, 6, hair_lo)
         c.rect(11, hy + 4, 2, 4, hair)
         if cfg.get("long_hair"):
-            c.rect(7, hy + 4, 4, 11, hair_lo)
-            c.rect(8, hy + 5, 3, 9, hair)
-            c.px(7, hy + 14, hair)
+            sway_h = -1 if pose in ("w1", "w3") else 0
+            c.rect(7 + sway_h, hy + 4, 4, 11, hair_lo)
+            c.rect(8 + sway_h, hy + 5, 3, 9, hair)
+            c.px(7 + sway_h, hy + 14, hair)
         if cfg.get("beard"):
             c.poly([(13, hy + 9), (22, hy + 9), (20, hy + 14), (15, hy + 14)], hair)
             c.rect(15, hy + 10, 5, 2, hair_hi)
@@ -257,7 +279,7 @@ def draw_humanoid(cfg, pose="stand"):
             c.rect(18, hy + 5, 4, 2, (230, 240, 255))
             c.px(17, hy + 5, (196, 162, 82))
     elif species == "billfish":
-        flare = 1 if pose in ("w1", "w3") else 0
+        flare = 1 if pose in ("w1", "w3") else (-1 if pose == "w2" else 0)
         c.poly([(10, hy + 2), (14, hy - 4 - flare), (19, hy + 2)], cfg["fin"])
         c.poly([(12, hy + 1), (14, hy - 2 - flare), (17, hy + 1)], shade(cfg["fin"], 1.28))
         c.poly([(22, hy + 6), (31, hy + 7), (22, hy + 9)], shade(skin, 1.18))
@@ -266,7 +288,8 @@ def draw_humanoid(cfg, pose="stand"):
             c.rect(18, hy + 4, 4, 4, (235, 210, 120))
             c.rect(19, hy + 5, 2, 2, (160, 240, 255))
     elif species == "angelfish":
-        c.poly([(9, hy + 2), (14, hy - 4), (20, hy + 2)], (235, 244, 255))
+        flare = 1 if pose in ("w2", "w4") else 0
+        c.poly([(9, hy + 2), (14, hy - 4 - flare), (20, hy + 2)], (235, 244, 255))
         c.rect(8, hy + 2, 4, 9, (244, 248, 255))
         c.rect(11, ty, 7, 4, (255, 255, 255))
     elif species == "stonefish":
@@ -277,29 +300,34 @@ def draw_humanoid(cfg, pose="stand"):
         c.px(20, hy + 9, (112, 92, 64))
     elif species == "angler":
         lure = cfg["lure"]
-        lure_off = 1 if pose in ("w1", "w3") else (-1 if pose == "w2" else 0)
-        c.line(14, hy + 1, 19, hy - 3, (56, 70, 96))
-        c.line(19, hy - 3, 25 + lure_off, hy + 1, (56, 70, 96))
-        if pose in ("w1", "w3"):
-            c.oval(25 + lure_off, hy + 2, 3, 3, shade(lure, 0.8))
-        c.oval(25 + lure_off, hy + 2, 2, 2, lure)
-        c.px(25 + lure_off, hy + 1, (255, 255, 255))
+        lure_dx = 1 if pose == "w1" else (-1 if pose == "w3" else 0)
+        lure_dy = -1 if pose == "w2" else (1 if pose == "w4" else 0)
         if cfg.get("hat"):
+            # Mount lure stem cleanly off front brim so zero hollow triangle gap forms behind lure
             c.rect(7, hy + 1, 16, 2, (22, 20, 34))
             c.rect(10, hy - 2, 10, 3, (36, 32, 54))
             c.rect(10, hy, 10, 1, (90, 44, 72))
-        elif cfg.get("hood"):
-            c.oval(15, hy - 1, 7, 3, cfg["hood"])
-            c.rect(10, hy - 2, 6, 2, shade(cfg["hood"], 1.25))
+            c.line(21, hy + 1, 25 + lure_dx, hy - 1 + lure_dy, (74, 86, 118))
+            c.oval(25 + lure_dx, hy - 1 + lure_dy, 2, 2, lure)
+            c.px(25 + lure_dx, hy - 2 + lure_dy, (255, 255, 255))
+        else:
+            if cfg.get("hood"):
+                c.oval(15, hy - 1, 7, 3, cfg["hood"])
+                c.rect(10, hy - 2, 6, 2, shade(cfg["hood"], 1.25))
+            c.line(18, hy, 25 + lure_dx, hy - 1 + lure_dy, (56, 70, 96))
+            if pose in ("w1", "w3"):
+                c.oval(26 + lure_dx, hy + lure_dy, 3, 3, shade(lure, 0.8))
+            c.oval(26 + lure_dx, hy + lure_dy, 2, 2, lure)
+            c.px(26 + lure_dx, hy - 1 + lure_dy, (255, 255, 255))
     elif species == "reef":
-        fin_fl = 1 if pose in ("w1", "w3") else 0
+        fin_fl = 1 if pose in ("w1", "w3") else (-1 if pose == "w2" else 0)
         c.poly([(9, hy + 3), (4 - fin_fl, hy + 6), (9, hy + 9)], cfg["fin"])
         if cfg.get("helmet"):
             c.oval(15, hy + 1, 6, 3, (124, 152, 186))
             c.rect(12, hy, 5, 1, (186, 212, 240))
         elif cfg.get("shawl"):
             c.rect(8, ty, 13, 5, cfg["shawl"])
-            c.rect(6, ty + 4, 6, 6, (176, 126, 72))  # backpack resting cleanly behind shoulders
+            c.rect(6, ty + 4, 6, 6, (176, 126, 72))
             c.px(8, ty + 3, (220, 74, 160))
             c.px(10, ty + 3, (140, 210, 255))
 
@@ -307,32 +335,29 @@ def draw_humanoid(cfg, pose="stand"):
 
 
 def draw_river_swim(pose="swim1"):
-    """River swimming horizontally in a 4-frame freestyle kick matching 3/4 River proportions (38x32)."""
+    """River swimming horizontally in a fluid 4-frame freestyle kick matching 3/4 River proportions (38x32)."""
     c = Canvas(38, 32)
     idx = {"swim1": 0, "swim2": 1, "swim3": 2, "swim4": 3}.get(pose, 0)
-    kicks = [3, 1, -3, -1][idx]
-    reach = [2, 0, -2, 0][idx]
+    kicks = [3, 0, -3, 0][idx]
+    reach = [3, -1, -2, 1][idx]
     bob = [0, -1, 0, 1][idx]
 
-    if idx % 2 == 0:
-        c.px(1, 15 + bob, (190, 245, 255))
-        c.px(2, 22 + bob, (160, 232, 250))
-
-    # Scissor kicking khakis & dark boots
-    c.rect(4, 14 + kicks // 2 + bob, 9, 4, (194, 150, 96))
-    c.rect(1, 14 + kicks // 2 + bob, 3, 4, (72, 48, 38))
-    c.rect(5, 19 - kicks // 2 + bob, 9, 4, (152, 114, 68))
-    c.rect(2, 19 - kicks // 2 + bob, 3, 4, (58, 38, 30))
+    # Connected trailing water foam attached softly behind heel on power kicks (no floating 1px dot!)
+    c.rect(3, 15 + kicks // 2 + bob, 9, 4, (194, 150, 96))
+    c.rect(1, 15 + kicks // 2 + bob, 3, 4, (72, 48, 38))
+    c.rect(4, 20 - kicks // 2 + bob, 9, 4, (152, 114, 68))
+    c.rect(2, 20 - kicks // 2 + bob, 3, 4, (58, 38, 30))
 
     # Blue hoodie/shirt matching CAST["river"] palette + crisp white collar trim
-    c.rect(12, 13 + bob, 11, 9, (46, 134, 232))
-    c.rect(13, 13 + bob, 9, 3, (88, 174, 250))
+    c.rect(11, 13 + bob, 12, 9, (46, 134, 232))
+    c.rect(12, 13 + bob, 10, 3, (88, 174, 250))
     c.rect(21, 14 + bob, 2, 6, (236, 242, 250))
 
-    # Far & near stroke arms
-    c.rect(12 - reach, 20 + bob, 7, 3, (32, 94, 172))
-    c.rect(18 + reach, 16 + bob, 7, 3, (46, 134, 232))
-    c.rect(25 + reach, 16 + bob, 3, 3, (242, 196, 160))
+    # Alternating overhead catch & pull stroke arms
+    far_reach = -reach
+    c.rect(15 + far_reach, 11 + bob, 8, 3, (32, 94, 172))
+    c.rect(19 + reach, 18 + bob, 7, 3, (46, 134, 232))
+    c.rect(26 + reach, 18 + bob, 3, 3, (242, 196, 160))
 
     # 3/4 Head turned right with tousled brown locks & clear eyes
     c.rect(23, 8 + bob, 10, 10, (242, 196, 160))
@@ -345,22 +370,27 @@ def draw_river_swim(pose="swim1"):
 
 
 def draw_kenny(pose="stand"):
-    """Kenny: 3/4 side-facing Red Kelp Crab with kelp satchel & asymmetric claws (38x36)."""
+    """Kenny: 4-frame scuttling Red Kelp Crab with kelp satchel & shaded snapping pincers (38x36)."""
     c = Canvas(38, 36)
-    step = {"stand": 0, "idle": 0, "w1": 2, "w2": -2}.get(pose, 0)
-    bob = {"stand": 0, "idle": 1, "w1": -1, "w2": 0}.get(pose, 0)
+    step = {"stand": 0, "idle": 0, "w1": 2, "w2": 0, "w3": -2, "w4": 0}.get(pose, 0)
+    bob = {"stand": 0, "idle": 1, "w1": 0, "w2": -1, "w3": 0, "w4": 1}.get(pose, 0)
     shell = (224, 84, 42)
     shell_hi = (255, 144, 82)
     shell_lo = (162, 48, 22)
+    cleft = (102, 28, 16)
     kelp = (74, 172, 92)
     kelp_hi = (120, 214, 128)
     kelp_lo = (44, 114, 62)
 
-    # Far-side legs (shaded darker behind carapace arc)
-    for i, lx in enumerate((19, 24, 28)):
+    # Far-side legs rooted higher under carapace rim with tapered claw tips (clean open floor spacing)
+    for i, lx in enumerate((22, 26, 30)):
         off = -step if (i % 2 == 0) else step
-        c.rect(lx, 25 + off // 2, 2, 7, shell_lo)
-        c.rect(lx + 1, 30 + off // 2, 2, 3, shell)
+        if pose == "w2" and i % 2 == 1:
+            off = -2
+        elif pose == "w4" and i % 2 == 0:
+            off = -2
+        c.rect(lx, 20 + off // 2, 2, 10, shell_lo)
+        c.rect(lx + 1, 30 + off // 2, 1, 3, shell)
 
     # Angled 3/4 carapace + underside belly rim
     cy = 18 + bob
@@ -372,66 +402,74 @@ def draw_kenny(pose="stand"):
     c.rect(15, cy + 5, 10, 2, (246, 198, 138))
 
     # Near-side legs drawn in front of lower carapace
-    for i, lx in enumerate((9, 13, 17)):
+    for i, lx in enumerate((8, 13, 18)):
         off = step if (i % 2 == 0) else -step
-        c.rect(lx, 26 + off // 2, 2, 7, shell)
-        c.rect(lx - 1, 31 + off // 2, 3, 2, shell_hi)
+        if pose == "w2" and i % 2 == 0:
+            off = -2
+        elif pose == "w4" and i % 2 == 1:
+            off = -2
+        c.rect(lx, 24 + off // 2, 2, 6, shell)
+        c.rect(lx, 30 + off // 2, 1, 3, shell_hi)
 
-    # Woven Kelp Satchel carried over near hip
-    c.line(10, cy - 4, 21, cy + 5, kelp, width=2)
-    c.line(10, cy - 5, 20, cy + 4, kelp_hi, width=1)
+    # Woven Kelp Satchel carried cleanly across near hip (no stray gaps)
+    c.line(11, cy - 3, 21, cy + 5, kelp, width=2)
+    c.line(11, cy - 4, 20, cy + 4, kelp_hi, width=1)
     c.rect(12, cy + 1, 7, 6, kelp_lo)
     c.rect(13, cy + 1, 5, 3, kelp)
     c.px(16, cy + 4, (240, 206, 98))
 
-    # 3/4 Claws: far claw snaps high ahead (+X); near claw guards chest-left (-X)
-    snap_near = -2 if pose == "w1" else (1 if pose == "w2" else 0)
-    snap_far = -2 if pose == "w2" else (1 if pose == "w1" else 0)
+    # 3/4 Claws with shaded inner pincer jaws (zero CLEAR cutouts!)
+    snap_near = {"w1": -2, "w2": -1, "w3": 1, "w4": 0}.get(pose, 0)
+    snap_far = {"w1": 1, "w2": -1, "w3": -2, "w4": 0}.get(pose, 0)
     c.oval(31, cy - 4 + snap_far, 4, 4, shell)
-    if pose != "w1":
-        c.rect(31, cy - 8 + snap_far, 2, 3, CLEAR)
+    if pose in ("stand", "idle", "w2", "w3"):
+        c.rect(31, cy - 7 + snap_far, 2, 3, cleft)
+        c.px(30, cy - 7 + snap_far, shell_hi)
+        c.px(33, cy - 7 + snap_far, shell_hi)
     c.oval(8, cy - 1 + snap_near, 4, 4, shell_hi)
-    if pose != "w2":
-        c.rect(7, cy - 5 + snap_near, 2, 3, CLEAR)
+    if pose in ("stand", "idle", "w1", "w4"):
+        c.rect(7, cy - 4 + snap_near, 2, 3, cleft)
+        c.px(6, cy - 4 + snap_near, shell_hi)
+        c.px(9, cy - 4 + snap_near, shell)
 
     # 3/4 shifted eyestalks & blinking eyes facing right
-    c.rect(17, cy - 11, 2, 5, shell)
-    c.rect(23, cy - 11, 2, 5, shell)
+    eye_bob = -1 if pose in ("w2", "w4") else 0
+    c.rect(17, cy - 11 + eye_bob, 2, 5 - eye_bob, shell)
+    c.rect(23, cy - 11 + eye_bob, 2, 5 - eye_bob, shell)
     eye_mood = "closed" if pose == "idle" else "normal"
-    c.eyes(17, 23, cy - 12, iris=(28, 20, 38), mood=eye_mood, wide=True)
+    c.eyes(17, 23, cy - 12 + eye_bob, iris=(28, 20, 38), mood=eye_mood, wide=True)
     c.line(19, cy + 1, 25, cy + 1, (70, 24, 16))
     return c.finish(OUTLINE_WARM)
 
 
 def draw_seahorse_guard(variant=0, pose="stand"):
-    """Seahorse guard with segmented chest armor, Spartan plume, and billowing crimson spear ribbon (34x38)."""
+    """Seahorse guard with 4-frame banner flutter, segmented armor, and solid coiled tail spiral (34x38)."""
     c = Canvas(34, 38)
-    bob = 0 if pose == "stand" else (1 if pose == "w1" else -1)
-    rib_dy = -1 if pose == "w1" else (1 if pose == "w2" else 0)
+    bob = {"stand": 0, "idle": 1, "w1": -1, "w2": 0, "w3": 1, "w4": 0}.get(pose, 0)
+    rib_dy = {"stand": 0, "idle": 0, "w1": -1, "w2": 0, "w3": 1, "w4": 0}.get(pose, 0)
+    fin_fl = {"w1": 1, "w2": 0, "w3": -1, "w4": 0}.get(pose, 0)
     body = (76, 194, 168) if variant == 0 else (92, 126, 232)
     body_hi = shade(body, 1.24)
     body_lo = shade(body, 0.72)
     armor = (218, 178, 86) if variant == 0 else (186, 196, 218)
 
-    # Polished Spear + waving crimson pennant
     sx = 26
     c.rect(sx, 2 + bob, 2, 32, (132, 86, 52))
     c.poly([(sx - 1, 5 + bob), (sx + 1, 0), (sx + 3, 5 + bob)], (232, 242, 255))
-    c.poly([(sx + 2, 6 + bob), (sx + 6, 7 + bob + rib_dy), (sx + 5, 9 + bob + rib_dy), (sx + 2, 8 + bob)], (226, 54, 96))
+    c.poly([(sx + 2, 6 + bob), (sx + 7, 7 + bob + rib_dy), (sx + 5, 9 + bob + rib_dy), (sx + 2, 8 + bob)], (226, 54, 96))
 
-    # Curled tail + segmented armor plates
+    # Solid coiled tail with shaded inner dimple (no transparent hole!)
     c.oval(14, 29 + bob, 5, 4, body_lo)
-    c.rect(13, 28 + bob, 2, 2, CLEAR)
+    c.rect(13, 28 + bob, 2, 2, shade(body_lo, 0.65))
     c.oval(15, 21 + bob, 5, 7, body)
     c.rect(13, 17 + bob, 4, 8, body_hi)
     for ry in (18, 21, 24):
         c.line(12, ry + bob, 18, ry + bob, shade(armor, 0.85))
-    c.poly([(10, 17 + bob), (5, 20 + bob), (10, 24 + bob)], body_hi)
+    c.poly([(10, 17 + bob), (4 - fin_fl, 20 + bob + fin_fl), (10, 24 + bob)], body_hi)
 
-    # Head + snout + Spartan crest
     c.oval(16, 11 + bob, 5, 4, body)
     c.rect(20, 11 + bob, 5, 2, body_hi)
-    c.eyes(15, 18, 10 + bob, iris=(24, 24, 48))
+    c.eyes(15, 18, 10 + bob, iris=(24, 24, 48), mood=("closed" if pose == "idle" else "normal"))
     c.rect(11, 5 + bob, 10, 4, armor)
     c.rect(12, 6 + bob, 6, 1, shade(armor, 1.25))
     c.poly([(12, 4 + bob), (16, 1 + bob), (20, 4 + bob)], (216, 52, 88))
@@ -439,38 +477,35 @@ def draw_seahorse_guard(variant=0, pose="stand"):
 
 
 def draw_queen_crab(pose="stand"):
-    """Queen Crab: 3/4 angled King Crab monarch in trailing royal cape, jewel crown & claws (46x42)."""
+    """Queen Crab: 4-frame 3/4 King Crab monarch with billowing cloak, jewel crown & alternating claws (46x42)."""
     c = Canvas(46, 42)
-    bob = 0 if pose == "stand" else (1 if pose == "w1" else -1)
-    flare = 2 if pose == "w1" else 0
+    bob = {"stand": 0, "idle": 1, "w1": 0, "w2": -1, "w3": 0, "w4": 1}.get(pose, 0)
+    flare = {"w1": 2, "w2": 1, "w3": 0, "w4": 1}.get(pose, 0)
     shell = (214, 65, 40)
     shell_hi = (252, 122, 78)
     shell_lo = (146, 30, 22)
     cape = (118, 22, 56)
 
-    # Spiky 3/4 carapace & clawed legs tucked behind billowing royal crimson mantle
-    for lx in (12, 17, 27, 32):
-        c.rect(lx, 33 + bob, 3, 6, shell_lo)
+    for i, lx in enumerate((12, 17, 27, 32)):
+        leg_dy = -1 if ((i % 2 == 0 and pose == "w1") or (i % 2 == 1 and pose == "w3")) else 0
+        c.rect(lx, 31 + bob + leg_dy, 3, 8, shell_lo)
     c.poly([(10, 18), (29, 18), (31 + flare, 36), (5 - flare, 36)], cape)
     c.rect(6 - flare, 33, 24 + flare * 2, 3, (245, 238, 232))
     c.oval(22, 20 + bob, 12, 9, shell)
     c.oval(19, 16 + bob, 8, 5, shell_hi)
     for sx, sy in ((11, 15), (15, 11), (31, 12), (34, 16), (11, 22), (34, 23)):
-        c.poly([(sx - 2, sy + 2), (sx, sy - 3), (sx + 2, sy + 2)], shell_lo)
+        c.poly([(sx - 2, sy + bob + 2), (sx, sy + bob - 3), (sx + 2, sy + bob + 2)], shell_lo)
 
-    # Far raised pincer (+X) + foreground near claw (-X)
-    claw_near = -2 if pose == "w1" else 1
-    claw_far = 1 if pose == "w1" else -2
+    claw_near = {"w1": -2, "w2": 0, "w3": 2, "w4": 0}.get(pose, 0)
+    claw_far = {"w1": 2, "w2": 0, "w3": -2, "w4": 0}.get(pose, 0)
     c.oval(39, 18 + claw_far, 5, 5, shell)
     c.oval(8, 22 + claw_near, 5, 5, shell_hi)
 
-    # Glowing Elixir Pearl Necklace + shifted jewel clasp
     for nx in range(18, 32, 3):
         c.rect(nx, 28 + bob, 2, 2, (246, 240, 210))
     c.oval(25, 30 + bob, 3, 3, (96, 232, 255))
     c.px(24, 29 + bob, (255, 255, 255))
 
-    # Golden Crown tilted 3/4 right
     c.rect(18, 6 + bob, 14, 5, (244, 198, 72))
     for cx in (18, 24, 30):
         c.rect(cx, 3 + bob, 2, 3, (244, 198, 72))
@@ -478,29 +513,31 @@ def draw_queen_crab(pose="stand"):
     c.px(21, 8 + bob, (92, 232, 176))
     c.px(29, 8 + bob, (92, 232, 176))
 
-    c.eyes(21, 28, 16 + bob, iris=(40, 12, 20), mood="angry")
+    c.eyes(21, 28, 16 + bob, iris=(40, 12, 20), mood=("closed" if pose == "idle" else "angry"))
     return c.finish(OUTLINE_WARM)
 
 
 def draw_sophie(pose="stand"):
-    """Sophie: 3/4 Clownfish Jester hopping with directional eyes & bouncing cap bells (32x36)."""
+    """Sophie: 4-frame skipping Clownfish Jester with solid hip seam & swinging cap bells (32x36)."""
     c = Canvas(32, 36)
-    bob = -2 if pose == "w1" else (0 if pose == "stand" else -1)
-    bell_off = 1 if pose == "w1" else (-1 if pose == "w2" else 0)
+    bob = {"stand": 0, "idle": 1, "w1": -1, "w2": -2, "w3": -1, "w4": 0}.get(pose, 0)
+    bell_off = {"stand": 0, "idle": 0, "w1": 1, "w2": 0, "w3": -1, "w4": 0}.get(pose, 0)
+    leg_off = {"w1": 2, "w2": 0, "w3": -2, "w4": 0}.get(pose, 0)
     orange = (255, 122, 42)
     orange_lo = (204, 78, 20)
     white = (250, 246, 240)
 
-    c.rect(17, 26 - (bob // 2), 4, 8, (38, 30, 56))
-    c.rect(11, 26 + (bob // 2), 4, 8, (54, 42, 78))
-    c.rect(10, 15 + bob, 11, 12, orange)
-    c.rect(15, 15 + bob, 4, 12, white)
+    c.rect(10, 23 + bob, 11, 5, (46, 36, 68))  # solid hip seam prevents gap during high skip
+    c.rect(17 + leg_off // 2, 26 - leg_off // 2, 4, 8, (38, 30, 56))
+    c.rect(11 - leg_off // 2, 26 + leg_off // 2, 4, 8, (54, 42, 78))
+    c.rect(10, 15 + bob, 11, 11, orange)
+    c.rect(15, 15 + bob, 4, 11, white)
     c.rect(20, 16 + bob - bell_off, 2, 6, orange_lo)
     c.rect(8, 16 + bob + bell_off, 3, 7, orange)
     c.rect(10, 14 + bob, 12, 3, (244, 212, 92))
     c.oval(16, 9 + bob, 6, 5, orange)
     c.rect(19, 6 + bob, 2, 7, white)
-    c.eyes(14, 19, 8 + bob, iris=(28, 22, 44))
+    c.eyes(14, 19, 8 + bob, iris=(28, 22, 44), mood=("closed" if pose == "idle" else "normal"))
     c.poly([(11, 6 + bob), (5, 1 + bob + bell_off), (15, 4 + bob)], (216, 48, 86))
     c.poly([(20, 6 + bob), (25, 2 + bob - bell_off), (17, 4 + bob)], (82, 194, 130))
     c.rect(4, 1 + bob + bell_off, 2, 2, (250, 216, 86))
@@ -509,38 +546,38 @@ def draw_sophie(pose="stand"):
 
 
 def draw_towtou(pose="stand"):
-    """Tow-Tou: Leatherback turtle with wooden cart, beret, beard, scar, and brass fin (48x42)."""
+    """Tow-Tou: 4-frame paddling Leatherback turtle with seated cart, beret, scar, and brass fin (48x42)."""
     c = Canvas(48, 42)
-    bob = 0 if pose == "stand" else (1 if pose == "w1" else -1)
-    fin_dy = -2 if pose == "w1" else (1 if pose == "w2" else 0)
+    bob = {"stand": 0, "idle": 1, "w1": 0, "w2": -1, "w3": 0, "w4": 1}.get(pose, 0)
+    fin_dy = {"stand": 0, "idle": 0, "w1": -2, "w2": 0, "w3": 2, "w4": 1}.get(pose, 0)
+    hind_dx = {"w1": -2, "w2": 0, "w3": 2, "w4": 0}.get(pose, 0)
     shell = (42, 74, 80)
     shell_hi = (68, 114, 120)
     ridge = (146, 184, 176)
     skin = (72, 118, 108)
 
-    # Passenger cart strapped on top with glowing side lantern
-    c.rect(10, 4 + bob, 18, 11, (146, 96, 58))
-    c.rect(11, 5 + bob, 16, 8, (178, 124, 78))
-    c.rect(9, 4 + bob, 20, 2, (216, 180, 96))
-    c.rect(7, 8 + bob, 3, 4, (255, 226, 116))  # glowing cart lantern
-    c.line(10, 15 + bob, 28, 22 + bob, (92, 62, 42), width=2)
+    # Flush-seated wooden passenger cart resting solidly into upper shell (eliminating pinhole!)
+    c.rect(10, 6 + bob, 18, 12, (146, 96, 58))
+    c.rect(11, 7 + bob, 16, 8, (178, 124, 78))
+    c.rect(9, 6 + bob, 20, 2, (216, 180, 96))
+    c.rect(7, 10 + bob, 3, 4, (255, 226, 116))
+    c.rect(10, 16 + bob, 18, 4, (92, 62, 42))
 
-    # Scute-patterned shell
+    # Scute-patterned shell + deeply overlapped flippers
     c.oval(20, 24 + bob, 14, 9, shell)
     for ry in (19, 23, 27):
         c.line(9, ry + bob, 31, ry + bob, ridge)
     c.oval(18, 19 + bob, 10, 3, shell_hi)
 
-    # Hind flipper + waving articulated brass prosthetic fin!
-    c.poly([(8, 29 + bob), (3, 36 - bob), (13, 35 - bob)], skin)
-    c.poly([(28, 28 + bob), (35, 37 + fin_dy), (24, 35 + bob)], (226, 182, 78))
-    c.rect(28, 28 + bob, 4, 3, (150, 110, 46))
-    c.px(32, 34 + fin_dy, (255, 236, 148))
+    c.poly([(10, 28 + bob), (4 + hind_dx, 35 - bob), (15, 34 - bob)], skin)
+    c.poly([(27, 27 + bob), (36, 36 + fin_dy), (24, 34 + bob)], (226, 182, 78))
+    c.rect(27, 27 + bob, 5, 4, (150, 110, 46))
+    c.px(32, 33 + fin_dy, (255, 236, 148))
 
     # Head + snowy beard + eye scar + tilted maroon beret
     c.oval(37, 21 + bob, 6, 5, skin)
     c.rect(35, 24 + bob, 6, 6, (238, 240, 245))
-    c.eyes(35, 40, 19 + bob, iris=(24, 24, 40))
+    c.eyes(35, 40, 19 + bob, iris=(24, 24, 40), mood=("closed" if pose == "idle" else "normal"))
     c.line(34, 17 + bob, 37, 22 + bob, (198, 62, 76))
     c.oval(36, 15 + bob, 6, 2, (196, 44, 72))
     c.px(33, 13 + bob, (238, 198, 92))
@@ -548,10 +585,10 @@ def draw_towtou(pose="stand"):
 
 
 def draw_genie(pose="stand"):
-    """Magic Fire Genie: blazing flame spirit with animated ember crown & swirling vortex (38x42)."""
+    """Magic Fire Genie: 4-frame blazing flame spirit with connected vortex & swaying crown (38x42)."""
     c = Canvas(38, 42)
-    sway = 0 if pose == "stand" else (2 if pose == "w1" else -2)
-    flick = 1 if pose == "w1" else (-1 if pose == "w2" else 0)
+    sway = {"stand": 0, "idle": 0, "w1": 2, "w2": 1, "w3": -2, "w4": -1}.get(pose, 0)
+    flick = {"stand": 0, "idle": 1, "w1": 2, "w2": 0, "w3": -2, "w4": 0}.get(pose, 0)
     fire_out = (242, 92, 34)
     fire_mid = (255, 168, 54)
     fire_core = (255, 242, 148)
@@ -561,14 +598,15 @@ def draw_genie(pose="stand"):
     c.poly([(9, 17), (29, 17), (24, 28), (14, 28)], fire_out)
     c.poly([(12, 18), (26, 18), (22, 27), (16, 27)], fire_mid)
     c.rect(13, 25, 12, 2, (238, 198, 86))
-    c.rect(5, 16 - sway // 2, 4, 8, fire_mid)
-    c.rect(29, 16 + sway // 2, 4, 8, fire_mid)
-    c.rect(5, 22 - sway // 2, 4, 2, (238, 198, 86))
-    c.rect(29, 22 + sway // 2, 4, 2, (238, 198, 86))
+    c.rect(11, 15, 16, 4, fire_out)
+    # Attached swirling shoulder/arm flames rooted solidly into roaring torso
+    c.rect(5, 16 - sway // 2, 7, 8, fire_mid)
+    c.rect(26, 16 + sway // 2, 7, 8, fire_mid)
+    c.rect(5, 22 - sway // 2, 5, 2, (238, 198, 86))
+    c.rect(28, 22 + sway // 2, 5, 2, (238, 198, 86))
     c.oval(19, 12, 5, 5, fire_mid)
-    c.poly([(13, 9), (16, 2 + flick), (19, 7), (22, 1 - flick), (25, 9)], fire_core)
-    c.px(10 + sway, 5 - abs(flick), fire_core)
-    c.px(28 - sway, 7, fire_core)
+    # Multi-tongue attached flame crown (no detached floating ember pixels!)
+    c.poly([(12, 10), (15, 2 + flick // 2), (18, 7), (20, 1 - flick // 2), (24, 9), (26, 4 + flick // 2), (25, 10)], fire_core)
     c.rect(16, 11, 2, 2, (255, 255, 245))
     c.rect(20, 11, 2, 2, (255, 255, 245))
     return c.finish((120, 28, 18, 255))
@@ -1336,22 +1374,65 @@ def generate_all(char_dir, portrait_dir, intro_dir, props_dir):
         "tenebris": {"species": "angler", "skin": (62, 68, 96), "lure": (255, 96, 136), "shirt": (28, 26, 42), "pants": (22, 20, 34), "hair": (24, 22, 36), "short": 8, "trenchcoat": True, "hat": True, "sunglasses": True, "outline": OUTLINE_ABYSS},
     }
 
+    def _assert_clean(im, tag):
+        w, h = im.size
+        px = im.load()
+        bg = [[False] * w for _ in range(h)]
+        q = [(x, 0) for x in range(w)] + [(x, h - 1) for x in range(w)] + [(0, y) for y in range(h)] + [(w - 1, y) for y in range(h)]
+        head = 0
+        for sx, sy in q:
+            if px[sx, sy][3] == 0 and not bg[sy][sx]:
+                bg[sy][sx] = True
+            else:
+                continue
+        stack = [(x, y) for y in range(h) for x in range(w) if bg[y][x]]
+        while stack:
+            cx, cy = stack.pop()
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < w and 0 <= ny < h and not bg[ny][nx] and px[nx, ny][3] == 0:
+                    bg[ny][nx] = True
+                    stack.append((nx, ny))
+        holes = [(x, y) for y in range(h) for x in range(w) if px[x, y][3] == 0 and not bg[y][x]]
+        seen = [[False] * w for _ in range(h)]
+        comps = 0
+        for y in range(h):
+            for x in range(w):
+                if px[x, y][3] > 0 and not seen[y][x]:
+                    comps += 1
+                    st = [(x, y)]
+                    seen[y][x] = True
+                    while st:
+                        cx, cy = st.pop()
+                        for dx in (-1, 0, 1):
+                            for dy in (-1, 0, 1):
+                                if dx == 0 and dy == 0:
+                                    continue
+                                nx, ny = cx + dx, cy + dy
+                                if 0 <= nx < w and 0 <= ny < h and px[nx, ny][3] > 0 and not seen[ny][nx]:
+                                    seen[ny][nx] = True
+                                    st.append((nx, ny))
+        assert not holes and comps == 1, f"{tag}: holes={holes} comps={comps}"
+
     cast_imgs = {}
+    poses_all = ("stand", "idle", "w1", "w2", "w3", "w4")
     for cid, cfg in humanoid_specs.items():
-        poses = ("stand", "idle", "w1", "w2", "w3", "w4") if cid == "river" else ("stand", "idle", "w1", "w2")
-        for pose in poses:
+        for pose in poses_all:
             im = draw_humanoid(cfg, pose)
             if pose == "stand":
                 cast_imgs[cid] = im
             fn = cid if pose == "stand" else f"{cid}_{pose}"
+            _assert_clean(im, fn)
             im.save(os.path.join(char_dir, f"{fn}.png"))
         make_shadow(draw_humanoid(cfg, "stand")).save(os.path.join(char_dir, f"{cid}_shadow.png"))
 
     # River swimming 4-frame cycle
     for idx in (1, 2, 3, 4):
-        draw_river_swim(f"swim{idx}").save(os.path.join(char_dir, f"river_swim{idx}.png"))
+        sim = draw_river_swim(f"swim{idx}")
+        _assert_clean(sim, f"river_swim{idx}")
+        sim.save(os.path.join(char_dir, f"river_swim{idx}.png"))
 
-    # Bespoke non-humanoid cast (+ idle blink/snap frames)
+    # Bespoke non-humanoid cast (+ 4-frame action & idle breathing)
     custom_fns = {
         "kenny": draw_kenny,
         "guard_a": lambda p: draw_seahorse_guard(0, p),
@@ -1362,9 +1443,10 @@ def generate_all(char_dir, portrait_dir, intro_dir, props_dir):
         "genie": draw_genie,
     }
     for cid, fn in custom_fns.items():
-        for pose in ("stand", "idle", "w1", "w2"):
+        for pose in poses_all:
             im = fn(pose)
             out_name = cid if pose == "stand" else f"{cid}_{pose}"
+            _assert_clean(im, out_name)
             im.save(os.path.join(char_dir, f"{out_name}.png"))
         make_shadow(fn("stand")).save(os.path.join(char_dir, f"{cid}_shadow.png"))
 

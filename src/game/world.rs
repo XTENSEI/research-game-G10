@@ -968,16 +968,18 @@ impl World {
                 }
             }
             Biome::Slums => {
-                // Distant luminous void crystals behind walkway
-                for i in 0..14 {
-                    let wx = 180.0 + i as f32 * 260.0;
+                // Grounded luminous void crystals behind walkway (skip hero buildings/skeleton)
+                for i in 0..13 {
+                    let wx = 250.0 + i as f32 * 270.0;
+                    if (wx - 380.0).abs() < 110.0 || (wx - 740.0).abs() < 100.0 || (wx - 1140.0).abs() < 140.0 || (wx - 2440.0).abs() < 140.0 {
+                        continue;
+                    }
                     let sx = wx - cam;
                     if sx < -80.0 || sx > sw + 80.0 {
                         continue;
                     }
                     let spr = &tex.cosma.crystals[i % tex.cosma.crystals.len()];
-                    let hover = (t * 1.4 + i as f32).sin() * 5.0;
-                    draw_texture_ex(spr, sx - 24.0, ground_y - 96.0 + hover, WHITE, DrawTextureParams {
+                    draw_texture_ex(spr, sx - 24.0, ground_y - 63.0, WHITE, DrawTextureParams {
                         dest_size: Some(vec2(52.0, 68.0)),
                         ..Default::default()
                     });
@@ -1095,45 +1097,34 @@ impl World {
         let walks = tex.walk_of(a.anim);
         let idle = tex.idle_of(a.anim);
 
-        // Alive personality idle/action cycles per cast member
+        // Smooth 4-frame motion for walkers & lively cast; calm blink+exhale idle for stationary cast
         let spr = if a.patrol.is_some() {
-            if let Some([w1, w2]) = walks {
-                match ((phase_t * 5.5) as usize) % 4 {
-                    0 => &a.tex,
-                    1 => w1,
-                    2 => &a.tex,
-                    _ => w2,
-                }
+            if let Some(frames) = walks {
+                &frames[((phase_t * 7.5) as usize) % 4]
             } else {
                 &a.tex
             }
-        } else if let Some([w1, w2]) = walks {
+        } else if let Some(frames) = walks {
             match a.anim {
-                "genie" => match ((phase_t * 7.5) as usize) % 3 {
+                "genie" => &frames[((phase_t * 8.0) as usize) % 4],
+                "kenny" | "queen_crab" => match ((phase_t * 4.8) as usize) % 6 {
                     0 => &a.tex,
-                    1 => w1,
-                    _ => w2,
-                },
-                "kenny" | "queen_crab" => match ((phase_t * 3.4) as usize) % 5 {
-                    0 | 1 => &a.tex,
-                    2 => w1,
-                    3 => w2,
+                    1 => &frames[0],
+                    2 => &frames[1],
+                    3 => &frames[2],
+                    4 => &frames[3],
                     _ => idle.unwrap_or(&a.tex),
                 },
                 "angler_a" | "angler_b" | "angler_c" | "thaumiel" | "sophie" => {
-                    match ((phase_t * 4.2) as usize) % 4 {
-                        0 => &a.tex,
-                        1 => w1,
-                        2 => &a.tex,
-                        _ => w2,
-                    }
+                    &frames[((phase_t * 5.2) as usize) % 4]
                 }
                 "guard_a" | "guard_b" | "towtou" => {
-                    if ((phase_t * 2.4) as usize) % 2 == 0 { &a.tex } else { w1 }
+                    &frames[((phase_t * 4.5) as usize) % 4]
                 }
                 _ => {
-                    // Calm cast periodically blinks using their idle frame
-                    if (phase_t % 3.6) > 3.42 {
+                    // Calm breathing + natural eye blink rhythm without lifting feet
+                    let cyc = phase_t % 3.6;
+                    if cyc > 3.25 || (cyc > 1.5 && cyc < 1.85) {
                         idle.unwrap_or(&a.tex)
                     } else {
                         &a.tex
@@ -1145,20 +1136,16 @@ impl World {
         };
 
         let hover_y = match a.anim {
-            "guard_a" | "guard_b" => (phase_t * 2.8).sin() * 4.5,
-            "genie" => -6.0 + (phase_t * 3.2).sin() * 5.5,
+            "guard_a" | "guard_b" => (phase_t * 2.8).sin() * 4.0,
+            "genie" => -6.0 + (phase_t * 3.2).sin() * 5.0,
             _ => 0.0,
         };
-        let breath = if a.patrol.is_none() {
-            1.0 + (phase_t * 2.6).sin() * 0.015
-        } else {
-            1.0
-        };
 
+        // Crisp integer scaling (avoid 1.015 fractional Y shimmer on static pixel art!)
         let near = a.patrol.is_none() && (self.player.0 - a.x).abs() <= REACH;
-        let talk_hop = if near { -((phase_t * 6.0).sin().abs()) * 2.8 } else { 0.0 };
+        let talk_hop = if near && ((phase_t * 4.2) as usize % 4 == 1) { -2.0 } else { 0.0 };
         let dw = spr.width() * a.scale;
-        let dh = spr.height() * a.scale * breath * if near { 1.035 } else { 1.0 };
+        let dh = spr.height() * a.scale;
         let face = if a.patrol.is_none() && (self.player.0 - a.x).abs() < 230.0 {
             if self.player.0 >= a.x { 1.0 } else { -1.0 }
         } else {
@@ -1186,21 +1173,24 @@ impl World {
         let swimming = self.biome == Biome::Kelp || self.biome == Biome::Coral;
         let dashing = self.dash_t > 0.0;
         let spr = if swimming && dashing {
-            let idx = (self.bob_t * 0.65) as usize % 4;
+            let idx = (self.bob_t * 0.72) as usize % 4;
             &tex.river_swim[idx]
         } else if self.moving {
-            let idx = (self.bob_t * 0.65) as usize % 4;
+            let idx = (self.bob_t * 0.72) as usize % 4;
             &tex.river_walks[idx]
-        } else if (t % 3.8) > 3.62 {
-            tex.idle_of("river").unwrap_or(&tex.river)
         } else {
-            &tex.river
+            let cyc = t % 3.6;
+            if cyc > 3.25 || (cyc > 1.5 && cyc < 1.85) {
+                tex.idle_of("river").unwrap_or(&tex.river)
+            } else {
+                &tex.river
+            }
         };
 
-        // Dash cyan afterimages matching Soul Knight roll ghosting
+        // Dash cyan afterimages use the matching swim/stride pose
         for &(ax, ay, aface, life, aswim) in &self.afterimages {
             let k = (life / 0.22).clamp(0.0, 1.0);
-            let aspr = if aswim { &tex.river_swim[1] } else { &tex.river_walks[1] };
+            let aspr = if aswim { &tex.river_swim[((life * 14.0) as usize) % 4] } else { spr };
             let aw = aspr.width() * 3.0 * self.scale_x;
             let ah = aspr.height() * 3.0 * self.scale_y;
             draw_texture_ex(
@@ -1216,13 +1206,12 @@ impl World {
             );
         }
 
-        let stride_bounce = if self.moving && !dashing { (self.bob_t.sin().abs()) * 0.035 } else { 0.0 };
-        let dw = spr.width() * 3.0 * (self.scale_x + stride_bounce * 0.5);
-        let dh = spr.height() * 3.0 * (self.scale_y - stride_bounce);
+        let dw = spr.width() * 3.0 * self.scale_x;
+        let dh = spr.height() * 3.0 * self.scale_y;
         let float_off = if swimming && dashing {
             -12.0 + (t * 5.5).sin() * 4.5
         } else {
-            -(self.bob_t.sin().abs()) * 3.0
+            0.0
         };
 
         if let Some(sh) = tex.shadow_of("river") {
